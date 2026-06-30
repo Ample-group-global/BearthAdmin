@@ -1,0 +1,47 @@
+{
+  "name": "Bearth Genesis #192",
+  "description": "Bearth Genesis NFT Collection",
+  "image": "ipfs://YOUR_CID_HERE/192.png",
+  "attributes": [
+    {
+      "trait_type": "BG",
+      "value": "Blue"
+    },
+    {
+      "trait_type": "Back Back",
+      "value": "Fire"
+    },
+    {
+      "trait_type": "Body",
+      "value": "Brownie"
+    },
+    {
+      "trait_type": "Headwear Back",
+      "value": "NONE"
+    },
+    {
+      "trait_type": "Clothe",
+      "value": "Hoodie (Blue)"
+    },
+    {
+      "trait_type": "Backpack Front",
+      "value": "NONE"
+    },
+    {
+      "trait_type": "Head",
+      "value": "Brownie"
+    },
+    {
+      "trait_type": "Holding",
+      "value": "Rocket"
+    },
+    {
+      "trait_type": "Emotion",
+      "value": "Lost"
+    },
+    {
+      "trait_type": "Headwear Front",
+      "value": "Sushi-1"
+    }
+  ]
+}

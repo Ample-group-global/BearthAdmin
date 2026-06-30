@@ -1,0 +1,47 @@
+{
+  "name": "Bearth Genesis #389",
+  "description": "Bearth Genesis NFT Collection",
+  "image": "ipfs://YOUR_CID_HERE/389.png",
+  "attributes": [
+    {
+      "trait_type": "BG",
+      "value": "Blue"
+    },
+    {
+      "trait_type": "Back Back",
+      "value": "NONE"
+    },
+    {
+      "trait_type": "Body",
+      "value": "Lune"
+    },
+    {
+      "trait_type": "Headwear Back",
+      "value": "NONE"
+    },
+    {
+      "trait_type": "Clothe",
+      "value": "NONE"
+    },
+    {
+      "trait_type": "Backpack Front",
+      "value": "NONE"
+    },
+    {
+      "trait_type": "Head",
+      "value": "Lune"
+    },
+    {
+      "trait_type": "Holding",
+      "value": "Salmon"
+    },
+    {
+      "trait_type": "Emotion",
+      "value": "Happy"
+    },
+    {
+      "trait_type": "Headwear Front",
+      "value": "Bear Hat"
+    }
+  ]
+}

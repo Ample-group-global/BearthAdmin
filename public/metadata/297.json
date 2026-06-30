@@ -1,0 +1,47 @@
+{
+  "name": "Bearth Genesis #297",
+  "description": "Bearth Genesis NFT Collection",
+  "image": "ipfs://YOUR_CID_HERE/297.png",
+  "attributes": [
+    {
+      "trait_type": "BG",
+      "value": "Blue"
+    },
+    {
+      "trait_type": "Back Back",
+      "value": "Fire"
+    },
+    {
+      "trait_type": "Body",
+      "value": "Lune"
+    },
+    {
+      "trait_type": "Headwear Back",
+      "value": "NONE"
+    },
+    {
+      "trait_type": "Clothe",
+      "value": "Jacket (purple)"
+    },
+    {
+      "trait_type": "Backpack Front",
+      "value": "NONE"
+    },
+    {
+      "trait_type": "Head",
+      "value": "Lune"
+    },
+    {
+      "trait_type": "Holding",
+      "value": "Alien"
+    },
+    {
+      "trait_type": "Emotion",
+      "value": "Lost"
+    },
+    {
+      "trait_type": "Headwear Front",
+      "value": "NONE"
+    }
+  ]
+}

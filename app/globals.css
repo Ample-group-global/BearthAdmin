@@ -1,0 +1,91 @@
+@import "tailwindcss";
+@import "./font.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --font-sans: 'hoss-round', 'Figtree', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  /* Remap blue → Bearth primary #41afeb */
+  --color-blue-50: #eff8fe;
+  --color-blue-100: #daf0fd;
+  --color-blue-200: #bee4fb;
+  --color-blue-300: #93d3f8;
+  --color-blue-400: #61bbf3;
+  --color-blue-500: #41afeb;
+  --color-blue-600: #41afeb;
+  --color-blue-700: #2e9fd8;
+  --color-blue-800: #1d8fca;
+  --color-blue-900: #24315f;
+
+  /* Remap emerald → Bearth secondary navy tones */
+  --color-emerald-50: #eef1f9;
+  --color-emerald-100: #dde3f3;
+  --color-emerald-400: #6b85c4;
+  --color-emerald-500: #4a62a8;
+  --color-emerald-600: #24315f;
+  --color-emerald-700: #1a2347;
+}
+
+:root {
+  --radius: 0.5rem;
+  --background: #ffffff;
+  --foreground: #000000;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --primary: #41afeb;
+  --primary-foreground: #ffffff;
+  --secondary: #24315f;
+  --secondary-foreground: #ebe7e0;
+  --muted: #f4f6fb;
+  --muted-foreground: #6b7280;
+  --accent: #41afeb;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #41afeb;
+  --sidebar: #24315f;
+  --sidebar-foreground: #ebe7e0;
+  --sidebar-accent: rgba(65, 175, 235, 0.15);
+  --sidebar-accent-foreground: #41afeb;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'hoss-round', 'Figtree', sans-serif;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f4f6fb; }
+::-webkit-scrollbar-thumb { background: #c9d3e0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9bafc5; }

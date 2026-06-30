@@ -1,0 +1,65 @@
+@font-face {
+  font-family: "hoss-round";
+  src:
+    url("/fonts/hoss-round/normal-400.woff2") format("woff2"),
+    url("/fonts/hoss-round/normal-400.woff") format("woff"),
+    url("/fonts/hoss-round/normal-400.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "hoss-round";
+  src:
+    url("/fonts/hoss-round/normal-600.woff2") format("woff2"),
+    url("/fonts/hoss-round/normal-600.woff") format("woff"),
+    url("/fonts/hoss-round/normal-600.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 600;
+}
+
+@font-face {
+  font-family: "hoss-round";
+  src:
+    url("/fonts/hoss-round/normal-700.woff2") format("woff2"),
+    url("/fonts/hoss-round/normal-700.woff") format("woff"),
+    url("/fonts/hoss-round/normal-700.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: "hoss-round";
+  src:
+    url("/fonts/hoss-round/normal-900.woff2") format("woff2"),
+    url("/fonts/hoss-round/normal-900.woff") format("woff"),
+    url("/fonts/hoss-round/normal-900.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 900;
+}
+
+@font-face {
+  font-family: "hoss-round";
+  src:
+    url("/fonts/hoss-round/italic-400.woff2") format("woff2"),
+    url("/fonts/hoss-round/italic-400.woff") format("woff"),
+    url("/fonts/hoss-round/italic-400.otf") format("opentype");
+  font-display: swap;
+  font-style: italic;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "hoss-round";
+  src:
+    url("/fonts/hoss-round/italic-700.woff2") format("woff2"),
+    url("/fonts/hoss-round/italic-700.woff") format("woff"),
+    url("/fonts/hoss-round/italic-700.otf") format("opentype");
+  font-display: swap;
+  font-style: italic;
+  font-weight: 700;
+}

@@ -1,0 +1,47 @@
+{
+  "name": "Bearth Genesis #251",
+  "description": "Bearth Genesis NFT Collection",
+  "image": "ipfs://YOUR_CID_HERE/251.png",
+  "attributes": [
+    {
+      "trait_type": "BG",
+      "value": "Blue"
+    },
+    {
+      "trait_type": "Back Back",
+      "value": "Brownie"
+    },
+    {
+      "trait_type": "Body",
+      "value": "Brownie"
+    },
+    {
+      "trait_type": "Headwear Back",
+      "value": "NONE"
+    },
+    {
+      "trait_type": "Clothe",
+      "value": "Puff Jacket (green)"
+    },
+    {
+      "trait_type": "Backpack Front",
+      "value": "NONE"
+    },
+    {
+      "trait_type": "Head",
+      "value": "Brownie"
+    },
+    {
+      "trait_type": "Holding",
+      "value": "Diamond"
+    },
+    {
+      "trait_type": "Emotion",
+      "value": "Satisfy"
+    },
+    {
+      "trait_type": "Headwear Front",
+      "value": "NONE"
+    }
+  ]
+}

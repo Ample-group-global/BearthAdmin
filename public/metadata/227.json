@@ -1,0 +1,47 @@
+{
+  "name": "Bearth Genesis #227",
+  "description": "Bearth Genesis NFT Collection",
+  "image": "ipfs://YOUR_CID_HERE/227.png",
+  "attributes": [
+    {
+      "trait_type": "BG",
+      "value": "Blue"
+    },
+    {
+      "trait_type": "Back Back",
+      "value": "NONE"
+    },
+    {
+      "trait_type": "Body",
+      "value": "Andy"
+    },
+    {
+      "trait_type": "Headwear Back",
+      "value": "NONE"
+    },
+    {
+      "trait_type": "Clothe",
+      "value": "Puff Jacket (salmon)"
+    },
+    {
+      "trait_type": "Backpack Front",
+      "value": "Bowser (Green)"
+    },
+    {
+      "trait_type": "Head",
+      "value": "Andy"
+    },
+    {
+      "trait_type": "Holding",
+      "value": "NONE"
+    },
+    {
+      "trait_type": "Emotion",
+      "value": "Curious"
+    },
+    {
+      "trait_type": "Headwear Front",
+      "value": "Octopus"
+    }
+  ]
+}
