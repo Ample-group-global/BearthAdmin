@@ -1,37 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateCredentials, signToken } from "@/lib/auth";
+
+const API_BASE = process.env.BEARTH_API_URL!;
 
 export async function POST(req: NextRequest) {
   try {
-    const { username, password } = await req.json();
-
-    if (!username || !password) {
-      return NextResponse.json(
-        { error: "Username and password are required" },
-        { status: 400 }
-      );
+    const { email, password } = await req.json();
+    if (!email || !password) {
+      return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
     }
 
-    const role = validateCredentials(String(username), String(password));
+    const apiRes = await fetch(`${API_BASE}/api/auth/admin/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: String(email), password: String(password) }),
+    });
 
-    if (!role) {
-      return NextResponse.json(
-        { error: "Invalid username or password" },
-        { status: 401 }
-      );
-    }
+    const data = await apiRes.json();
+    if (!apiRes.ok) return NextResponse.json(data, { status: apiRes.status });
 
-    const token = signToken(role);
+    const { token, role } = data as { token: string; role: string };
     const res = NextResponse.json({ role, success: true });
-
     res.cookies.set("admin_session", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24, // 24 hours
+      maxAge: 60 * 60 * 24,
       path: "/",
     });
-
     return res;
   } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });

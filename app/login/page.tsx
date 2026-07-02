@@ -6,7 +6,7 @@ import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,7 +21,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
 
       const data = await res.json();
@@ -31,8 +31,9 @@ export default function LoginPage() {
         return;
       }
 
-      if (data.role === "tech") router.push("/dashboard");
-      else if (data.role === "ops") router.push("/ops");
+      if (data.role === "admin") router.push("/presale");
+      else if (data.role === "ops") router.push("/presale");
+      else if (data.role === "tech") router.push("/dashboard");
     } catch {
       setError("Network error. Please check your connection.");
     } finally {
@@ -70,18 +71,18 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Username */}
+            {/* Email */}
             <div>
               <label className="block text-sm font-semibold mb-1.5" style={{ color: "#24315f" }}>
-                Username
+                Email
               </label>
               <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter your username"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
                 required
-                autoComplete="username"
+                autoComplete="email"
                 className="w-full px-3.5 py-2.5 rounded-lg text-sm transition-colors outline-none"
                 style={{ border: "1px solid #e5e7eb", color: "#111827" }}
                 onFocus={e => { e.currentTarget.style.borderColor = "#41afeb"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(65,175,235,0.15)"; }}
@@ -149,20 +150,27 @@ export default function LoginPage() {
           </form>
 
           {/* Role info */}
-          <div className="mt-6 pt-6 grid grid-cols-2 gap-3" style={{ borderTop: "1px solid #f3f4f6" }}>
-            <div className="p-3 rounded-lg" style={{ background: "rgba(65,175,235,0.08)", border: "1px solid rgba(65,175,235,0.2)" }}>
+          <div className="mt-6 pt-6 grid grid-cols-3 gap-3" style={{ borderTop: "1px solid #f3f4f6" }}>
+            <div className="p-3 rounded-lg" style={{ background: "rgba(220,38,38,0.07)", border: "1px solid rgba(220,38,38,0.2)" }}>
               <div className="flex items-center gap-2 mb-1">
-                <span className="w-2 h-2 rounded-full inline-block" style={{ background: "#41afeb" }} />
-                <span className="text-xs font-bold" style={{ color: "#24315f" }}>Technical Admin</span>
+                <span className="w-2 h-2 rounded-full inline-block" style={{ background: "#dc2626" }} />
+                <span className="text-xs font-bold" style={{ color: "#24315f" }}>Admin</span>
               </div>
-              <p className="text-xs" style={{ color: "#6b7280" }}>Contract ops, whitelist management, NFT explorer</p>
+              <p className="text-xs" style={{ color: "#6b7280" }}>Full system access</p>
             </div>
             <div className="p-3 rounded-lg" style={{ background: "rgba(36,49,95,0.06)", border: "1px solid rgba(36,49,95,0.15)" }}>
               <div className="flex items-center gap-2 mb-1">
                 <span className="w-2 h-2 rounded-full inline-block" style={{ background: "#24315f" }} />
-                <span className="text-xs font-bold" style={{ color: "#24315f" }}>Operations Staff</span>
+                <span className="text-xs font-bold" style={{ color: "#24315f" }}>Operations</span>
               </div>
-              <p className="text-xs" style={{ color: "#6b7280" }}>NFT gallery, whitelist view, basic stats</p>
+              <p className="text-xs" style={{ color: "#6b7280" }}>Orders, products, customers</p>
+            </div>
+            <div className="p-3 rounded-lg" style={{ background: "rgba(65,175,235,0.08)", border: "1px solid rgba(65,175,235,0.2)" }}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-2 h-2 rounded-full inline-block" style={{ background: "#41afeb" }} />
+                <span className="text-xs font-bold" style={{ color: "#24315f" }}>Technical</span>
+              </div>
+              <p className="text-xs" style={{ color: "#6b7280" }}>NFT management, products</p>
             </div>
           </div>
         </div>
