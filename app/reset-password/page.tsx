@@ -101,7 +101,7 @@ export default function ResetPasswordPage() {
             <Image src="/icon.png" alt="Bearth" width={56} height={56} className="rounded-[18px] sm:w-[64px] sm:h-[64px]" />
           </div>
           <h1 className="text-[22px] sm:text-2xl font-bold text-white tracking-tight leading-tight">
-            Beart Admin
+            Bearth Admin
           </h1>
           <p className="text-[11px] sm:text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.42)" }}>
             Create a new secure password
