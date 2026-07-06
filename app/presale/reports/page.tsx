@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 interface ReportData {
   orders: {
@@ -131,6 +132,26 @@ export default function ReportsPage() {
         </button>
       </div>
 
+      {/* Detail report links */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { href: "/presale/reports/sales-by-stage", label: "Sales by Stage",        icon: "📊" },
+          { href: "/presale/reports/delivery",        label: "Delivery Report",       icon: "🚚" },
+          { href: "/presale/reports/reconciliation",  label: "Reconciliation",        icon: "🔄" },
+          { href: "/presale/reports/customers",       label: "Customer Report",       icon: "👥" },
+        ].map(r => (
+          <Link key={r.href} href={r.href}
+            className="bg-white rounded-xl p-4 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow"
+            style={{ border: "1px solid #e5e7eb", textDecoration: "none" }}>
+            <span style={{ fontSize: 20 }}>{r.icon}</span>
+            <span className="text-sm font-semibold" style={{ color: "#24315f" }}>{r.label}</span>
+            <svg className="w-4 h-4 ml-auto" style={{ color: "#9bafc5" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        ))}
+      </div>
+
       {/* Key metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl p-5 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
@@ -143,11 +164,11 @@ export default function ReportsPage() {
           <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>{data.customers.withOrders} with orders</p>
         </div>
         <div className="bg-white rounded-2xl p-5 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
-          <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "#9bafc5" }}>NFT Records</p>
+          <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "#9bafc5" }}>NFT Lists</p>
           <p className="text-3xl font-bold" style={{ color: "#24315f" }}>{data.nft.total.toLocaleString()}</p>
         </div>
         <div className="bg-white rounded-2xl p-5 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
-          <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "#9bafc5" }}>Products</p>
+          <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "#9bafc5" }}>Peripheral Products</p>
           <p className="text-3xl font-bold" style={{ color: "#24315f" }}>{data.products.total.toLocaleString()}</p>
           <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>{data.products.active} active</p>
         </div>

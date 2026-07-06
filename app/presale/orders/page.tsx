@@ -372,8 +372,8 @@ export default function OrdersPage() {
       {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)" }}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg" style={{ border: "1px solid #e5e7eb" }}>
-            <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid #e5e7eb" }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col" style={{ border: "1px solid #e5e7eb", maxHeight: "90vh" }}>
+            <div className="px-6 py-4 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
               <h2 className="text-base font-bold" style={{ color: "#24315f" }}>{editOrder ? "Edit Order" : "New Order"}</h2>
               <button onClick={() => setShowModal(false)} style={{ color: "#9bafc5" }}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -381,7 +381,7 @@ export default function OrdersPage() {
                 </svg>
               </button>
             </div>
-            <div className="px-6 py-4 space-y-4">
+            <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
               {formError && (
                 <div className="p-3 rounded-lg text-sm" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>
                   {formError}

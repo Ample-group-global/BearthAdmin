@@ -35,6 +35,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
 };
 
 export interface AuthContext {
+  userId: string;
   role: AdminRole;
   permissions: string[];
 }
@@ -48,9 +49,9 @@ export class AuthError extends Error {
 export function getAuth(req: NextRequest): AuthContext | null {
   const token = req.cookies.get("admin_session")?.value;
   if (!token) return null;
-  const role = verifyToken(token);
-  if (!role) return null;
-  return { role, permissions: ROLE_PERMISSIONS[role] };
+  const result = verifyToken(token);
+  if (!result) return null;
+  return { userId: result.userId, role: result.role, permissions: ROLE_PERMISSIONS[result.role] };
 }
 
 export function requireAuth(req: NextRequest): AuthContext {

@@ -1,5 +1,12 @@
 import { Page } from "@playwright/test";
 
+// ─── Credentials ────────────────────────────────────────────────────────────────
+export const CREDS = {
+  admin: { email: "admin@bearth.local", password: "Admin2024!" },
+  ops:   { email: "ops@bearth.local",   password: "Ops2024!"   },
+  tech:  { email: "tech@bearth.local",  password: "Tech2024!"  },
+} as const;
+
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
 export const MOCK_WHITELIST_ENTRIES = [
@@ -12,11 +19,10 @@ export const MOCK_WHITELIST_ENTRIES = [
 
 // ─── RPC mock helper ───────────────────────────────────────────────────────────
 
-// A minimal valid Ethereum block object (prevents ethers.js parentHash errors)
 const MOCK_BLOCK = {
   hash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   parentHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
-  number: "0x7d0",       // 2000 — small value keeps the event chunking loop to 1 iteration
+  number: "0x7d0",
   timestamp: "0x663a0000",
   nonce: "0x0000000000000000",
   difficulty: "0x0",
@@ -38,7 +44,7 @@ const MOCK_BLOCK = {
 };
 
 function rpcResultFor(method: string, data: string): unknown {
-  if (method === "eth_blockNumber") return "0x7d0"; // 2000 — small to avoid chunking
+  if (method === "eth_blockNumber") return "0x7d0";
   if (method === "eth_getBalance") return "0x16345785D8A0000";
   if (method === "eth_chainId") return "0x1";
   if (method === "net_version") return "1";
@@ -48,39 +54,29 @@ function rpcResultFor(method: string, data: string): unknown {
   if (method === "eth_maxPriorityFeePerGas") return "0x0";
   if (method === "eth_estimateGas") return "0x5208";
   if (method === "eth_call") {
-    // getData() selector: first bytes of keccak256("getData()")
-    // Function selectors computed from BearthNFT ABI
-    const GETDATA_SEL = "0x3bc5de30"; // getData()
-    // phase()=0xb1c9fe6e  sbt()=0xb1324f7b  root()=0xebf0c717  wlStart()=0x0489cf6e  wlEnd()=0x5b66b851
-
+    const GETDATA_SEL = "0x3bc5de30";
     if (data && data.startsWith(GETDATA_SEL)) {
-      // ABI-encoded tuple (9 × uint256/bool) — each field exactly 64 hex chars (32 bytes)
       return (
         "0x" +
         [
-          "0000000000000000000000000000000000000000000000000000000000000001", // phase=1
-          "000000000000000000000000000000000000000000000000000000000000002d", // _counter=45
-          "0000000000000000000000000000000000000000000000000000000000000bb8", // MAX_SUPPLY=3000
-          "000000000000000000000000000000000000000000000000000000000000002d", // stage1Minted=45
-          "0000000000000000000000000000000000000000000000000000000000000000", // sbt=false
-          "0000000000000000000000000000000000000000000000000000000000000001", // revealCount=1
-          "0000000000000000000000000000000000000000000000000000000000000001", // limit1
-          "0000000000000000000000000000000000000000000000000000000000000001", // limit2
-          "000000000000000000000000000000000000000000000000006a94d74f430000", // PRICE=0.03 ETH
+          "0000000000000000000000000000000000000000000000000000000000000001",
+          "000000000000000000000000000000000000000000000000000000000000002d",
+          "0000000000000000000000000000000000000000000000000000000000000bb8",
+          "000000000000000000000000000000000000000000000000000000000000002d",
+          "0000000000000000000000000000000000000000000000000000000000000000",
+          "0000000000000000000000000000000000000000000000000000000000000001",
+          "0000000000000000000000000000000000000000000000000000000000000001",
+          "0000000000000000000000000000000000000000000000000000000000000001",
+          "000000000000000000000000000000000000000000000000006a94d74f430000",
         ].join("")
       );
     }
-    // All other calls (phase, sbt, root, wlStart, wlEnd) → return uint256/bool = 1
     return "0x0000000000000000000000000000000000000000000000000000000000000001";
   }
   if (method === "eth_getLogs") return [];
   return "0x0";
 }
 
-/**
- * Intercept ALL outbound blockchain RPC requests so no live contract is hit.
- * Handles both single-request and batched (array) JSON-RPC bodies.
- */
 export async function mockBlockchain(page: Page) {
   const rpcGlobs = [
     "**/ethereum-rpc.publicnode.com**",
@@ -100,19 +96,13 @@ export async function mockBlockchain(page: Page) {
         const body = JSON.parse(raw);
 
         if (Array.isArray(body)) {
-          // Batched JSON-RPC
           const results = body.map((req) => ({
             jsonrpc: "2.0",
             id: req.id ?? 1,
             result: rpcResultFor(req.method, req.params?.[0]?.data ?? ""),
           }));
-          await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify(results),
-          });
+          await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(results) });
         } else {
-          // Single JSON-RPC
           await route.fulfill({
             status: 200,
             contentType: "application/json",
@@ -130,9 +120,6 @@ export async function mockBlockchain(page: Page) {
   }
 }
 
-/**
- * Intercept the whitelist backend API — no DB hit.
- */
 export async function mockWhitelistApi(page: Page) {
   await page.route(/\/api\/whitelist\/entries/, async (route) => {
     await route.fulfill({
@@ -158,15 +145,6 @@ export async function mockWhitelistApi(page: Page) {
     });
   });
 
-  // /api/whitelist base endpoint (last to avoid conflict)
-  await page.route(/\/api\/whitelist(?!\/|$)/, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ addresses: MOCK_WHITELIST_ENTRIES.map((e) => e.address) }),
-    });
-  });
-
   await page.route(/\/api\/whitelist$/, async (route) => {
     if (route.request().method() === "GET") {
       await route.fulfill({
@@ -181,19 +159,25 @@ export async function mockWhitelistApi(page: Page) {
 }
 
 /**
- * Log in via the real login form (sets a real httpOnly cookie server-side).
- * Clears existing cookies first so each test starts clean.
+ * Log in via the real login form using email/password.
  */
-export async function loginAs(page: Page, role: "tech" | "ops") {
+export async function loginAs(page: Page, role: "admin" | "ops" | "tech") {
   await page.context().clearCookies();
-
-  const creds = role === "tech"
-    ? { username: "tech_admin", password: "TechAdmin2024!" }
-    : { username: "ops_admin", password: "OpsAdmin2024!" };
+  const creds = CREDS[role];
 
   await page.goto("/login");
-  await page.fill('input[autocomplete="username"]', creds.username);
+  await page.fill('input[autocomplete="email"]', creds.email);
   await page.fill('input[autocomplete="current-password"]', creds.password);
   await page.click('button[type="submit"]');
-  await page.waitForURL(role === "tech" ? /\/dashboard/ : /\/ops/, { timeout: 15000 });
+
+  if (role === "tech") {
+    await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  } else {
+    await page.waitForURL(/\/presale/, { timeout: 15000 });
+  }
+}
+
+/** Take a labelled screenshot into the test-results screenshots folder. */
+export async function screenshot(page: Page, name: string) {
+  await page.screenshot({ path: `tests/screenshots/${name}.png`, fullPage: true });
 }

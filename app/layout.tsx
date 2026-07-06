@@ -12,7 +12,7 @@ const figtree = Figtree({
 });
 
 export const metadata: Metadata = {
-  title: "Bearth NFT Admin",
+  title: "Bearth Admin",
   description: "Bearth NFT Management Interface",
   icons: { icon: "/icon.png" },
 };

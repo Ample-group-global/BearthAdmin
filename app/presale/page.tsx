@@ -102,8 +102,8 @@ export default function PresaleOverviewPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Orders" value={data.orders.total.toLocaleString()} />
         <StatCard label="Total Customers" value={data.customers.total.toLocaleString()} sub={`${data.customers.withOrders} with orders`} />
-        <StatCard label="NFT Records" value={data.nft.total.toLocaleString()} />
-        <StatCard label="Products" value={data.products.total.toLocaleString()} sub={`${data.products.active} active`} />
+        <StatCard label="NFT Lists" value={data.nft.total.toLocaleString()} />
+        <StatCard label="Peripheral Products" value={data.products.total.toLocaleString()} sub={`${data.products.active} active`} />
       </div>
 
       {/* Revenue section */}

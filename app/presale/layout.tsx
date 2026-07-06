@@ -5,118 +5,148 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 
-const NAV_ITEMS = [
-  {
-    href: "/presale",
-    label: "Bearth Overview",
-    breadcrumb: "Overview",
-    exact: true,
-    icon: (
-      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-          d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-      </svg>
-    ),
-  },
-  {
-    href: "/presale/orders",
-    label: "Bearth Orders",
-    breadcrumb: "Orders",
-    icon: (
-      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-      </svg>
-    ),
-  },
-  {
-    href: "/presale/customers",
-    label: "Bearth Customers",
-    breadcrumb: "Customers",
-    icon: (
-      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-      </svg>
-    ),
-  },
-  {
-    href: "/presale/users",
-    label: "Bearth Team",
-    breadcrumb: "Team",
-    icon: (
-      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-  },
-  {
-    href: "/presale/products",
+interface MenuItem {
+  label: string;
+  href: string | null;
+  icon: string | null;
+  module: string | null;
+  sortOrder: number;
+  children?: MenuItem[];
+}
+
+const ICON_SVG: Record<string, React.ReactNode> = {
+  grid: (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+    </svg>
+  ),
+  "clipboard-list": (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+    </svg>
+  ),
+  users: (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+    </svg>
+  ),
+  package: (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+    </svg>
+  ),
+  image: (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  ),
+  layers: (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+    </svg>
+  ),
+  balance: (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+    </svg>
+  ),
+  "bar-chart": (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+    </svg>
+  ),
+  "user-cog": (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
+};
+
+function NavIcon({ icon }: { icon: string | null }) {
+  if (icon && ICON_SVG[icon]) return ICON_SVG[icon];
+  return (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M5 12h14" />
+    </svg>
+  );
+}
+
+// Hrefs that belong under "Bearth Products" group (in display order)
+const BEARTH_PRODUCTS_GROUP = ["/presale/products", "/presale/nft", "/presale/waves"];
+
+function applyGrouping(flat: MenuItem[]): MenuItem[] {
+  const inGroup = new Set(BEARTH_PRODUCTS_GROUP);
+  const groupChildren = BEARTH_PRODUCTS_GROUP
+    .map(href => flat.find(m => m.href === href))
+    .filter(Boolean) as MenuItem[];
+  const rest = flat.filter(m => !inGroup.has(m.href ?? ""));
+
+  if (groupChildren.length === 0) return rest.sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const minSort = Math.min(...groupChildren.map(c => c.sortOrder));
+  const groupItem: MenuItem = {
     label: "Bearth Products",
-    breadcrumb: "Products",
-    icon: (
-      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-      </svg>
-    ),
-  },
-  {
-    href: "/presale/nft",
-    label: "Bearth NFT Records",
-    breadcrumb: "NFT Records",
-    icon: (
-      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-    ),
-  },
-  {
-    href: "/presale/reconciliation",
-    label: "Bearth Reconciliation",
-    breadcrumb: "Reconciliation",
-    icon: (
-      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-          d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-      </svg>
-    ),
-  },
-  {
-    href: "/presale/reports",
-    label: "Bearth Reports",
-    breadcrumb: "Reports",
-    icon: (
-      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-    ),
-  },
-];
+    href: null,
+    icon: "layers",
+    module: "presale",
+    sortOrder: minSort - 5,
+    children: groupChildren,
+  };
+
+  return [...rest, groupItem].sort((a, b) => a.sortOrder - b.sortOrder);
+}
 
 export default function PresaleLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [menus, setMenus] = useState<MenuItem[]>([]);
   const [role, setRole] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+
+  // Auto-expand group when current path matches a child
+  useEffect(() => {
+    menus.forEach(item => {
+      if (item.children?.some(c => c.href && pathname.startsWith(c.href))) {
+        setOpenGroups(prev => new Set([...prev, item.label]));
+      }
+    });
+  }, [menus, pathname]);
 
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data.authenticated) {
-          router.push("/login");
-        } else if (data.role === "tech") {
-          router.push("/dashboard");
-        } else {
-          setRole(data.role);
-          setChecking(false);
-        }
+      .then(res => res.json())
+      .then(data => {
+        if (!data.authenticated) { router.push("/login"); return; }
+        if (data.role === "tech") { router.push("/dashboard"); return; }
+        setRole(data.role);
+        const presaleMenus: MenuItem[] = (data.menus ?? [])
+          .filter((m: MenuItem) => m.module === "presale" || m.href?.startsWith("/presale"))
+          .sort((a: MenuItem, b: MenuItem) => a.sortOrder - b.sortOrder);
+        const raw: MenuItem[] = presaleMenus.length ? presaleMenus : [
+          { label: "Bearth Overview",            href: "/presale",                icon: "grid",           module: "presale", sortOrder: 10 },
+          { label: "Bearth Orders",              href: "/presale/orders",         icon: "clipboard-list", module: "presale", sortOrder: 20 },
+          { label: "Bearth Customers",           href: "/presale/customers",      icon: "users",          module: "presale", sortOrder: 30 },
+          { label: "Bearth Peripheral Products", href: "/presale/products",       icon: "package",        module: "presale", sortOrder: 40 },
+          { label: "Bearth NFT Lists",           href: "/presale/nft",            icon: "image",          module: "presale", sortOrder: 50 },
+          { label: "NFT Waves & Phases",         href: "/presale/waves",          icon: "layers",         module: "presale", sortOrder: 55 },
+          { label: "Bearth Reconciliation",      href: "/presale/reconciliation", icon: "balance",        module: "presale", sortOrder: 60 },
+          { label: "Bearth Reports",             href: "/presale/reports",        icon: "bar-chart",      module: "presale", sortOrder: 70 },
+          { label: "Bearth Team",                href: "/presale/users",          icon: "user-cog",       module: "presale", sortOrder: 80 },
+        ];
+        setMenus(applyGrouping(raw));
+        setChecking(false);
       })
       .catch(() => router.push("/login"));
   }, [router]);
@@ -126,12 +156,128 @@ export default function PresaleLayout({ children }: { children: React.ReactNode 
     router.push("/login");
   };
 
-  const isActive = (item: (typeof NAV_ITEMS)[0]) =>
-    item.exact ? pathname === item.href : pathname.startsWith(item.href);
+  const isItemActive = (item: MenuItem): boolean => {
+    if (!item.href) {
+      return item.children?.some(c => c.href ? pathname.startsWith(c.href) : false) ?? false;
+    }
+    return item.sortOrder === 10 ? pathname === item.href : pathname.startsWith(item.href);
+  };
 
-  const currentItem = NAV_ITEMS.find(isActive);
-  const currentLabel = currentItem?.breadcrumb ?? currentItem?.label ?? "Bearth";
+  const currentLabel = (() => {
+    for (const item of menus) {
+      if (item.children) {
+        const child = item.children.find(c => c.href && pathname.startsWith(c.href));
+        if (child) return child.label;
+      } else if (item.href) {
+        const match = item.sortOrder === 10 ? pathname === item.href : pathname.startsWith(item.href);
+        if (match) return item.label;
+      }
+    }
+    return "Bearth";
+  })();
+
   const panelLabel = role === "admin" ? "Admin" : "Operations";
+
+  const toggleGroup = (label: string) =>
+    setOpenGroups(prev => {
+      const next = new Set(prev);
+      next.has(label) ? next.delete(label) : next.add(label);
+      return next;
+    });
+
+  // Renders a single nav link (leaf item)
+  const renderLeaf = (item: MenuItem, isChild = false) => {
+    const active = isItemActive(item);
+    const key = item.href ?? item.label;
+    return (
+      <div key={key} className="relative group px-1.5 mb-0.5">
+        <Link
+          href={item.href!}
+          className="flex items-center gap-2.5 rounded text-xs font-medium transition-all duration-150"
+          style={{
+            paddingTop:    isChild && !collapsed ? "5px" : "6px",
+            paddingBottom: isChild && !collapsed ? "5px" : "6px",
+            paddingRight:  "8px",
+            paddingLeft:   collapsed ? "0" : active ? (isChild ? "26px" : "6px") : (isChild ? "28px" : "8px"),
+            justifyContent: collapsed ? "center" : undefined,
+            background: active ? "rgba(65,175,235,0.13)" : "transparent",
+            color: active ? "#fff" : "rgba(255,255,255,0.52)",
+            borderLeft: active && !collapsed ? "2px solid #41afeb" : "2px solid transparent",
+          }}
+          onMouseEnter={e => { if (!active) { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "rgba(255,255,255,0.85)"; } }}
+          onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.52)"; } }}
+          title={collapsed ? item.label : undefined}
+        >
+          <span style={{ color: active ? "#41afeb" : "rgba(255,255,255,0.38)", flexShrink: 0 }}>
+            <NavIcon icon={item.icon} />
+          </span>
+          {!collapsed && <span className="truncate">{item.label}</span>}
+        </Link>
+        {collapsed && (
+          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded text-xs font-medium text-white whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
+            style={{ background: "#0f1726", border: "1px solid rgba(255,255,255,0.1)" }}>
+            {item.label}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Renders a collapsible group header + its children
+  const renderGroup = (item: MenuItem) => {
+    const isOpen = openGroups.has(item.label);
+    const groupActive = isItemActive(item);
+    return (
+      <div key={item.label}>
+        {/* Group header button */}
+        <div className="relative group px-1.5 mb-0.5">
+          <button
+            onClick={() => toggleGroup(item.label)}
+            className="w-full flex items-center gap-2.5 rounded text-xs font-medium transition-all duration-150"
+            style={{
+              padding: collapsed ? "7px 0" : "6px 8px",
+              justifyContent: collapsed ? "center" : undefined,
+              background: groupActive ? "rgba(65,175,235,0.08)" : "transparent",
+              color: groupActive ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.52)",
+              borderLeft: groupActive && !collapsed ? "2px solid rgba(65,175,235,0.4)" : "2px solid transparent",
+              paddingLeft: groupActive && !collapsed ? "6px" : collapsed ? undefined : "8px",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "rgba(255,255,255,0.85)"; }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = groupActive ? "rgba(65,175,235,0.08)" : "transparent";
+              e.currentTarget.style.color = groupActive ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.52)";
+            }}
+            title={collapsed ? item.label : undefined}
+          >
+            <span style={{ color: groupActive ? "#41afeb" : "rgba(255,255,255,0.38)", flexShrink: 0 }}>
+              <NavIcon icon={item.icon} />
+            </span>
+            {!collapsed && (
+              <>
+                <span className="truncate flex-1 text-left">{item.label}</span>
+                <svg
+                  className="w-3 h-3 flex-shrink-0 transition-transform duration-200"
+                  style={{ transform: isOpen ? "rotate(90deg)" : "rotate(0deg)", color: "rgba(255,255,255,0.25)" }}
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                </svg>
+              </>
+            )}
+          </button>
+          {collapsed && (
+            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded text-xs font-medium text-white whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
+              style={{ background: "#0f1726", border: "1px solid rgba(255,255,255,0.1)" }}>
+              {item.label}
+            </div>
+          )}
+        </div>
+        {/* Children — indented in expanded, flat in collapsed */}
+        {!collapsed && isOpen && item.children?.map(child => renderLeaf(child, true))}
+        {collapsed && item.children?.map(child => renderLeaf(child, false))}
+      </div>
+    );
+  };
 
   if (checking) {
     return (
@@ -157,41 +303,28 @@ export default function PresaleLayout({ children }: { children: React.ReactNode 
       >
         {/* Brand header */}
         {collapsed ? (
-          <div
-            className="flex-shrink-0 flex items-center justify-center"
-            style={{ height: "44px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}
-          >
-            <button
-              onClick={() => setCollapsed(false)}
+          <div className="flex-shrink-0 flex items-center justify-center" style={{ height: "44px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+            <button onClick={() => setCollapsed(false)}
               className="w-8 h-8 flex items-center justify-center rounded transition-colors"
-              style={{ color: "rgba(255,255,255,0.5)" }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#fff"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
-              title="Expand sidebar"
-            >
+              style={{ color: "rgba(255,255,255,0.5)" }} title="Expand sidebar"
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#fff"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
               </svg>
             </button>
           </div>
         ) : (
-          <div
-            className="flex items-center flex-shrink-0 px-2 gap-2"
-            style={{ height: "44px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}
-          >
+          <div className="flex items-center flex-shrink-0 px-2 gap-2" style={{ height: "44px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
             <Image src="/icon.png" alt="Bearth" width={26} height={26} className="rounded-md flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-sm font-bold text-white leading-none">Bearth</div>
               <div className="text-[10px] font-semibold mt-0.5 leading-none" style={{ color: "#41afeb" }}>Management</div>
             </div>
-            <button
-              onClick={() => setCollapsed(true)}
-              className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded transition-colors"
-              style={{ color: "rgba(255,255,255,0.3)" }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#fff"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
-              title="Collapse sidebar"
-            >
+            <button onClick={() => setCollapsed(true)} className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded transition-colors"
+              style={{ color: "rgba(255,255,255,0.3)" }} title="Collapse sidebar"
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#fff"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}>
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 19l-7-7 7-7M19 19l-7-7 7-7" />
               </svg>
@@ -206,68 +339,18 @@ export default function PresaleLayout({ children }: { children: React.ReactNode 
               Navigation
             </p>
           )}
-          {NAV_ITEMS.map((item) => {
-            const active = isActive(item);
-            return (
-              <div key={item.href} className="relative group px-1.5 mb-0.5">
-                <Link
-                  href={item.href}
-                  className="flex items-center gap-2.5 rounded text-xs font-medium transition-all duration-150"
-                  style={{
-                    padding: collapsed ? "7px 0" : "6px 8px",
-                    justifyContent: collapsed ? "center" : undefined,
-                    background: active ? "rgba(65,175,235,0.13)" : "transparent",
-                    color: active ? "#fff" : "rgba(255,255,255,0.52)",
-                    borderLeft: active && !collapsed ? "2px solid #41afeb" : "2px solid transparent",
-                    paddingLeft: active && !collapsed ? "6px" : collapsed ? undefined : "8px",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!active) {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.07)";
-                      e.currentTarget.style.color = "rgba(255,255,255,0.85)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!active) {
-                      e.currentTarget.style.background = "transparent";
-                      e.currentTarget.style.color = "rgba(255,255,255,0.52)";
-                    }
-                  }}
-                  title={collapsed ? item.label : undefined}
-                >
-                  <span style={{ color: active ? "#41afeb" : "rgba(255,255,255,0.38)", flexShrink: 0 }}>
-                    {item.icon}
-                  </span>
-                  {!collapsed && <span className="truncate">{item.label}</span>}
-                </Link>
-                {collapsed && (
-                  <div
-                    className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded text-xs font-medium text-white whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
-                    style={{ background: "#0f1726", border: "1px solid rgba(255,255,255,0.1)" }}
-                  >
-                    {item.label}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {menus.map(item => item.children ? renderGroup(item) : renderLeaf(item))}
         </nav>
 
         {/* Footer */}
         <div className="px-1.5 py-2 flex-shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
           <div className="relative group">
-            <button
-              onClick={logout}
+            <button onClick={logout}
               className="w-full flex items-center gap-2.5 rounded text-xs font-medium transition-colors duration-150"
-              style={{
-                padding: collapsed ? "7px 0" : "6px 8px",
-                justifyContent: collapsed ? "center" : undefined,
-                color: "rgba(255,255,255,0.38)",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.12)"; e.currentTarget.style.color = "#f87171"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.38)"; }}
+              style={{ padding: collapsed ? "7px 0" : "6px 8px", justifyContent: collapsed ? "center" : undefined, color: "rgba(255,255,255,0.38)" }}
               title={collapsed ? "Sign Out" : undefined}
-            >
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.12)"; e.currentTarget.style.color = "#f87171"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.38)"; }}>
               <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
                   d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -275,10 +358,8 @@ export default function PresaleLayout({ children }: { children: React.ReactNode 
               {!collapsed && <span>Sign Out</span>}
             </button>
             {collapsed && (
-              <div
-                className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded text-xs font-medium text-white whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
-                style={{ background: "#0f1726", border: "1px solid rgba(255,255,255,0.1)" }}
-              >
+              <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded text-xs font-medium text-white whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                style={{ background: "#0f1726", border: "1px solid rgba(255,255,255,0.1)" }}>
                 Sign Out
               </div>
             )}
@@ -288,13 +369,8 @@ export default function PresaleLayout({ children }: { children: React.ReactNode 
 
       {/* ── Main area ───────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-
-        {/* Top bar */}
-        <header
-          className="flex-shrink-0 flex items-center justify-between px-5 bg-white"
-          style={{ height: "44px", borderBottom: "1px solid #e4e7ed", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
-        >
-          {/* Breadcrumb */}
+        <header className="flex-shrink-0 flex items-center justify-between px-5 bg-white"
+          style={{ height: "44px", borderBottom: "1px solid #e4e7ed", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
           <div className="flex items-center gap-1.5 text-xs">
             <span className="font-bold" style={{ color: "#24315f" }}>Bearth</span>
             <svg className="w-3 h-3" style={{ color: "#c4c9d4" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -302,25 +378,17 @@ export default function PresaleLayout({ children }: { children: React.ReactNode 
             </svg>
             <span className="font-semibold" style={{ color: "#6b7280" }}>{currentLabel}</span>
           </div>
-
-          {/* Right: role + logout */}
           <div className="flex items-center gap-3">
-            <span
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-bold"
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-bold"
               style={role === "admin"
                 ? { background: "rgba(220,38,38,0.08)", color: "#dc2626", border: "1px solid rgba(220,38,38,0.2)" }
-                : { background: "rgba(65,175,235,0.08)", color: "#41afeb", border: "1px solid rgba(65,175,235,0.2)" }}
-            >
+                : { background: "rgba(65,175,235,0.08)", color: "#41afeb", border: "1px solid rgba(65,175,235,0.2)" }}>
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: role === "admin" ? "#dc2626" : "#41afeb" }} />
               {panelLabel}
             </span>
           </div>
         </header>
-
-        {/* Page content */}
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
+        <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>
   );
