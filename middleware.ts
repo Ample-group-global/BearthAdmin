@@ -63,10 +63,7 @@ export async function middleware(req: NextRequest) {
 
   // Role-based section guards
   if (pathname.startsWith("/dashboard") && role !== "tech") {
-    return redirectTo(req, role === "ops" ? "/ops" : "/presale");
-  }
-  if (pathname.startsWith("/ops") && role === "tech") {
-    return redirectTo(req, "/dashboard");
+    return redirectTo(req, "/presale");
   }
   if (pathname.startsWith("/presale") && role === "tech") {
     return redirectTo(req, "/dashboard");
@@ -79,5 +76,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/login", "/forgot-password", "/reset-password", "/presale/:path*", "/dashboard/:path*", "/admin/:path*", "/ops/:path*"],
+  matcher: ["/login", "/forgot-password", "/reset-password", "/presale/:path*", "/dashboard/:path*", "/admin/:path*"],
 };
