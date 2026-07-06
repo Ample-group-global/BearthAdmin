@@ -41,7 +41,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-[360px] sm:max-w-md">
 
         {/* ── Logo ── */}
-        <div className="flex flex-col items-center mb-5 sm:mb-7">
+        <div className="flex flex-col items-center mt-8 sm:mt-10 mb-5 sm:mb-7">
           <div
             className="mb-3 rounded-[18px] shadow-xl"
             style={{ boxShadow: "0 0 0 4px rgba(65,175,235,0.18), 0 12px 32px rgba(0,0,0,0.35)" }}
