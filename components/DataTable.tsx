@@ -7,6 +7,7 @@ import React from "react";
 export interface ColumnDef<T> {
   key: string;
   header: string;
+  sortKey?: string;
   width?: number | string;
   align?: "left" | "center" | "right";
   render: (row: T, rowIndex: number) => React.ReactNode;
@@ -23,6 +24,9 @@ interface DataTableProps<T> {
   error?:       string | null;
   emptyText?:   string;
   keyExtractor: (row: T) => string | number;
+  sortKey?:     string;
+  sortDir?:     "asc" | "desc";
+  onSort?:      (key: string, dir: "asc" | "desc") => void;
 }
 
 // ─── Pagination helper ────────────────────────────────────────────────────────
@@ -40,6 +44,19 @@ function buildPages(current: number, totalPages: number): Array<number | "…"> 
   return pages;
 }
 
+// ─── Sort icon ────────────────────────────────────────────────────────────────
+
+function SortIcon({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) {
+  const up   = active && dir === "asc"  ? "#41afeb" : "#d1d5db";
+  const down = active && dir === "desc" ? "#41afeb" : "#d1d5db";
+  return (
+    <span style={{ display: "inline-flex", flexDirection: "column", gap: 1, marginLeft: 4, verticalAlign: "middle" }}>
+      <svg width="7" height="5" viewBox="0 0 7 5" fill={up}><path d="M3.5 0L7 5H0L3.5 0Z" /></svg>
+      <svg width="7" height="5" viewBox="0 0 7 5" fill={down}><path d="M3.5 5L0 0H7L3.5 5Z" /></svg>
+    </span>
+  );
+}
+
 // ─── DataTable component ──────────────────────────────────────────────────────
 
 export default function DataTable<T>({
@@ -53,11 +70,20 @@ export default function DataTable<T>({
   error = null,
   emptyText = "No records found",
   keyExtractor,
+  sortKey,
+  sortDir,
+  onSort,
 }: DataTableProps<T>) {
   const currentPage = Math.floor(offset / pageSize) + 1;
   const totalPages  = Math.ceil(total / pageSize);
   const rangeStart  = total === 0 ? 0 : offset + 1;
   const rangeEnd    = Math.min(offset + pageSize, total);
+
+  const handleHeaderClick = (col: ColumnDef<T>) => {
+    if (!col.sortKey || !onSort) return;
+    const newDir = sortKey === col.sortKey && sortDir === "asc" ? "desc" : "asc";
+    onSort(col.sortKey, newDir);
+  };
 
   const thBase: React.CSSProperties = {
     fontSize: "11px", fontWeight: 700, color: "#9bafc5",
@@ -111,15 +137,28 @@ export default function DataTable<T>({
               <thead>
                 <tr>
                   <th style={{ ...thBase, width: 52, textAlign: "center" }}>Sr.</th>
-                  {columns.map(col => (
-                    <th key={col.key} style={{
-                      ...thBase,
-                      textAlign: col.align ?? "left",
-                      width: col.width,
-                    }}>
-                      {col.header}
-                    </th>
-                  ))}
+                  {columns.map(col => {
+                    const isSortable = !!col.sortKey && !!onSort;
+                    const isActive   = isSortable && sortKey === col.sortKey;
+                    return (
+                      <th
+                        key={col.key}
+                        onClick={() => handleHeaderClick(col)}
+                        style={{
+                          ...thBase,
+                          textAlign: col.align ?? "left",
+                          width: col.width,
+                          cursor: isSortable ? "pointer" : "default",
+                          userSelect: isSortable ? "none" : undefined,
+                          color: isActive ? "#41afeb" : "#9bafc5",
+                        }}
+                        title={isSortable ? `Sort by ${col.header}` : undefined}
+                      >
+                        {col.header}
+                        {isSortable && <SortIcon active={isActive} dir={isActive ? sortDir : undefined} />}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>

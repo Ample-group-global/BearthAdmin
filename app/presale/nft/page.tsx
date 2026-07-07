@@ -134,6 +134,8 @@ export default function NftPage() {
   const [error, setError]       = useState<string | null>(null);
   const [master, setMaster]     = useState<Master | null>(null);
   const [myRole, setMyRole]     = useState<string | null>(null);
+  const [sortKey, setSortKey]   = useState<string | undefined>(undefined);
+  const [sortDir, setSortDir]   = useState<"asc" | "desc">("asc");
 
   // Modals
   const [showModal, setShowModal]             = useState(false);
@@ -164,12 +166,17 @@ export default function NftPage() {
   };
 
   // ── Data loading ───────────────────────────────────────────────────────────
-  const loadRecords = useCallback((q: string, off: number, status: string, stage: string, revealed: string) => {
+  const loadRecords = useCallback((
+    q: string, off: number, status: string, stage: string, revealed: string,
+    sk?: string, sd?: "asc" | "desc",
+  ) => {
     setLoading(true); setError(null);
     const params = new URLSearchParams({ search: q, limit: String(PAGE_SIZE), offset: String(off) });
     if (status)  params.set("delivery_status", status);
     if (stage)   params.set("stage", stage);
     if (revealed) params.set("revealed", revealed);
+    if (sk)      params.set("sort_by", sk);
+    if (sk && sd) params.set("sort_dir", sd);
     fetch(`/api/presale/nft?${params}`, { credentials: "include" })
       .then(r => { if (!r.ok) throw new Error("API error"); return r.json(); })
       .then(data => { setRecords(data.nftRecords ?? []); setTotal(data.total ?? 0); setLoading(false); })
@@ -184,18 +191,25 @@ export default function NftPage() {
   }, []);
 
   useEffect(() => {
-    loadRecords(search, offset, statusFilter, stageFilter, revealFilter);
+    loadRecords(search, offset, statusFilter, stageFilter, revealFilter, sortKey, sortDir);
   }, [offset, statusFilter, stageFilter, revealFilter]);
 
   const handleSearch = (v: string) => {
     setSearch(v);
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => { setOffset(0); loadRecords(v, 0, statusFilter, stageFilter, revealFilter); }, 300);
+    searchTimer.current = setTimeout(() => { setOffset(0); loadRecords(v, 0, statusFilter, stageFilter, revealFilter, sortKey, sortDir); }, 300);
   };
 
   const applyFilter = (status = statusFilter, stage = stageFilter, revealed = revealFilter) => {
     setOffset(0);
-    loadRecords(search, 0, status, stage, revealed);
+    loadRecords(search, 0, status, stage, revealed, sortKey, sortDir);
+  };
+
+  const handleSort = (key: string, dir: "asc" | "desc") => {
+    setSortKey(key);
+    setSortDir(dir);
+    setOffset(0);
+    loadRecords(search, 0, statusFilter, stageFilter, revealFilter, key, dir);
   };
 
   // ── Column definitions ─────────────────────────────────────────────────────
@@ -203,6 +217,7 @@ export default function NftPage() {
     {
       key: "serial",
       header: "Serial / Token",
+      sortKey: "serial_number",
       render: r => (
         <div>
           <div className="font-mono font-bold text-sm" style={{ color: "#24315f" }}>{r.serialNumber}</div>
@@ -222,6 +237,7 @@ export default function NftPage() {
     {
       key: "wave",
       header: "Wave",
+      sortKey: "wave",
       render: r => r.waveNumber != null ? (
         <div>
           <span className="text-xs font-semibold" style={{ color: "#24315f" }}>W{r.waveNumber}</span>
@@ -232,6 +248,7 @@ export default function NftPage() {
     {
       key: "price",
       header: "Price (ETH)",
+      sortKey: "price_eth",
       align: "right",
       render: r => {
         const eff = r.effectivePriceEth;
@@ -251,22 +268,26 @@ export default function NftPage() {
     {
       key: "stage",
       header: "Stage",
+      sortKey: "stage",
       render: r => <span className="text-xs" style={{ color: "#6b7280" }}>{r.stageName ?? "—"}</span>,
     },
     {
       key: "type",
       header: "Type",
+      sortKey: "type",
       render: r => <span className="text-xs" style={{ color: "#6b7280" }}>{r.typeName ?? "—"}</span>,
     },
     {
       key: "reveal",
       header: "Reveal",
+      sortKey: "is_revealed",
       align: "center",
       render: r => <RevealBadge revealed={r.isRevealed} />,
     },
     {
       key: "delivery",
       header: "Delivery",
+      sortKey: "delivery_status",
       align: "center",
       render: r => r.deliveryStatusCode
         ? <DeliveryBadge code={r.deliveryStatusCode} name={r.deliveryStatusName} />
@@ -275,6 +296,7 @@ export default function NftPage() {
     {
       key: "deliveredAt",
       header: "Delivered At",
+      sortKey: "delivered_at",
       render: r => (
         <span className="text-xs" style={{ color: "#6b7280", whiteSpace: "nowrap" }}>
           {r.deliveredAt ? new Date(r.deliveredAt).toLocaleDateString() : "—"}
@@ -337,7 +359,7 @@ export default function NftPage() {
       });
       if (!res.ok) { const d = await res.json(); setFormError(d.error ?? "Save failed."); return; }
       setShowModal(false);
-      loadRecords(search, offset, statusFilter, stageFilter, revealFilter);
+      loadRecords(search, offset, statusFilter, stageFilter, revealFilter, sortKey, sortDir);
     } catch { setFormError("Network error."); }
     finally { setSaving(false); }
   };
@@ -352,7 +374,7 @@ export default function NftPage() {
       setError(msg ?? "Delivery confirmation failed."); return;
     }
     setConfirmDeliveryId(null);
-    loadRecords(search, offset, statusFilter, stageFilter, revealFilter);
+    loadRecords(search, offset, statusFilter, stageFilter, revealFilter, sortKey, sortDir);
   };
 
   // ── CSV import ─────────────────────────────────────────────────────────────
@@ -383,7 +405,7 @@ export default function NftPage() {
       const d = await res.json();
       if (!res.ok) { setFormError(d.error ?? "Import failed."); return; }
       setImportResult({ created: d.created ?? 0, failed: d.failed ?? 0 });
-      loadRecords(search, offset, statusFilter, stageFilter, revealFilter);
+      loadRecords(search, offset, statusFilter, stageFilter, revealFilter, sortKey, sortDir);
     } catch { setFormError("Network error."); }
     finally { setImporting(false); }
   };
@@ -494,6 +516,9 @@ export default function NftPage() {
         error={error}
         emptyText="No NFT records found"
         keyExtractor={r => r.id}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={handleSort}
       />
 
       {/* ══ New NFT Modal ════════════════════════════════════════════════════════ */}
@@ -629,8 +654,8 @@ export default function NftPage() {
                 </div>
               )}
 
-              {/* Blind box + Metadata URI — tech/admin only */}
-              {(myRole === "tech" || myRole === "admin") && (
+              {/* Blind box + Metadata URI — technical team only */}
+              {myRole === "tech" && (
                 <>
                   {!viewRecord.isRevealed && (
                     <div className="p-3 rounded-xl flex items-center gap-3"
