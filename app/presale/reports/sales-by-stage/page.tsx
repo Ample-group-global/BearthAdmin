@@ -1,7 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import DataTable, { type ColumnDef } from "@/components/DataTable";
+
+function StatCard({ label, value, color, href }: { label: string; value: string | number; color?: string; href?: string }) {
+  const inner = (
+    <>
+      <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "#9bafc5" }}>{label}</p>
+      <p className="text-2xl font-bold" style={{ color: color ?? "#24315f" }}>{typeof value === "number" ? value.toLocaleString() : value}</p>
+    </>
+  );
+  return href ? (
+    <Link href={href} className="block bg-white rounded-2xl p-4 shadow-sm transition-shadow hover:shadow-md" style={{ border: "1px solid #e5e7eb" }}>{inner}</Link>
+  ) : (
+    <div className="bg-white rounded-2xl p-4 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>{inner}</div>
+  );
+}
 
 interface StageRow {
   stageId: string;
@@ -17,10 +32,15 @@ function pct(n: number, total: number) {
   return total > 0 ? Math.round((n / total) * 100) : 0;
 }
 
+const PAGE_SIZE = 10;
+
 export default function SalesByStage() {
-  const [stages, setStages] = useState<StageRow[]>([]);
+  const [stages, setStages]   = useState<StageRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState<string | null>(null);
+  const [error, setError]     = useState<string | null>(null);
+  const [offset, setOffset]   = useState(0);
+  const [sortKey, setSortKey] = useState<string | undefined>(undefined);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   useEffect(() => {
     fetch("/api/presale/reports/sales-by-stage", { credentials: "include" })
@@ -29,7 +49,81 @@ export default function SalesByStage() {
       .catch(() => { setError("Failed to load report."); setLoading(false); });
   }, []);
 
+  const sorted = useMemo(() => {
+    if (!sortKey) return stages;
+    return [...stages].sort((a, b) => {
+      let av: string | number, bv: string | number;
+      switch (sortKey) {
+        case "stage":     av = a.stageName;                              bv = b.stageName;                              break;
+        case "total":     av = Number(a.total);                          bv = Number(b.total);                          break;
+        case "delivered": av = Number(a.delivered);                      bv = Number(b.delivered);                      break;
+        case "pending":   av = Number(a.pending);                        bv = Number(b.pending);                        break;
+        case "cancelled": av = Number(a.cancelled);                      bv = Number(b.cancelled);                      break;
+        case "pct":       av = pct(Number(a.delivered), Number(a.total)); bv = pct(Number(b.delivered), Number(b.total)); break;
+        default: return 0;
+      }
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [stages, sortKey, sortDir]);
+
+  const page = sorted.slice(offset, offset + PAGE_SIZE);
+
   const grandTotal = stages.reduce((s, r) => s + Number(r.total), 0);
+
+  const columns: ColumnDef<StageRow>[] = [
+    {
+      key: "stage",
+      header: "Stage",
+      sortKey: "stage",
+      render: r => <span className="font-semibold" style={{ color: "#24315f" }}>{r.stageName}</span>,
+    },
+    {
+      key: "total",
+      header: "Total",
+      sortKey: "total",
+      align: "right",
+      render: r => <span className="font-bold" style={{ color: "#374151" }}>{Number(r.total).toLocaleString()}</span>,
+    },
+    {
+      key: "delivered",
+      header: "Delivered",
+      sortKey: "delivered",
+      align: "right",
+      render: r => <span style={{ color: "#16a34a" }}>{Number(r.delivered).toLocaleString()}</span>,
+    },
+    {
+      key: "pending",
+      header: "Pending",
+      sortKey: "pending",
+      align: "right",
+      render: r => <span style={{ color: "#d97706" }}>{Number(r.pending).toLocaleString()}</span>,
+    },
+    {
+      key: "cancelled",
+      header: "Cancelled",
+      sortKey: "cancelled",
+      align: "right",
+      render: r => <span style={{ color: "#dc2626" }}>{Number(r.cancelled).toLocaleString()}</span>,
+    },
+    {
+      key: "pct",
+      header: "% Delivered",
+      sortKey: "pct",
+      render: r => {
+        const p = pct(Number(r.delivered), Number(r.total));
+        return (
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#f3f4f6", minWidth: 60 }}>
+              <div className="h-full rounded-full" style={{ width: `${p}%`, background: "#16a34a" }} />
+            </div>
+            <span className="text-xs font-semibold" style={{ color: "#16a34a" }}>{p}%</span>
+          </div>
+        );
+      },
+    },
+  ];
 
   return (
     <div className="p-6 space-y-5 max-w-4xl">
@@ -39,65 +133,35 @@ export default function SalesByStage() {
         <h1 className="text-base font-bold" style={{ color: "#24315f" }}>Sales by Stage</h1>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-16" style={{ color: "#9bafc5" }}>
-          <svg className="w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          Loading…
-        </div>
-      ) : error ? (
+      {error ? (
         <div className="p-4 rounded-xl text-sm" style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>{error}</div>
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: "Total NFTs", value: grandTotal },
-              { label: "Delivered",  value: stages.reduce((s, r) => s + Number(r.delivered), 0), color: "#16a34a" },
-              { label: "Pending",    value: stages.reduce((s, r) => s + Number(r.pending),   0), color: "#d97706" },
-              { label: "Cancelled",  value: stages.reduce((s, r) => s + Number(r.cancelled), 0), color: "#dc2626" },
+              { label: "Total NFTs", value: grandTotal,                                                     href: "/presale/nft" },
+              { label: "Delivered",  value: stages.reduce((s, r) => s + Number(r.delivered), 0), color: "#16a34a", href: "/presale/reports/delivery?status=delivered" },
+              { label: "Pending",    value: stages.reduce((s, r) => s + Number(r.pending),   0), color: "#d97706", href: "/presale/reports/delivery?status=pending" },
+              { label: "Cancelled",  value: stages.reduce((s, r) => s + Number(r.cancelled), 0), color: "#dc2626", href: "/presale/reports/delivery?status=cancelled" },
             ].map(c => (
-              <div key={c.label} className="bg-white rounded-2xl p-4 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
-                <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "#9bafc5" }}>{c.label}</p>
-                <p className="text-2xl font-bold" style={{ color: c.color ?? "#24315f" }}>{c.value.toLocaleString()}</p>
-              </div>
+              <StatCard key={c.label} label={c.label} value={c.value} color={c.color} href={c.href} />
             ))}
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
-            <table className="w-full text-sm">
-              <thead>
-                <tr style={{ borderBottom: "1px solid #e5e7eb", background: "#f9fafb" }}>
-                  {["Stage", "Total", "Delivered", "Pending", "Cancelled", "% Delivered"].map(h => (
-                    <th key={h} className="px-4 py-3 text-left font-semibold" style={{ color: "#9bafc5" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {stages.map((s, i) => (
-                  <tr key={s.stageId} style={{ borderBottom: i < stages.length - 1 ? "1px solid #f3f4f6" : "none" }}>
-                    <td className="px-4 py-3 font-semibold" style={{ color: "#24315f" }}>{s.stageName}</td>
-                    <td className="px-4 py-3 font-bold" style={{ color: "#374151" }}>{Number(s.total).toLocaleString()}</td>
-                    <td className="px-4 py-3" style={{ color: "#16a34a" }}>{Number(s.delivered).toLocaleString()}</td>
-                    <td className="px-4 py-3" style={{ color: "#d97706" }}>{Number(s.pending).toLocaleString()}</td>
-                    <td className="px-4 py-3" style={{ color: "#dc2626" }}>{Number(s.cancelled).toLocaleString()}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#f3f4f6", minWidth: 60 }}>
-                          <div className="h-full rounded-full" style={{ width: `${pct(Number(s.delivered), Number(s.total))}%`, background: "#16a34a" }} />
-                        </div>
-                        <span className="text-xs font-semibold" style={{ color: "#16a34a" }}>{pct(Number(s.delivered), Number(s.total))}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {stages.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-8 text-sm" style={{ color: "#9bafc5" }}>No data</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={columns}
+            data={page}
+            total={sorted.length}
+            offset={offset}
+            pageSize={PAGE_SIZE}
+            onPageChange={setOffset}
+            loading={loading}
+            emptyText="No stage data available"
+            keyExtractor={r => r.stageId}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={(key, dir) => { setSortKey(key); setSortDir(dir); setOffset(0); }}
+          />
         </>
       )}
     </div>

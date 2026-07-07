@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 interface ReportData {
   orders: {
@@ -27,12 +28,25 @@ interface ReportData {
   };
 }
 
-function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color?: string }) {
-  return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
+function StatCard({ label, value, sub, color, href }: { label: string; value: string | number; sub?: string; color?: string; href?: string }) {
+  const inner = (
+    <>
       <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "#9bafc5" }}>{label}</p>
       <p className="text-2xl font-bold" style={{ color: color ?? "#24315f" }}>{value}</p>
       {sub && <p className="text-xs mt-1" style={{ color: "#9bafc5" }}>{sub}</p>}
+    </>
+  );
+  if (href) {
+    return (
+      <Link href={href} className="block bg-white rounded-2xl p-5 shadow-sm transition-shadow hover:shadow-md"
+        style={{ border: "1px solid #e5e7eb", textDecoration: "none" }}>
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
+      {inner}
     </div>
   );
 }
@@ -100,31 +114,19 @@ export default function PresaleOverviewPage() {
 
       {/* Top stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Orders" value={data.orders.total.toLocaleString()} />
-        <StatCard label="Total Customers" value={data.customers.total.toLocaleString()} sub={`${data.customers.withOrders} with orders`} />
-        <StatCard label="NFT Lists" value={data.nft.total.toLocaleString()} />
-        <StatCard label="Peripheral Products" value={data.products.total.toLocaleString()} sub={`${data.products.active} active`} />
+        <StatCard label="Total Orders"        value={data.orders.total.toLocaleString()}    href="/presale/orders" />
+        <StatCard label="Total Customers"     value={data.customers.total.toLocaleString()} href="/presale/customers" sub={`${data.customers.withOrders} with orders`} />
+        <StatCard label="NFT Lists"           value={data.nft.total.toLocaleString()}        href="/presale/nft" />
+        <StatCard label="Peripheral Products" value={data.products.total.toLocaleString()}  href="/presale/products" sub={`${data.products.active} active`} />
       </div>
 
       {/* Revenue section */}
       <div>
         <h2 className="text-sm font-bold uppercase tracking-wider mb-3" style={{ color: "#9bafc5" }}>Revenue</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard
-            label="NFT Revenue (TWD)"
-            value={`TWD ${(data.orders.totalNftTwd ?? 0).toLocaleString()}`}
-            color="#41afeb"
-          />
-          <StatCard
-            label="NFT Revenue (ETH)"
-            value={`${data.orders.totalNftEth ?? 0} ETH`}
-            color="#41afeb"
-          />
-          <StatCard
-            label="Merch Revenue (TWD)"
-            value={`TWD ${(data.orders.totalMerchTwd ?? 0).toLocaleString()}`}
-            color="#41afeb"
-          />
+          <StatCard label="NFT Revenue (TWD)"  value={`TWD ${(data.orders.totalNftTwd ?? 0).toLocaleString()}`}  color="#41afeb" href="/presale/reports/reconciliation" />
+          <StatCard label="NFT Revenue (ETH)"  value={`${data.orders.totalNftEth ?? 0} ETH`}                      color="#41afeb" href="/presale/reports/reconciliation" />
+          <StatCard label="Merch Revenue (TWD)" value={`TWD ${(data.orders.totalMerchTwd ?? 0).toLocaleString()}`} color="#41afeb" href="/presale/reports/reconciliation" />
         </div>
       </div>
 
@@ -142,20 +144,21 @@ export default function PresaleOverviewPage() {
               </thead>
               <tbody>
                 {data.orders.byNftStatus.map((s, i) => (
-                  <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                  <tr key={i}
+                    style={{ borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "#fafbff")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "")}>
                     <td className="py-2.5">
-                      <span
+                      <Link href={`/presale/orders?status=${s.statusCode}`}
                         className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold"
-                        style={{
-                          background: `${statusColor(s.statusCode)}18`,
-                          color: statusColor(s.statusCode),
-                        }}
-                      >
+                        style={{ background: `${statusColor(s.statusCode)}18`, color: statusColor(s.statusCode) }}>
                         <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: statusColor(s.statusCode) }} />
                         {s.statusName}
-                      </span>
+                      </Link>
                     </td>
-                    <td className="py-2.5 text-right font-semibold" style={{ color: "#24315f" }}>{s.count}</td>
+                    <td className="py-2.5 text-right font-semibold" style={{ color: "#24315f" }}>
+                      <Link href={`/presale/orders?status=${s.statusCode}`} style={{ color: "#24315f" }}>{s.count}</Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -178,20 +181,21 @@ export default function PresaleOverviewPage() {
               </thead>
               <tbody>
                 {data.nft.byDeliveryStatus.map((s, i) => (
-                  <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                  <tr key={i}
+                    style={{ borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "#fafbff")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "")}>
                     <td className="py-2.5">
-                      <span
+                      <Link href={`/presale/nft?delivery_status=${s.statusCode}`}
                         className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold"
-                        style={{
-                          background: `${statusColor(s.statusCode)}18`,
-                          color: statusColor(s.statusCode),
-                        }}
-                      >
+                        style={{ background: `${statusColor(s.statusCode)}18`, color: statusColor(s.statusCode) }}>
                         <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: statusColor(s.statusCode) }} />
                         {s.statusName}
-                      </span>
+                      </Link>
                     </td>
-                    <td className="py-2.5 text-right font-semibold" style={{ color: "#24315f" }}>{s.count}</td>
+                    <td className="py-2.5 text-right font-semibold" style={{ color: "#24315f" }}>
+                      <Link href={`/presale/nft?delivery_status=${s.statusCode}`} style={{ color: "#24315f" }}>{s.count}</Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>
