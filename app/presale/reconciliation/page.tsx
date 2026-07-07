@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 interface ReconciliationEntry {
-  id: number;
+  id: string;
   entryType: string;
   amountTwd: number;
   amountEth: number;
@@ -11,6 +11,9 @@ interface ReconciliationEntry {
   orderNumber: string;
   customerName: string;
   currencyCode: string;
+  paymentMethodName: string;
+  confirmedAt: string | null;
+  cancelledAt: string | null;
   totalCount: number;
 }
 
@@ -44,7 +47,7 @@ export default function ReconciliationPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionModal, setActionModal] = useState<{ id: number; action: "confirm" | "cancel" } | null>(null);
+  const [actionModal, setActionModal] = useState<{ id: string; action: "confirm" | "cancel" } | null>(null);
   const [actionNotes, setActionNotes] = useState("");
   const [actioning, setActioning] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -72,7 +75,7 @@ export default function ReconciliationPage() {
     loadEntries(statusFilter, offset);
   }, [offset, statusFilter]);
 
-  const openAction = (id: number, action: "confirm" | "cancel") => {
+  const openAction = (id: string, action: "confirm" | "cancel") => {
     setActionModal({ id, action });
     setActionNotes("");
     setActionError(null);

@@ -57,6 +57,38 @@ const ICON_SVG: Record<string, React.ReactNode> = {
         d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
     </svg>
   ),
+  tag: (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+    </svg>
+  ),
+  collection: (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+    </svg>
+  ),
+  inventory: (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+    </svg>
+  ),
+  truck: (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+    </svg>
+  ),
+  "book-open": (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
+  ),
   "bar-chart": (
     <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
@@ -64,6 +96,25 @@ const ICON_SVG: Record<string, React.ReactNode> = {
     </svg>
   ),
   "user-cog": (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
+  share: (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+    </svg>
+  ),
+  "credit-card": (
+    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+        d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+    </svg>
+  ),
+  cog: (
     <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
         d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -81,29 +132,43 @@ function NavIcon({ icon }: { icon: string | null }) {
   );
 }
 
-// Hrefs that belong under "Bearth Products" group (in display order)
-const BEARTH_PRODUCTS_GROUP = ["/presale/products", "/presale/nft", "/presale/waves"];
+const GROUPS: Array<{ hrefs: string[]; label: string; icon: string }> = [
+  {
+    hrefs: ["/presale/products", "/presale/nft/records", "/presale/nft/waves", "/presale/nft/strategies"],
+    label: "Bearth Products",
+    icon: "layers",
+  },
+  {
+    hrefs: [
+      "/presale/reports/sales-by-stage",
+      "/presale/reports/customers",
+      "/presale/reports/delivery",
+      "/presale/reports/reconciliation",
+    ],
+    label: "Reports",
+    icon: "bar-chart",
+  },
+  {
+    hrefs: ["/presale/settings/payment-methods"],
+    label: "Settings",
+    icon: "cog",
+  },
+];
 
 function applyGrouping(flat: MenuItem[]): MenuItem[] {
-  const inGroup = new Set(BEARTH_PRODUCTS_GROUP);
-  const groupChildren = BEARTH_PRODUCTS_GROUP
-    .map(href => flat.find(m => m.href === href))
-    .filter(Boolean) as MenuItem[];
-  const rest = flat.filter(m => !inGroup.has(m.href ?? ""));
+  const allGrouped = new Set(GROUPS.flatMap(g => g.hrefs));
+  const result: MenuItem[] = flat.filter(m => !allGrouped.has(m.href ?? ""));
 
-  if (groupChildren.length === 0) return rest.sort((a, b) => a.sortOrder - b.sortOrder);
+  for (const g of GROUPS) {
+    const children = g.hrefs
+      .map(href => flat.find(m => m.href === href))
+      .filter(Boolean) as MenuItem[];
+    if (children.length === 0) continue;
+    const minSort = Math.min(...children.map(c => c.sortOrder));
+    result.push({ label: g.label, href: null, icon: g.icon, module: "presale", sortOrder: minSort - 5, children });
+  }
 
-  const minSort = Math.min(...groupChildren.map(c => c.sortOrder));
-  const groupItem: MenuItem = {
-    label: "Bearth Products",
-    href: null,
-    icon: "layers",
-    module: "presale",
-    sortOrder: minSort - 5,
-    children: groupChildren,
-  };
-
-  return [...rest, groupItem].sort((a, b) => a.sortOrder - b.sortOrder);
+  return result.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 export default function PresaleLayout({ children }: { children: React.ReactNode }) {
@@ -134,18 +199,7 @@ export default function PresaleLayout({ children }: { children: React.ReactNode 
         const presaleMenus: MenuItem[] = (data.menus ?? [])
           .filter((m: MenuItem) => m.module === "presale" || m.href?.startsWith("/presale"))
           .sort((a: MenuItem, b: MenuItem) => a.sortOrder - b.sortOrder);
-        const raw: MenuItem[] = presaleMenus.length ? presaleMenus : [
-          { label: "Bearth Overview",            href: "/presale",                icon: "grid",           module: "presale", sortOrder: 10 },
-          { label: "Bearth Orders",              href: "/presale/orders",         icon: "clipboard-list", module: "presale", sortOrder: 20 },
-          { label: "Bearth Customers",           href: "/presale/customers",      icon: "users",          module: "presale", sortOrder: 30 },
-          { label: "Bearth Peripheral Products", href: "/presale/products",       icon: "package",        module: "presale", sortOrder: 40 },
-          { label: "Bearth NFT Lists",           href: "/presale/nft",            icon: "image",          module: "presale", sortOrder: 50 },
-          { label: "NFT Waves & Phases",         href: "/presale/waves",          icon: "layers",         module: "presale", sortOrder: 55 },
-          { label: "Bearth Reconciliation",      href: "/presale/reconciliation", icon: "balance",        module: "presale", sortOrder: 60 },
-          { label: "Bearth Reports",             href: "/presale/reports",        icon: "bar-chart",      module: "presale", sortOrder: 70 },
-          { label: "Bearth Team",                href: "/presale/users",          icon: "user-cog",       module: "presale", sortOrder: 80 },
-        ];
-        setMenus(applyGrouping(raw));
+        setMenus(applyGrouping(presaleMenus));
         setChecking(false);
       })
       .catch(() => router.push("/login"));

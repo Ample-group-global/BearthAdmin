@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import DataTable, { type ColumnDef } from "@/components/DataTable";
 
 interface Customer {
   id: string;
@@ -51,7 +52,7 @@ export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState("created_at");
+  const [sortKey, setSortKey] = useState("created_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [showInactive, setShowInactive] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -97,10 +98,10 @@ export default function CustomersPage() {
     notes: "",
   });
 
-  const loadCustomers = (q: string, off: number, sb = sortBy, sd = sortDir, inactive = showInactive) => {
+  const loadCustomers = (q: string, off: number, sb = sortKey, sd = sortDir, inactive = showInactive) => {
     setLoading(true);
     setError(null);
-    const params = new URLSearchParams({ search: q, limit: String(PAGE_SIZE), offset: String(off), sortBy: sb, sortDir: sd });
+    const params = new URLSearchParams({ search: q, limit: String(PAGE_SIZE), offset: String(off), sort_by: sb, sort_dir: sd });
     if (inactive) params.set("active", "false");
     fetch(`/api/presale/customers?${params}`, { credentials: "include" })
       .then((r) => r.json())
@@ -112,7 +113,7 @@ export default function CustomersPage() {
       .catch(() => { setError("Failed to load customers."); setLoading(false); });
   };
 
-  useEffect(() => { loadCustomers(search, offset, sortBy, sortDir, showInactive); }, [offset, sortBy, sortDir, showInactive]);
+  useEffect(() => { loadCustomers(search, offset, sortKey, sortDir, showInactive); }, [offset, sortKey, sortDir, showInactive]);
 
   useEffect(() => {
     if (!referrerDropOpen) return;
@@ -125,11 +126,11 @@ export default function CustomersPage() {
     return () => document.removeEventListener("mousedown", handler);
   }, [referrerDropOpen]);
 
-  const handleSort = (col: string) => {
-    const newDir = sortBy === col && sortDir === "asc" ? "desc" : "asc";
-    setSortBy(col);
-    setSortDir(newDir);
+  const handleSort = (key: string, dir: "asc" | "desc") => {
+    setSortKey(key);
+    setSortDir(dir);
     setOffset(0);
+    loadCustomers(search, 0, key, dir, showInactive);
   };
 
   const handleSearch = (v: string) => {
@@ -252,30 +253,75 @@ export default function CustomersPage() {
   const inputStyle = { width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "14px", color: "#111827", outline: "none" };
   const labelStyle: React.CSSProperties = { display: "block", fontSize: "12px", fontWeight: 600, color: "#24315f", marginBottom: "4px" };
 
-  const SortTh = ({ col, label, center }: { col: string; label: string; center?: boolean }) => {
-    const active = sortBy === col;
-    return (
-      <th
-        className={`px-4 py-3 font-semibold cursor-pointer select-none ${center ? "text-center" : "text-left"}`}
-        style={{ color: active ? "#41afeb" : "#9bafc5", userSelect: "none" }}
-        onClick={() => handleSort(col)}
-      >
-        <span className="inline-flex items-center gap-0.5">
-          {label}
-          {active ? (
-            <span style={{ fontSize: "10px", color: "#41afeb", lineHeight: 1 }}>
-              {sortDir === "asc" ? "▲" : "▼"}
-            </span>
-          ) : (
-            <svg width="8" height="11" viewBox="0 0 8 11" fill="none" style={{ flexShrink: 0 }}>
-              <path d="M4 0L8 4H0L4 0Z" fill="#b8c4d0" />
-              <path d="M4 11L0 7H8L4 11Z" fill="#b8c4d0" />
-            </svg>
-          )}
-        </span>
-      </th>
-    );
-  };
+  const columns: ColumnDef<Customer>[] = [
+    { key: "user_code",   header: "Customer Code", sortKey: "user_code",     render: (c) => <span className="font-mono text-xs font-semibold" style={{ color: "#41afeb" }}>{c.userCode ?? "N/A"}</span> },
+    { key: "first_name",  header: "First Name",    sortKey: "first_name",    render: (c) => <span className="font-medium" style={{ color: "#111827" }}>{c.firstName || "N/A"}</span> },
+    { key: "last_name",   header: "Last Name",     sortKey: "last_name",     render: (c) => <span style={{ color: "#6b7280" }}>{c.lastName || "N/A"}</span> },
+    { key: "full_name",   header: "Full Name",     sortKey: "full_name",     render: (c) => <span className="font-medium" style={{ color: "#111827" }}>{`${c.firstName} ${c.lastName}`.trim() || "N/A"}</span> },
+    { key: "phone",       header: "Phone",                                   render: (c) => <span style={{ color: "#6b7280" }}>{c.phone || "N/A"}</span> },
+    { key: "email",       header: "Email",         sortKey: "email",         render: (c) => <span style={{ color: "#6b7280" }}>{c.email || "N/A"}</span> },
+    { key: "line_id",     header: "LINE ID",       sortKey: "line_id",       render: (c) => <span style={{ color: "#6b7280" }}>{c.lineId || "N/A"}</span> },
+    { key: "referrer",    header: "Referrer",      sortKey: "referrer_name", render: (c) => <span style={{ color: "#6b7280" }}>{c.referrerName?.trim() || "N/A"}</span> },
+    {
+      key: "wallets", header: "Wallets", sortKey: "wallet_count", align: "center",
+      render: (c) => (
+        <button
+          onClick={() => openWallets(c)}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors"
+          style={{ background: "rgba(65,175,235,0.1)", color: "#41afeb" }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(65,175,235,0.2)")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(65,175,235,0.1)")}
+          title="View wallets"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+          </svg>
+          {c.walletCount ?? 0}
+        </button>
+      ),
+    },
+    {
+      key: "created_at", header: "Joined", sortKey: "created_at", align: "center",
+      render: (c) => <span className="text-xs" style={{ color: "#6b7280" }}>{c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "N/A"}</span>,
+    },
+    {
+      key: "is_active", header: "Active", sortKey: "is_active", align: "center",
+      render: (c) => (
+        <button
+          onClick={() => handleToggleActive(c)}
+          disabled={togglingId === c.id}
+          title={c.isActive !== false ? "Click to deactivate" : "Click to activate"}
+          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold transition-opacity"
+          style={{
+            opacity: togglingId === c.id ? 0.5 : 1,
+            cursor: togglingId === c.id ? "wait" : "pointer",
+            ...(c.isActive !== false
+              ? { background: "rgba(22,163,74,0.1)", color: "#16a34a" }
+              : { background: "rgba(156,163,175,0.1)", color: "#9ca3af" })
+          }}
+        >
+          {togglingId === c.id ? "…" : c.isActive !== false ? "Active" : "Inactive"}
+        </button>
+      ),
+    },
+    {
+      key: "actions", header: "Actions", align: "center",
+      render: (c) => (
+        <button
+          onClick={() => openEdit(c)}
+          className="p-1.5 rounded-lg"
+          style={{ color: "#41afeb" }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(65,175,235,0.1)")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          title="Edit"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+        </button>
+      ),
+    },
+  ];
 
   const filteredReferrers = referrers.filter((r) => {
     const q = referrerSearch.toLowerCase().trim();
@@ -324,8 +370,8 @@ export default function CustomersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-base font-bold" style={{ color: "#24315f" }}>Bearth Customer</h1>
-          <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>Manage Bearth customers</p>
+          <h1 className="text-xl font-extrabold" style={{ color: "#24315f" }}>Bearth Customers</h1>
+          <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>Manage and view all registered customers</p>
         </div>
         <button
           onClick={openCreate}
@@ -371,165 +417,21 @@ export default function CustomersPage() {
         </span>
       </div>
 
-      {error && (
-        <div className="p-3 rounded-xl text-sm" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>{error}</div>
-      )}
-
-      {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
-        {loading ? (
-          <div className="flex items-center justify-center h-48" style={{ color: "#9bafc5" }}>
-            <svg className="w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Loading...
-          </div>
-        ) : customers.length === 0 ? (
-          <div className="flex items-center justify-center h-48">
-            <p className="text-sm" style={{ color: "#9bafc5" }}>No customers found</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-max [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap [&_th]:border-r [&_th]:border-gray-100 [&_td]:border-r [&_td]:border-gray-100 [&_th]:py-2 [&_th]:px-3 [&_td]:py-2 [&_td]:px-3">
-              <thead>
-                <tr style={{ borderBottom: "1px solid #e5e7eb", background: "#f9fafb" }}>
-                  <th className="px-4 py-3 text-center font-semibold w-14" style={{ color: "#9bafc5" }}>Sr.No</th>
-                  <SortTh col="user_code" label="Customer Code" />
-                  <SortTh col="first_name"      label="First Name" />
-                  <SortTh col="last_name"        label="Last Name" />
-                  <SortTh col="full_name"        label="Full Name" />
-                  <SortTh col="phone"            label="Phone" />
-                  <SortTh col="email"            label="Email" />
-                  <SortTh col="line_id"          label="LINE ID" />
-                  <SortTh col="referrer_name"    label="Referrer" />
-                  <SortTh col="wallet_count"     label="Wallets" center />
-                  <SortTh col="created_at"       label="Joined"  center />
-                  <SortTh col="is_active"        label="Active"  center />
-                  <th className="px-4 py-3 text-center font-semibold" style={{ color: "#9bafc5" }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {customers.map((c, i) => (
-                  <tr key={c.id} style={{ borderBottom: i < customers.length - 1 ? "1px solid #f3f4f6" : "none" }}>
-                    <td className="px-4 py-3 text-center text-xs font-semibold" style={{ color: "#9bafc5" }}>{offset + i + 1}</td>
-                    <td className="px-4 py-3 font-mono text-xs font-semibold" style={{ color: "#41afeb" }}>{c.userCode ?? "N/A"}</td>
-                    <td className="px-4 py-3 font-medium" style={{ color: "#111827" }}>{c.firstName || "N/A"}</td>
-                    <td className="px-4 py-3" style={{ color: "#6b7280" }}>{c.lastName || "N/A"}</td>
-                    <td className="px-4 py-3 font-medium" style={{ color: "#111827" }}>{`${c.firstName} ${c.lastName}`.trim() || "N/A"}</td>
-                    <td className="px-4 py-3" style={{ color: "#6b7280" }}>{c.phone || "N/A"}</td>
-                    <td className="px-4 py-3" style={{ color: "#6b7280" }}>{c.email || "N/A"}</td>
-                    <td className="px-4 py-3" style={{ color: "#6b7280" }}>{c.lineId || "N/A"}</td>
-                    <td className="px-4 py-3" style={{ color: "#6b7280" }}>{c.referrerName?.trim() || "N/A"}</td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => openWallets(c)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors"
-                        style={{ background: "rgba(65,175,235,0.1)", color: "#41afeb" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(65,175,235,0.2)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(65,175,235,0.1)")}
-                        title="View wallets"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                        </svg>
-                        {c.walletCount ?? 0}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 text-center text-xs" style={{ color: "#6b7280" }}>
-                      {c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "N/A"}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => handleToggleActive(c)}
-                        disabled={togglingId === c.id}
-                        title={c.isActive !== false ? "Click to deactivate" : "Click to activate"}
-                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold transition-opacity"
-                        style={{
-                          opacity: togglingId === c.id ? 0.5 : 1,
-                          cursor: togglingId === c.id ? "wait" : "pointer",
-                          ...(c.isActive !== false
-                            ? { background: "rgba(22,163,74,0.1)", color: "#16a34a" }
-                            : { background: "rgba(156,163,175,0.1)", color: "#9ca3af" })
-                        }}
-                      >
-                        {togglingId === c.id ? "…" : c.isActive !== false ? "Active" : "Inactive"}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => openEdit(c)}
-                          className="p-1.5 rounded-lg"
-                          style={{ color: "#41afeb" }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(65,175,235,0.1)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                          title="Edit"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Pagination */}
-      {total > PAGE_SIZE && (() => {
-        const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
-        const totalPages  = Math.ceil(total / PAGE_SIZE);
-        const pages: number[] = [];
-        const start = Math.max(1, currentPage - 2);
-        const end   = Math.min(totalPages, currentPage + 2);
-        for (let p = start; p <= end; p++) pages.push(p);
-
-        const btnBase = "min-w-[36px] h-[36px] px-2 text-sm font-medium rounded-lg flex items-center justify-center";
-        return (
-          <div className="flex items-center justify-between">
-            <span className="text-sm" style={{ color: "#9bafc5" }}>
-              {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                disabled={offset === 0}
-                className={btnBase}
-                style={{ border: "1px solid #e5e7eb", color: offset === 0 ? "#d1d5db" : "#24315f", cursor: offset === 0 ? "not-allowed" : "pointer" }}
-              >‹</button>
-              {start > 1 && <>
-                <button onClick={() => setOffset(0)} className={btnBase} style={{ border: "1px solid #e5e7eb", color: "#24315f" }}>1</button>
-                {start > 2 && <span className="px-1 text-sm" style={{ color: "#9bafc5" }}>…</span>}
-              </>}
-              {pages.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setOffset((p - 1) * PAGE_SIZE)}
-                  className={btnBase}
-                  style={p === currentPage
-                    ? { background: "#41afeb", color: "#fff", border: "1px solid #41afeb" }
-                    : { border: "1px solid #e5e7eb", color: "#24315f" }}
-                >{p}</button>
-              ))}
-              {end < totalPages && <>
-                {end < totalPages - 1 && <span className="px-1 text-sm" style={{ color: "#9bafc5" }}>…</span>}
-                <button onClick={() => setOffset((totalPages - 1) * PAGE_SIZE)} className={btnBase} style={{ border: "1px solid #e5e7eb", color: "#24315f" }}>{totalPages}</button>
-              </>}
-              <button
-                onClick={() => setOffset(offset + PAGE_SIZE)}
-                disabled={offset + PAGE_SIZE >= total}
-                className={btnBase}
-                style={{ border: "1px solid #e5e7eb", color: offset + PAGE_SIZE >= total ? "#d1d5db" : "#24315f", cursor: offset + PAGE_SIZE >= total ? "not-allowed" : "pointer" }}
-              >›</button>
-            </div>
-          </div>
-        );
-      })()}
+      <DataTable
+        columns={columns}
+        data={customers}
+        total={total}
+        offset={offset}
+        pageSize={PAGE_SIZE}
+        onPageChange={(off) => { setOffset(off); loadCustomers(search, off); }}
+        loading={loading}
+        error={error}
+        emptyText="No customers found"
+        keyExtractor={(c) => c.id}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={handleSort}
+      />
 
       {/* ── Wallet Modal ─────────────────────────────────────────────── */}
       {walletCustomer && (

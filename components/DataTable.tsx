@@ -14,19 +14,20 @@ export interface ColumnDef<T> {
 }
 
 interface DataTableProps<T> {
-  columns:      ColumnDef<T>[];
-  data:         T[];
-  total:        number;
-  offset:       number;
-  pageSize:     number;
-  onPageChange: (newOffset: number) => void;
-  loading?:     boolean;
-  error?:       string | null;
-  emptyText?:   string;
-  keyExtractor: (row: T) => string | number;
-  sortKey?:     string;
-  sortDir?:     "asc" | "desc";
-  onSort?:      (key: string, dir: "asc" | "desc") => void;
+  columns:        ColumnDef<T>[];
+  data:           T[];
+  total:          number;
+  offset:         number;
+  pageSize:       number;
+  onPageChange:   (newOffset: number) => void;
+  loading?:       boolean;
+  error?:         string | null;
+  emptyText?:     string;
+  keyExtractor:   (row: T) => string | number;
+  sortKey?:       string;
+  sortDir?:       "asc" | "desc";
+  onSort?:        (key: string, dir: "asc" | "desc") => void;
+  hideSerial?:    boolean;
 }
 
 // ─── Pagination helper ────────────────────────────────────────────────────────
@@ -73,6 +74,7 @@ export default function DataTable<T>({
   sortKey,
   sortDir,
   onSort,
+  hideSerial = false,
 }: DataTableProps<T>) {
   const currentPage = Math.floor(offset / pageSize) + 1;
   const totalPages  = Math.ceil(total / pageSize);
@@ -136,7 +138,9 @@ export default function DataTable<T>({
             <table className="w-full text-sm min-w-max">
               <thead>
                 <tr>
-                  <th style={{ ...thBase, width: 52, textAlign: "center" }}>Sr.</th>
+                  {!hideSerial && (
+                    <th style={{ ...thBase, width: 60, textAlign: "center" }}>Sr.No</th>
+                  )}
                   {columns.map(col => {
                     const isSortable = !!col.sortKey && !!onSort;
                     const isActive   = isSortable && sortKey === col.sortKey;
@@ -167,10 +171,12 @@ export default function DataTable<T>({
                     style={{ borderTop: i === 0 ? "none" : "1px solid #f3f4f6" }}
                     onMouseEnter={e => (e.currentTarget.style.background = "#fafbff")}
                     onMouseLeave={e => (e.currentTarget.style.background = "")}>
-                    <td style={{ padding: "10px 14px", textAlign: "center",
-                      fontSize: 12, color: "#9bafc5", fontWeight: 600 }}>
-                      {offset + i + 1}
-                    </td>
+                    {!hideSerial && (
+                      <td style={{ padding: "10px 14px", textAlign: "center",
+                        fontSize: 12, color: "#9bafc5", fontWeight: 600 }}>
+                        {offset + i + 1}
+                      </td>
+                    )}
                     {columns.map(col => (
                       <td key={col.key} style={{
                         padding: "10px 14px",
@@ -188,107 +194,111 @@ export default function DataTable<T>({
       </div>
 
       {/* ── Pagination ── */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between flex-wrap gap-3 px-1">
+      {total > 0 && (
+        <div className="flex items-center justify-between flex-wrap gap-3 px-1 py-1">
 
           {/* Range info */}
           <span className="text-xs font-medium" style={{ color: "#9bafc5" }}>
             Showing{" "}
-            <strong style={{ color: "#374151" }}>{rangeStart}</strong>
-            {" – "}
-            <strong style={{ color: "#374151" }}>{rangeEnd}</strong>
+            <strong style={{ color: "#374151" }}>{rangeStart}–{rangeEnd}</strong>
             {" of "}
-            <strong style={{ color: "#374151" }}>{total}</strong>
+            <strong style={{ color: "#374151" }}>{total.toLocaleString()}</strong>
+            {" records"}
           </span>
 
-          {/* Page buttons */}
-          <div className="flex items-center gap-1">
+          {/* Page buttons — only render when multiple pages */}
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
 
-            {/* Prev */}
-            <button
-              onClick={() => onPageChange(Math.max(0, offset - pageSize))}
-              disabled={currentPage === 1}
-              style={{
-                ...btnBase,
-                gap: 4, padding: "0 12px",
-                border: "1.5px solid",
-                borderColor: currentPage === 1 ? "#f3f4f6" : "#e5e7eb",
-                color: currentPage === 1 ? "#d1d5db" : "#374151",
-                background: currentPage === 1 ? "#fafafa" : "white",
-                cursor: currentPage === 1 ? "not-allowed" : "pointer",
-              }}>
-              <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-              </svg>
-              Prev
-            </button>
+              {/* First + Prev */}
+              <button
+                onClick={() => onPageChange(0)}
+                disabled={currentPage === 1}
+                title="First page"
+                style={{ ...btnBase, width: 34, border: "1.5px solid #e5e7eb",
+                  background: "white", color: currentPage === 1 ? "#d1d5db" : "#374151",
+                  borderColor: currentPage === 1 ? "#f3f4f6" : "#e5e7eb",
+                  cursor: currentPage === 1 ? "not-allowed" : "pointer" }}>
+                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+                </svg>
+              </button>
 
-            {/* Page numbers */}
-            {buildPages(currentPage, totalPages).map((p, idx) =>
-              p === "…" ? (
-                <span key={`e-${idx}`}
-                  style={{
-                    width: 34, height: 34, lineHeight: "34px",
-                    textAlign: "center", fontSize: 13, color: "#9bafc5",
-                    userSelect: "none", display: "inline-block",
-                  }}>
-                  ···
-                </span>
-              ) : (
-                <button
-                  key={p}
-                  onClick={() => onPageChange((p - 1) * pageSize)}
-                  style={{
-                    ...btnBase,
-                    width: 34,
-                    border: p === currentPage ? "none" : "1.5px solid #e5e7eb",
-                    background: p === currentPage ? "#41afeb" : "white",
-                    color: p === currentPage ? "white" : "#374151",
-                    cursor: "pointer",
-                    fontWeight: p === currentPage ? 800 : 500,
-                    boxShadow: p === currentPage ? "0 2px 8px rgba(65,175,235,0.4)" : "none",
-                  }}>
-                  {p}
-                </button>
-              )
-            )}
+              <button
+                onClick={() => onPageChange(Math.max(0, offset - pageSize))}
+                disabled={currentPage === 1}
+                style={{ ...btnBase, gap: 4, padding: "0 10px",
+                  border: "1.5px solid", borderColor: currentPage === 1 ? "#f3f4f6" : "#e5e7eb",
+                  color: currentPage === 1 ? "#d1d5db" : "#374151",
+                  background: currentPage === 1 ? "#fafafa" : "white",
+                  cursor: currentPage === 1 ? "not-allowed" : "pointer" }}>
+                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                </svg>
+                <span style={{ fontSize: 12 }}>Prev</span>
+              </button>
 
-            {/* Next */}
-            <button
-              onClick={() => onPageChange(Math.min((totalPages - 1) * pageSize, offset + pageSize))}
-              disabled={currentPage === totalPages}
-              style={{
-                ...btnBase,
-                gap: 4, padding: "0 12px",
-                border: "1.5px solid",
-                borderColor: currentPage === totalPages ? "#f3f4f6" : "#e5e7eb",
-                color: currentPage === totalPages ? "#d1d5db" : "#374151",
-                background: currentPage === totalPages ? "#fafafa" : "white",
-                cursor: currentPage === totalPages ? "not-allowed" : "pointer",
-              }}>
-              Next
-              <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+              {/* Page numbers */}
+              {buildPages(currentPage, totalPages).map((p, idx) =>
+                p === "…" ? (
+                  <span key={`e-${idx}`}
+                    style={{ width: 34, height: 34, lineHeight: "34px", textAlign: "center",
+                      fontSize: 13, color: "#9bafc5", userSelect: "none", display: "inline-block" }}>
+                    ···
+                  </span>
+                ) : (
+                  <button key={p} onClick={() => onPageChange((p - 1) * pageSize)}
+                    style={{ ...btnBase, width: 34,
+                      border: p === currentPage ? "none" : "1.5px solid #e5e7eb",
+                      background: p === currentPage ? "#24315f" : "white",
+                      color: p === currentPage ? "white" : "#374151",
+                      cursor: "pointer",
+                      fontWeight: p === currentPage ? 800 : 500,
+                      boxShadow: p === currentPage ? "0 2px 8px rgba(36,49,95,0.3)" : "none",
+                    }}>
+                    {p}
+                  </button>
+                )
+              )}
 
-          </div>
+              {/* Next + Last */}
+              <button
+                onClick={() => onPageChange(Math.min((totalPages - 1) * pageSize, offset + pageSize))}
+                disabled={currentPage === totalPages}
+                style={{ ...btnBase, gap: 4, padding: "0 10px",
+                  border: "1.5px solid", borderColor: currentPage === totalPages ? "#f3f4f6" : "#e5e7eb",
+                  color: currentPage === totalPages ? "#d1d5db" : "#374151",
+                  background: currentPage === totalPages ? "#fafafa" : "white",
+                  cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}>
+                <span style={{ fontSize: 12 }}>Next</span>
+                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+
+              <button
+                onClick={() => onPageChange((totalPages - 1) * pageSize)}
+                disabled={currentPage === totalPages}
+                title="Last page"
+                style={{ ...btnBase, width: 34, border: "1.5px solid #e5e7eb",
+                  background: "white", color: currentPage === totalPages ? "#d1d5db" : "#374151",
+                  borderColor: currentPage === totalPages ? "#f3f4f6" : "#e5e7eb",
+                  cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}>
+                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 5l7 7-7 7M6 5l7 7-7 7" />
+                </svg>
+              </button>
+
+            </div>
+          )}
 
           {/* Page counter */}
           <span className="text-xs font-medium" style={{ color: "#9bafc5" }}>
-            Page{" "}
-            <strong style={{ color: "#374151" }}>{currentPage}</strong>
+            Page <strong style={{ color: "#374151" }}>{currentPage}</strong>
             {" / "}
             <strong style={{ color: "#374151" }}>{totalPages}</strong>
           </span>
 
-        </div>
-      )}
-
-      {/* Single page hint */}
-      {totalPages <= 1 && total > 0 && (
-        <div className="text-xs text-right px-1" style={{ color: "#9bafc5" }}>
-          Showing all <strong style={{ color: "#374151" }}>{total}</strong> records
         </div>
       )}
     </div>

@@ -110,11 +110,16 @@ export default function DeliveryReport() {
 
   return (
     <div className="p-6 space-y-5 max-w-6xl">
-      <div className="flex items-center gap-3">
-        <Link href="/presale/reports" className="text-sm font-medium hover:underline" style={{ color: "#9bafc5" }}>Reports</Link>
-        <span style={{ color: "#d1d5db" }}>›</span>
-        <h1 className="text-base font-bold" style={{ color: "#24315f" }}>Delivery Report</h1>
-        <span className="ml-auto text-sm" style={{ color: "#9bafc5" }}>{total.toLocaleString()} records</span>
+      <div>
+        <div className="flex items-center gap-1.5 text-xs mb-1">
+          <Link href="/presale" className="hover:underline" style={{ color: "#9bafc5" }}>Overview</Link>
+          <span style={{ color: "#d1d5db" }}>›</span>
+          <span style={{ color: "#9bafc5" }}>Delivery Report</span>
+        </div>
+        <div className="flex items-end justify-between">
+          <h1 className="text-lg font-extrabold" style={{ color: "#24315f" }}>Delivery Report</h1>
+          <span className="text-xs" style={{ color: "#9bafc5" }}>{total.toLocaleString()} records</span>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">

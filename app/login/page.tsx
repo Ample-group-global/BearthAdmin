@@ -54,7 +54,7 @@ export default function LoginPage() {
           <h1 className="text-[22px] sm:text-2xl font-bold text-white tracking-tight leading-tight">
             Bearth Admin
           </h1>
-          <p className="text-[11px] sm:text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.42)" }}>
+          <p className="text-[13px] sm:text-sm mt-1 font-medium tracking-wide" style={{ color: "rgba(255,255,255,0.78)" }}>
             Sign in to access the dashboard
           </p>
         </div>
@@ -200,9 +200,13 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-center mt-4" style={{ fontSize: "10px", color: "rgba(255,255,255,0.22)" }}>
-          Bearth Admin Console · Secure Access
-        </p>
+        <div className="flex items-center justify-center gap-2 mt-5">
+          <span style={{ width: 32, height: 1, background: "rgba(255,255,255,0.18)", display: "inline-block" }} />
+          <p className="text-center" style={{ fontSize: "11px", color: "rgba(255,255,255,0.55)", letterSpacing: "0.06em", fontWeight: 500 }}>
+            Bearth Admin Console · Secure Access
+          </p>
+          <span style={{ width: 32, height: 1, background: "rgba(255,255,255,0.18)", display: "inline-block" }} />
+        </div>
 
       </div>
     </div>

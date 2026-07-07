@@ -4,17 +4,18 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import DataTable, { type ColumnDef } from "@/components/DataTable";
 
-function StatCard({ label, value, color, href }: { label: string; value: string | number; color?: string; href?: string }) {
+function StatCard({ label, value, color = "#24315f", href }: { label: string; value: string | number; color?: string; href?: string }) {
   const inner = (
     <>
-      <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "#9bafc5" }}>{label}</p>
-      <p className="text-2xl font-bold" style={{ color: color ?? "#24315f" }}>{typeof value === "number" ? value.toLocaleString() : value}</p>
+      <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "#9bafc5" }}>{label}</p>
+      <p className="text-2xl font-extrabold leading-none" style={{ color }}>{typeof value === "number" ? value.toLocaleString() : value}</p>
     </>
   );
+  const style = { border: "1px solid #e5e7eb", borderLeft: `3px solid ${color}`, padding: "14px 16px" };
   return href ? (
-    <Link href={href} className="block bg-white rounded-2xl p-4 shadow-sm transition-shadow hover:shadow-md" style={{ border: "1px solid #e5e7eb" }}>{inner}</Link>
+    <Link href={href} className="block bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow" style={style}>{inner}</Link>
   ) : (
-    <div className="bg-white rounded-2xl p-4 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>{inner}</div>
+    <div className="bg-white rounded-xl shadow-sm" style={style}>{inner}</div>
   );
 }
 
@@ -127,10 +128,13 @@ export default function SalesByStage() {
 
   return (
     <div className="p-6 space-y-5 max-w-4xl">
-      <div className="flex items-center gap-3">
-        <Link href="/presale/reports" className="text-sm font-medium hover:underline" style={{ color: "#9bafc5" }}>Reports</Link>
-        <span style={{ color: "#d1d5db" }}>›</span>
-        <h1 className="text-base font-bold" style={{ color: "#24315f" }}>Sales by Stage</h1>
+      <div>
+        <div className="flex items-center gap-1.5 text-xs mb-1">
+          <Link href="/presale" className="hover:underline" style={{ color: "#9bafc5" }}>Overview</Link>
+          <span style={{ color: "#d1d5db" }}>›</span>
+          <span style={{ color: "#9bafc5" }}>Sales by Stage</span>
+        </div>
+        <h1 className="text-lg font-extrabold" style={{ color: "#24315f" }}>Sales by Stage</h1>
       </div>
 
       {error ? (
@@ -139,7 +143,7 @@ export default function SalesByStage() {
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: "Total NFTs", value: grandTotal,                                                     href: "/presale/nft" },
+              { label: "Total NFTs", value: grandTotal, color: "#24315f",                                   href: "/presale/nft/records" },
               { label: "Delivered",  value: stages.reduce((s, r) => s + Number(r.delivered), 0), color: "#16a34a", href: "/presale/reports/delivery?status=delivered" },
               { label: "Pending",    value: stages.reduce((s, r) => s + Number(r.pending),   0), color: "#d97706", href: "/presale/reports/delivery?status=pending" },
               { label: "Cancelled",  value: stages.reduce((s, r) => s + Number(r.cancelled), 0), color: "#dc2626", href: "/presale/reports/delivery?status=cancelled" },

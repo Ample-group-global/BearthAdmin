@@ -15,6 +15,7 @@ interface CustomerRow {
   isActive: boolean;
   orderCount: number;
   nftCount: number;
+  productCount: number;
 }
 
 const PAGE_SIZE = 20;
@@ -54,9 +55,10 @@ export default function CustomerReport() {
 
   const fmtDate = (s: string | null) => s ? new Date(s).toLocaleDateString() : "—";
 
-  const withOrders = customers.filter(c => c.orderCount > 0).length;
-  const totalNfts  = customers.reduce((s, c) => s + Number(c.nftCount), 0);
-  const convRate   = customers.length > 0 ? Math.round((withOrders / customers.length) * 100) : 0;
+  const withOrders    = customers.filter(c => c.orderCount > 0).length;
+  const totalNfts     = customers.reduce((s, c) => s + Number(c.nftCount), 0);
+  const totalProducts = customers.reduce((s, c) => s + Number(c.productCount), 0);
+  const convRate      = customers.length > 0 ? Math.round((withOrders / customers.length) * 100) : 0;
 
   const columns: ColumnDef<CustomerRow>[] = [
     {
@@ -84,17 +86,24 @@ export default function CustomerReport() {
     },
     {
       key: "orders",
-      header: "Orders",
+      header: "Total Orders",
       sortKey: "orders",
       align: "center",
       render: r => <span className="font-bold" style={{ color: Number(r.orderCount) > 0 ? "#24315f" : "#9bafc5" }}>{Number(r.orderCount)}</span>,
     },
     {
       key: "nfts",
-      header: "NFTs",
+      header: "NFT Items",
       sortKey: "nfts",
       align: "center",
       render: r => <span className="font-bold" style={{ color: Number(r.nftCount) > 0 ? "#24315f" : "#9bafc5" }}>{Number(r.nftCount)}</span>,
+    },
+    {
+      key: "products",
+      header: "Product Items",
+      sortKey: "products",
+      align: "center",
+      render: r => <span className="font-bold" style={{ color: Number(r.productCount) > 0 ? "#24315f" : "#9bafc5" }}>{Number(r.productCount)}</span>,
     },
     {
       key: "status",
@@ -118,30 +127,37 @@ export default function CustomerReport() {
 
   return (
     <div className="p-6 space-y-5 max-w-6xl">
-      <div className="flex items-center gap-3">
-        <Link href="/presale/reports" className="text-sm font-medium hover:underline" style={{ color: "#9bafc5" }}>Reports</Link>
-        <span style={{ color: "#d1d5db" }}>›</span>
-        <h1 className="text-base font-bold" style={{ color: "#24315f" }}>Customer Report</h1>
-        <span className="ml-auto text-sm" style={{ color: "#9bafc5" }}>{total.toLocaleString()} customers</span>
+      <div>
+        <div className="flex items-center gap-1.5 text-xs mb-1">
+          <Link href="/presale" className="hover:underline" style={{ color: "#9bafc5" }}>Overview</Link>
+          <span style={{ color: "#d1d5db" }}>›</span>
+          <span style={{ color: "#9bafc5" }}>Customer Report</span>
+        </div>
+        <div className="flex items-end justify-between">
+          <h1 className="text-lg font-extrabold" style={{ color: "#24315f" }}>Customer Report</h1>
+          <span className="text-xs" style={{ color: "#9bafc5" }}>{total.toLocaleString()} customers</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "Total Customers", value: total },
-          { label: "With Orders",     value: withOrders, href: "/presale/orders" },
-          { label: "Total NFTs",      value: totalNfts,  href: "/presale/nft" },
-          { label: "Conversion Rate", value: `${convRate}%` },
+          { label: "Total Customers",  value: total,         color: "#24315f", sub: `${convRate}% conversion` },
+          { label: "With Orders",      value: withOrders,    color: "#41afeb", href: "/presale/orders" },
+          { label: "NFT Items Bought", value: totalNfts,     color: "#7c3aed", href: "/presale/nft/records" },
+          { label: "Product Items",    value: totalProducts, color: "#16a34a", href: "/presale/products" },
         ].map(m => {
           const inner = (
             <>
-              <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "#9bafc5" }}>{m.label}</p>
-              <p className="text-2xl font-bold" style={{ color: "#24315f" }}>{typeof m.value === "number" ? m.value.toLocaleString() : m.value}</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "#9bafc5" }}>{m.label}</p>
+              <p className="text-2xl font-extrabold leading-none" style={{ color: m.color }}>{typeof m.value === "number" ? m.value.toLocaleString() : m.value}</p>
+              {"sub" in m && m.sub && <p className="text-xs mt-1.5" style={{ color: "#9bafc5" }}>{m.sub}</p>}
             </>
           );
-          return m.href ? (
-            <Link key={m.label} href={m.href} className="block bg-white rounded-2xl p-4 shadow-sm transition-shadow hover:shadow-md" style={{ border: "1px solid #e5e7eb" }}>{inner}</Link>
+          const cardStyle = { border: "1px solid #e5e7eb", borderLeft: `3px solid ${m.color}`, padding: "16px 18px" };
+          return "href" in m && m.href ? (
+            <Link key={m.label} href={m.href} className="block bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow" style={cardStyle}>{inner}</Link>
           ) : (
-            <div key={m.label} className="bg-white rounded-2xl p-4 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>{inner}</div>
+            <div key={m.label} className="bg-white rounded-xl shadow-sm" style={cardStyle}>{inner}</div>
           );
         })}
       </div>
