@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import DataTable, { type ColumnDef } from "@/components/DataTable";
 
 interface Order {
   id: number;
@@ -29,7 +30,7 @@ interface Customer {
   phone: string;
 }
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 20;
 
 function statusColor(code: string): string {
   const c = (code ?? "").toLowerCase();
@@ -67,6 +68,8 @@ export default function OrdersPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<string | undefined>(undefined);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [form, setForm] = useState({
@@ -79,23 +82,17 @@ export default function OrdersPage() {
     notes: "",
   });
 
-  const loadOrders = (q: string, off: number) => {
+  const loadOrders = useCallback((q: string, off: number, sk?: string, sd?: "asc" | "desc") => {
     setLoading(true);
     setError(null);
     const params = new URLSearchParams({ search: q, limit: String(PAGE_SIZE), offset: String(off) });
+    if (sk) params.set("sort_by", sk);
+    if (sk && sd) params.set("sort_dir", sd);
     fetch(`/api/presale/orders?${params}`, { credentials: "include" })
       .then((r) => r.json())
-      .then((data) => {
-        const rows: Order[] = data.orders ?? [];
-        setOrders(rows);
-        setTotal(data.total ?? 0);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError("Failed to load orders.");
-        setLoading(false);
-      });
-  };
+      .then((data) => { setOrders(data.orders ?? []); setTotal(data.total ?? 0); setLoading(false); })
+      .catch(() => { setError("Failed to load orders."); setLoading(false); });
+  }, []);
 
   useEffect(() => {
     fetch("/api/presale/master", { credentials: "include" })
@@ -107,16 +104,17 @@ export default function OrdersPage() {
   }, []);
 
   useEffect(() => {
-    loadOrders(search, offset);
+    loadOrders(search, offset, sortKey, sortDir);
   }, [offset]);
 
   const handleSearch = (v: string) => {
     setSearch(v);
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => {
-      setOffset(0);
-      loadOrders(v, 0);
-    }, 300);
+    searchTimer.current = setTimeout(() => { setOffset(0); loadOrders(v, 0, sortKey, sortDir); }, 300);
+  };
+
+  const handleSort = (key: string, dir: "asc" | "desc") => {
+    setSortKey(key); setSortDir(dir); setOffset(0); loadOrders(search, 0, key, dir);
   };
 
   const openCreate = () => {
@@ -170,7 +168,7 @@ export default function OrdersPage() {
       }
       setShowModal(false);
       setOffset(0);
-      loadOrders(search, 0);
+      loadOrders(search, 0, sortKey, sortDir);
     } catch {
       setFormError("Network error.");
     } finally {
@@ -187,7 +185,7 @@ export default function OrdersPage() {
         return;
       }
       setDeleteId(null);
-      loadOrders(search, offset);
+      loadOrders(search, offset, sortKey, sortDir);
     } catch {
       setError("Network error during delete.");
     }
@@ -204,6 +202,82 @@ export default function OrdersPage() {
   };
 
   const labelStyle = { display: "block", fontSize: "12px", fontWeight: 600, color: "#24315f", marginBottom: "4px" };
+
+  const columns: ColumnDef<Order>[] = [
+    {
+      key: "orderNumber",
+      header: "Order #",
+      sortKey: "order_number",
+      render: o => <span className="font-mono font-semibold" style={{ color: "#24315f" }}>{o.orderNumber}</span>,
+    },
+    {
+      key: "customer",
+      header: "Customer",
+      sortKey: "customer",
+      render: o => (
+        <div>
+          <div className="font-medium" style={{ color: "#111827" }}>{o.customerName ?? "—"}</div>
+          {o.customerPhone && <div className="text-xs" style={{ color: "#9bafc5" }}>{o.customerPhone}</div>}
+        </div>
+      ),
+    },
+    {
+      key: "date",
+      header: "Date",
+      sortKey: "purchase_date",
+      render: o => <span style={{ color: "#6b7280" }}>{o.purchaseDate ? new Date(o.purchaseDate).toLocaleDateString() : "—"}</span>,
+    },
+    {
+      key: "nftAmount",
+      header: "NFT Amount",
+      sortKey: "nft_amount_twd",
+      align: "right",
+      render: o => (
+        <div className="text-right">
+          {o.nftAmountTwd ? <div style={{ color: "#111827" }}>TWD {Number(o.nftAmountTwd).toLocaleString()}</div> : <span style={{ color: "#9bafc5" }}>—</span>}
+          {o.nftAmountEth ? <div className="text-xs" style={{ color: "#9bafc5" }}>{o.nftAmountEth} ETH</div> : null}
+        </div>
+      ),
+    },
+    {
+      key: "nftStatus",
+      header: "NFT Status",
+      sortKey: "nft_status",
+      render: o => o.nftPaymentStatusCode
+        ? <StatusBadge code={o.nftPaymentStatusCode} name={o.nftPaymentStatusName} />
+        : <span style={{ color: "#9bafc5" }}>—</span>,
+    },
+    {
+      key: "merch",
+      header: "Merch TWD",
+      sortKey: "merch_amount_twd",
+      align: "right",
+      render: o => <span style={{ color: "#6b7280" }}>{o.merchAmountTwd ? `TWD ${Number(o.merchAmountTwd).toLocaleString()}` : "—"}</span>,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "center",
+      render: o => (
+        <div className="flex items-center justify-center gap-2">
+          <button onClick={() => openEdit(o)} className="p-1.5 rounded-lg transition-colors" style={{ color: "#41afeb" }} title="Edit"
+            onMouseEnter={e => (e.currentTarget.style.background = "rgba(65,175,235,0.1)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+          <button onClick={() => setDeleteId(o.id)} className="p-1.5 rounded-lg transition-colors" style={{ color: "#dc2626" }} title="Delete"
+            onMouseEnter={e => (e.currentTarget.style.background = "rgba(220,38,38,0.1)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="p-4 space-y-4">
@@ -228,146 +302,32 @@ export default function OrdersPage() {
       </div>
 
       {/* Search */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#9bafc5" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search orders..."
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none bg-white"
-            style={{ border: "1px solid #e5e7eb", color: "#111827" }}
-          />
-        </div>
-        <span className="text-sm" style={{ color: "#9bafc5" }}>
-          {total > 0 ? `${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} of ${total}` : "0 results"}
-        </span>
+      <div className="relative max-w-sm">
+        <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#9bafc5" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <input type="text" placeholder="Search orders..." value={search}
+          onChange={e => handleSearch(e.target.value)}
+          className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none bg-white"
+          style={{ border: "1px solid #e5e7eb", color: "#111827" }} />
       </div>
-
-      {/* Error */}
-      {error && (
-        <div className="p-3 rounded-xl text-sm" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>
-          {error}
-        </div>
-      )}
 
       {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
-        {loading ? (
-          <div className="flex items-center justify-center h-48" style={{ color: "#9bafc5" }}>
-            <svg className="w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Loading...
-          </div>
-        ) : orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48">
-            <p className="text-sm" style={{ color: "#9bafc5" }}>No orders found</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-max [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap [&_th]:border-r [&_th]:border-gray-100 [&_td]:border-r [&_td]:border-gray-100 [&_th]:py-2 [&_th]:px-3 [&_td]:py-2 [&_td]:px-3">
-              <thead>
-                <tr style={{ borderBottom: "1px solid #e5e7eb", background: "#f9fafb" }}>
-                  <th className="px-4 py-3 text-left font-semibold" style={{ color: "#9bafc5" }}>Order #</th>
-                  <th className="px-4 py-3 text-left font-semibold" style={{ color: "#9bafc5" }}>Customer</th>
-                  <th className="px-4 py-3 text-left font-semibold" style={{ color: "#9bafc5" }}>Date</th>
-                  <th className="px-4 py-3 text-right font-semibold" style={{ color: "#9bafc5" }}>NFT Amount</th>
-                  <th className="px-4 py-3 text-left font-semibold" style={{ color: "#9bafc5" }}>NFT Status</th>
-                  <th className="px-4 py-3 text-right font-semibold" style={{ color: "#9bafc5" }}>Merch TWD</th>
-                  <th className="px-4 py-3 text-center font-semibold" style={{ color: "#9bafc5" }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((o, i) => (
-                  <tr
-                    key={o.id}
-                    style={{ borderBottom: i < orders.length - 1 ? "1px solid #f3f4f6" : "none" }}
-                  >
-                    <td className="px-4 py-3 font-mono font-semibold" style={{ color: "#24315f" }}>{o.orderNumber}</td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium" style={{ color: "#111827" }}>{o.customerName ?? "—"}</div>
-                      {o.customerPhone && <div className="text-xs" style={{ color: "#9bafc5" }}>{o.customerPhone}</div>}
-                    </td>
-                    <td className="px-4 py-3" style={{ color: "#6b7280" }}>
-                      {o.purchaseDate ? new Date(o.purchaseDate).toLocaleDateString() : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right" style={{ color: "#111827" }}>
-                      {o.nftAmountTwd ? `TWD ${Number(o.nftAmountTwd).toLocaleString()}` : "—"}
-                      {o.nftAmountEth ? <div className="text-xs" style={{ color: "#9bafc5" }}>{o.nftAmountEth} ETH</div> : null}
-                    </td>
-                    <td className="px-4 py-3">
-                      {o.nftPaymentStatusCode ? (
-                        <StatusBadge code={o.nftPaymentStatusCode} name={o.nftPaymentStatusName} />
-                      ) : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right" style={{ color: "#6b7280" }}>
-                      {o.merchAmountTwd ? `TWD ${Number(o.merchAmountTwd).toLocaleString()}` : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => openEdit(o)}
-                          className="p-1.5 rounded-lg transition-colors"
-                          style={{ color: "#41afeb" }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(65,175,235,0.1)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                          title="Edit"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => setDeleteId(o.id)}
-                          className="p-1.5 rounded-lg transition-colors"
-                          style={{ color: "#dc2626" }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(220,38,38,0.1)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                          title="Delete"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Pagination */}
-      {total > PAGE_SIZE && (
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-            disabled={offset === 0}
-            className="px-4 py-2 text-sm font-medium rounded-lg border transition-colors"
-            style={{ border: "1px solid #e5e7eb", color: offset === 0 ? "#9bafc5" : "#24315f", cursor: offset === 0 ? "not-allowed" : "pointer" }}
-          >
-            Previous
-          </button>
-          <span className="text-sm" style={{ color: "#9bafc5" }}>
-            Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
-          </span>
-          <button
-            onClick={() => setOffset(offset + PAGE_SIZE)}
-            disabled={offset + PAGE_SIZE >= total}
-            className="px-4 py-2 text-sm font-medium rounded-lg border transition-colors"
-            style={{ border: "1px solid #e5e7eb", color: offset + PAGE_SIZE >= total ? "#9bafc5" : "#24315f", cursor: offset + PAGE_SIZE >= total ? "not-allowed" : "pointer" }}
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        data={orders}
+        total={total}
+        offset={offset}
+        pageSize={PAGE_SIZE}
+        onPageChange={off => { setOffset(off); }}
+        loading={loading}
+        error={error}
+        emptyText="No orders found"
+        keyExtractor={o => o.id}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={handleSort}
+      />
 
       {/* Create/Edit Modal */}
       {showModal && (
