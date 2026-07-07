@@ -51,3 +51,9 @@ yarn-error.log*
 
 # Test artifacts
 /test-results/
+
+# Backup folders
+_backup_*/
+screenshot.cjs
+screenshot2.cjs
+test-team-page.cjs
