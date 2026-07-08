@@ -21,6 +21,9 @@ if (typeof window !== "undefined") {
   console.error = (...args: unknown[]) => {
     if (typeof args[0] === "string" && args[0].includes("unique \"key\" prop")) return;
     if (typeof args[0] === "string" && args[0].startsWith("ERROR:") && args[1] != null && typeof args[1] === "object" && Object.keys(args[1]).length === 0) return;
+    // Privy SDK internally checks COOP headers by fetching the current URL; in local dev this
+    // returns 404 from Turbopack for HEAD requests. Presale pages don't use Privy — safe to suppress.
+    if (typeof args[0] === "string" && args[0].includes("Cross-Origin-Opener-Policy")) return;
     origError.apply(console, args as any[]);
   };
 }

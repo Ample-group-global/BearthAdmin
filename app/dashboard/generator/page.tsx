@@ -24,8 +24,11 @@ const DEFAULT_COLLECTION = {
 };
 
 export default function Page() {
-  const [step,           setStep]          = useState('rarity');
+  const [step,           setStep]          = useState('settings');
   const [collection,     setCollection]    = useState(DEFAULT_COLLECTION);
+  const [collectionId,   setCollectionId]  = useState<string | null>(null);
+  const [syncing,        setSyncing]       = useState(false);
+  const [syncError,      setSyncError]     = useState('');
   const [layers,         setLayers]        = useState<any[]>([]);
   const [weights,        setWeights]       = useState<Record<string, any>>({});
   const [activeFolder,   setActiveFolder]  = useState<string | null>(null);
@@ -70,6 +73,14 @@ export default function Page() {
       .then(r => r.json())
       .then(setConflicts)
       .catch(() => {});
+
+    // Check if there's already a collection saved in session storage
+    const savedId = sessionStorage.getItem('nft_collection_id');
+    const savedName = sessionStorage.getItem('nft_collection_name');
+    if (savedId && savedName) {
+      setCollectionId(savedId);
+      setCollection(prev => ({ ...prev, name: savedName }));
+    }
   }, []);
 
   const handleWeightChange = useCallback((folder: string, stem: string, value: any) => {
@@ -97,8 +108,65 @@ export default function Page() {
     loadLayers();
   }
 
+  // Create/update collection in DB, then sync layers from disk
+  async function handleCollectionContinue() {
+    setSyncing(true);
+    setSyncError('');
+    try {
+      // Create or update collection in DB
+      let cid = collectionId;
+      if (!cid) {
+        const r = await fetch('/api/nft-gen/collections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name:        collection.name || 'Bearth NFT Collection',
+            description: collection.description,
+            symbol:      collection.symbol || 'BRT',
+            network:     collection.blockchain === 'solana' ? 'sol' : 'eth',
+            formatWidth: collection.width  ?? 2000,
+            formatHeight:collection.height ?? 2000,
+            shuffleOutput: true,
+          }),
+        });
+        const data = await r.json();
+        cid = data?.collection?.id ?? data?.id ?? null;
+        if (cid) {
+          setCollectionId(cid);
+          sessionStorage.setItem('nft_collection_id', cid);
+          sessionStorage.setItem('nft_collection_name', collection.name || 'Bearth NFT Collection');
+        }
+      } else {
+        // Update existing
+        await fetch(`/api/nft-gen/collections/${cid}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name:        collection.name,
+            description: collection.description,
+            symbol:      collection.symbol,
+          }),
+        });
+      }
+
+      // Sync layers from BearthLayersv1 into DB
+      if (cid) {
+        await fetch(`/api/nft-gen/collections/${cid}/sync-from-disk`, { method: 'POST' });
+      }
+
+      goToStep('organize');
+    } catch (err: any) {
+      setSyncError(err.message ?? 'Failed to create collection');
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   function resetCollection() {
     setCollection(DEFAULT_COLLECTION);
+    setCollectionId(null);
+    sessionStorage.removeItem('nft_collection_id');
+    sessionStorage.removeItem('nft_collection_name');
   }
 
   const activeLayer = layers.find(l => l.folder === activeFolder) ?? null;
@@ -127,9 +195,11 @@ export default function Page() {
         <CollectionSetup
           collection={collection}
           onChange={setCollection}
-          onNext={() => goToStep('organize')}
+          onNext={handleCollectionContinue}
           onReset={resetCollection}
           onLayersChange={loadLayers}
+          syncing={syncing}
+          syncError={syncError}
         />
       )}
 
@@ -192,7 +262,12 @@ export default function Page() {
 
       {/* ── Step 5: Export ── */}
       {step === 'export' && (
-        <ExportPanel weights={weights} collection={collection} conflicts={conflicts} />
+        <ExportPanel
+          weights={weights}
+          collection={collection}
+          conflicts={conflicts}
+          collectionId={collectionId as any}
+        />
       )}
 
       {/* ── Conflict Rules modal ── */}

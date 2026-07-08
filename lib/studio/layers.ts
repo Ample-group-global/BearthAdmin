@@ -5,8 +5,7 @@ import { DEFAULT_WEIGHTS } from './default-weights';
 export const LAYERS_DIR = path.resolve(
   process.cwd(),
   '..',
-  'Bearth-NFT-Generator',
-  'exported_layers'
+  'BearthLayersv1'
 );
 
 // Derive a readable display name from any filesystem stem.

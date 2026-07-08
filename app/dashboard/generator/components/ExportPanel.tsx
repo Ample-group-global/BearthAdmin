@@ -38,7 +38,7 @@ function NftCard({ jobId, item }) {
   );
 }
 
-export default function ExportPanel({ weights, collection, conflicts }) {
+export default function ExportPanel({ weights, collection, conflicts, collectionId = null }) {
   const [phase,   setPhase]   = useState('idle');
   const [jobId,   setJobId]   = useState(null);
   const [cid,     setCid]     = useState('');
@@ -56,6 +56,23 @@ export default function ExportPanel({ weights, collection, conflicts }) {
 
   async function generate() {
     setPhase('generating'); setError(''); setProgress({ done: 0, total: supply });
+
+    // Register job in DB if we have a collection
+    let dbJobId = null;
+    if (collectionId) {
+      try {
+        const jr = await fetch(`/api/nft-gen/collections/${collectionId}/jobs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ editionSize: supply }),
+        });
+        const jdata = await jr.json();
+        dbJobId = jdata?.job?.id ?? jdata?.id ?? null;
+        if (dbJobId) {
+          await fetch(`/api/nft-gen/jobs/${dbJobId}/start`, { method: 'POST' });
+        }
+      } catch { /* non-fatal — local generation continues regardless */ }
+    }
 
     try {
       const r = await fetch('/api/generate', {
@@ -88,8 +105,20 @@ export default function ExportPanel({ weights, collection, conflicts }) {
       });
 
       setPhase('done');
+      // Mark DB job complete
+      if (dbJobId) {
+        fetch(`/api/nft-gen/jobs/${dbJobId}/complete`, { method: 'POST' }).catch(() => {});
+      }
       loadRarity(job_id, 1, 'rarity');
     } catch(e) {
+      // Mark DB job failed
+      if (dbJobId) {
+        fetch(`/api/nft-gen/jobs/${dbJobId}/fail`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ errorMessage: e.message }),
+        }).catch(() => {});
+      }
       setError(e.message);
       setPhase('idle');
     }

@@ -1,222 +1,174 @@
-'use client';
+"use client";
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect, useCallback } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-export interface WhitelistStats {
-  total: number;
-  merkleRoot?: string;
-  lastUpdated?: string;
-  timestamp?: number;
-  manualOverride?: boolean;
-}
-
-interface WhitelistMetaApi {
-  merkle_root?: string;
-  last_updated?: string;
-  timestamp?: number;
-  manual_override?: boolean;
-}
-
-export interface WhitelistResponse {
-  addresses: string[];
-  metadata?: WhitelistMetaApi;
-}
-
-export interface ProofData {
-  isWhitelisted: boolean;
-  address: string;
-  proof: string[];
-  root: string;
-  leafIndex?: number | null;
-  generatedAt: string;
-}
-
-/**
- * Main hook for managing whitelist state and API interactions
- * Uses TanStack Query for caching and synchronization
- */
 export function useWhitelist() {
-  const queryClient = useQueryClient();
+  const [addresses, setAddresses] = useState<string[]>([]);
+  const [stats, setStats] = useState<{
+    merkleRoot: string;
+    manualOverride: boolean;
+    lastUpdated: string;
+  } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch whitelist
-  const {
-    data: response = { addresses: [], metadata: {} },
-    isLoading,
-    error,
-    refetch,
-  } = useQuery<WhitelistResponse>({
-    queryKey: ['whitelist'],
-    queryFn: async () => {
-      const res = await fetch(`${API_BASE}/api/whitelist`, { credentials: 'include' });
-      if (!res.ok) {
-        throw new Error(`Failed to fetch whitelist: ${res.statusText}`);
+  const [addAddressLoading, setAddAddressLoading] = useState(false);
+  const [addAddressesLoading, setAddAddressesLoading] = useState(false);
+  const [removeAddressLoading, setRemoveAddressLoading] = useState(false);
+  const [testAddressLoading, setTestAddressLoading] = useState(false);
+  const [setMerkleRootLoading, setSetMerkleRootLoading] = useState(false);
+  const [clearMerkleRootOverrideLoading, setClearMerkleRootOverrideLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/whitelist?limit=1000`, { credentials: "include" });
+      if (!res.ok) throw new Error(res.statusText);
+      const data = await res.json();
+      setAddresses(data.addresses ?? []);
+      if (data.metadata) {
+        setStats({
+          merkleRoot: data.metadata.merkle_root ?? "0x0",
+          manualOverride: Boolean(data.metadata.manual_override),
+          lastUpdated: data.metadata.last_updated ?? "",
+        });
       }
-      return res.json();
-    },
-    staleTime: 30000, // 30 seconds
-    retry: 2,
-  });
+    } catch (e: unknown) {
+      setError((e as Error)?.message || "Failed to load whitelist");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  const addresses = response.addresses || [];
-  const meta = response.metadata || {};
-  const stats: WhitelistStats = {
-    total: addresses.length,
-    merkleRoot: meta.merkle_root,
-    lastUpdated: meta.last_updated,
-    timestamp: meta.timestamp,
-    manualOverride: meta.manual_override ?? false,
-  };
+  useEffect(() => { load(); }, [load]);
 
-  // Add single address mutation
-  const addAddressMutation = useMutation({
-    mutationFn: async (address: string) => {
-      const res = await fetch(`${API_BASE}/api/whitelist`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ addresses: [address] }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to add address');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whitelist'] });
-    },
-  });
-
-  // Add bulk addresses mutation
-  const addAddressesMutation = useMutation({
-    mutationFn: async (addrs: string[]) => {
-      const res = await fetch(`${API_BASE}/api/whitelist`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ addresses: addrs }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to add addresses');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whitelist'] });
-    },
-  });
-
-  // Remove address mutation
-  const removeAddressMutation = useMutation({
-    mutationFn: async (address: string) => {
-      const res = await fetch(`${API_BASE}/api/whitelist/${address}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to remove address');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whitelist'] });
-    },
-  });
-
-  // Set merkle root (manual override). Subsequent whitelist edits will NOT
-  // recompute the root until clearMerkleRootOverride is called.
-  const setMerkleRootMutation = useMutation({
-    mutationFn: async (root: string) => {
-      const res = await fetch(`${API_BASE}/api/whitelist/merkle-root`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ root }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || data.error || `Failed to set merkle root (${res.status})`);
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whitelist'] });
-    },
-  });
-
-  // Clear manual override and recompute from current whitelist.
-  const clearMerkleRootOverrideMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`${API_BASE}/api/whitelist/merkle-root`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || data.error || `Failed to clear override (${res.status})`);
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whitelist'] });
-    },
-  });
-
-  // Test address membership
-  const testAddressMutation = useMutation({
-    mutationFn: async (address: string): Promise<ProofData> => {
-      const res = await fetch(`${API_BASE}/api/whitelist/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+  const addAddress = useCallback(async (address: string) => {
+    setAddAddressLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/whitelist/entry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ address }),
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Failed to test address');
+        throw new Error(data.detail || data.error || "Failed to add address");
       }
-      return res.json();
-    },
-  });
-
-  // Export whitelist
-  const exportWhitelist = async (format: 'csv' | 'json' | 'txt' = 'json') => {
-    const res = await fetch(`${API_BASE}/api/whitelist/export?format=${format}`, { credentials: 'include' });
-    if (!res.ok) {
-      throw new Error('Failed to export whitelist');
+      await load();
+    } finally {
+      setAddAddressLoading(false);
     }
+  }, [load]);
+
+  const addAddressesBulk = useCallback(async (list: string[]) => {
+    setAddAddressesLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/whitelist/add`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ addresses: list }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || data.error || "Failed to import addresses");
+      }
+      await load();
+    } finally {
+      setAddAddressesLoading(false);
+    }
+  }, [load]);
+
+  const removeAddress = useCallback(async (address: string) => {
+    setRemoveAddressLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/whitelist/${encodeURIComponent(address)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || data.error || "Failed to remove address");
+      }
+      await load();
+    } finally {
+      setRemoveAddressLoading(false);
+    }
+  }, [load]);
+
+  const testAddress = useCallback(async (address: string) => {
+    setTestAddressLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/whitelist/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ address }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || data.error || "Failed to test address");
+      }
+      const data = await res.json();
+      return { isWhitelisted: Boolean(data.is_whitelisted), proof: data.proof ?? [] };
+    } finally {
+      setTestAddressLoading(false);
+    }
+  }, []);
+
+  const setMerkleRoot = useCallback(async (root: string) => {
+    setSetMerkleRootLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/whitelist/merkle-root`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ root }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || data.error || "Failed to set merkle root");
+      }
+      await load();
+    } finally {
+      setSetMerkleRootLoading(false);
+    }
+  }, [load]);
+
+  const clearMerkleRootOverride = useCallback(async () => {
+    setClearMerkleRootOverrideLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/whitelist/merkle-root`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || data.error || "Failed to clear override");
+      }
+      await load();
+    } finally {
+      setClearMerkleRootOverrideLoading(false);
+    }
+  }, [load]);
+
+  const exportWhitelist = useCallback(async (fmt: "csv" | "json" | "txt") => {
+    const res = await fetch(`${API_BASE}/api/whitelist/export?format=${fmt}`, {
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("Export failed");
     return res.blob();
-  };
+  }, []);
 
   return {
-    // State
-    addresses,
-    stats,
-    isLoading,
-    error: error ? (error as Error).message : null,
-
-    // Actions
-    addAddress: addAddressMutation.mutateAsync,
-    addAddressesBulk: addAddressesMutation.mutateAsync,
-    removeAddress: removeAddressMutation.mutateAsync,
-    testAddress: testAddressMutation.mutateAsync,
-    setMerkleRoot: setMerkleRootMutation.mutateAsync,
-    clearMerkleRootOverride: clearMerkleRootOverrideMutation.mutateAsync,
-    refetch,
-
-    // Mutations for loading state
-    addAddressLoading: addAddressMutation.isPending,
-    addAddressesLoading: addAddressesMutation.isPending,
-    removeAddressLoading: removeAddressMutation.isPending,
-    testAddressLoading: testAddressMutation.isPending,
-    setMerkleRootLoading: setMerkleRootMutation.isPending,
-    clearMerkleRootOverrideLoading: clearMerkleRootOverrideMutation.isPending,
-
-    // Export
-    exportWhitelist,
+    addresses, stats, isLoading, error,
+    addAddress, addAddressesBulk, removeAddress, testAddress,
+    setMerkleRoot, clearMerkleRootOverride, exportWhitelist,
+    addAddressLoading, addAddressesLoading, removeAddressLoading,
+    testAddressLoading, setMerkleRootLoading, clearMerkleRootOverrideLoading,
   };
 }

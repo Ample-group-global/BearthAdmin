@@ -51,7 +51,7 @@ function readEntry(entry) {
   });
 }
 
-export default function CollectionSetup({ collection, onChange, onNext, onReset, onLayersChange }) {
+export default function CollectionSetup({ collection, onChange, onNext, onReset, onLayersChange, syncing = false, syncError = '' }) {
   const [dragOver,   setDragOver]   = useState(false);
   const [uploading,  setUploading]  = useState(false);
   const [uploadDone, setUploadDone] = useState(false);
@@ -245,8 +245,16 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
             />
           </div>
 
-          <button className="btn btn-primary btn-lg setup-continue-btn" onClick={onNext}>
-            Continue
+          {syncError && <div style={{color:'#ef4444',fontSize:13,marginBottom:8}}>⚠ {syncError}</div>}
+
+          <button
+            className="btn btn-primary btn-lg setup-continue-btn"
+            onClick={onNext}
+            disabled={syncing}
+          >
+            {syncing ? (
+              <><span className="spinner" style={{width:14,height:14,marginRight:6}} />Saving to database…</>
+            ) : 'Save & Continue'}
           </button>
           <div className="setup-footer-links">
             <button className="link-btn" onClick={onReset}>Reset collection</button>
