@@ -1,81 +1,11 @@
 // @ts-nocheck
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { generateAllCombos } from '../../../../lib/studio/combos';
+import { useLayerFiles } from '../LayerFilesContext';
 
 const THUMB    = 160;  // thumbnail px
 const PAGE_SIZE = 96;  // cards per page
-
-// ── Weighted pick ─────────────────────────────────────────────────────────────
-function pickWeighted(assets, ws) {
-  const pool = assets.filter(a => (ws[a.stem] ?? a.defaultWeight ?? 1) > 0);
-  if (!pool.length) return null;
-  const tot = pool.reduce((s, a) => s + (ws[a.stem] ?? a.defaultWeight ?? 1), 0);
-  let r = Math.random() * tot;
-  for (const a of pool) {
-    r -= ws[a.stem] ?? a.defaultWeight ?? 1;
-    if (r <= 0) return a;
-  }
-  return pool[pool.length - 1];
-}
-
-// ── Conflict resolution (mirrors server logic) ────────────────────────────────
-function resolveConflicts(picks, conflicts, weights, layers) {
-  if (!conflicts?.length) return;
-  const layerMap = Object.fromEntries(layers.map(l => [l.folder, l]));
-  const rules = conflicts
-    .map(r => ({
-      type:       r.type ?? 'exclude',
-      ifLayer:    r.ifLayer,
-      ifTrait:    r.ifTrait,
-      thenLayer:  r.thenLayer,
-      thenTraits: Array.isArray(r.thenTraits) ? r.thenTraits : (r.thenTrait ? [r.thenTrait] : []),
-    }))
-    .filter(r => r.thenTraits.length);
-
-  for (let pass = 0; pass < 5; pass++) {
-    let changed = false;
-    for (const rule of rules) {
-      if (picks[rule.ifLayer]?.stem !== rule.ifTrait) continue;
-      const thenLayer = layerMap[rule.thenLayer];
-      if (!thenLayer) continue;
-      const ws = weights[rule.thenLayer] ?? {};
-      if (rule.type === 'exclude') {
-        if (!rule.thenTraits.includes(picks[rule.thenLayer]?.stem)) continue;
-        const valid = thenLayer.assets.filter(
-          a => !rule.thenTraits.includes(a.stem) && (ws[a.stem] ?? a.defaultWeight ?? 1) > 0
-        );
-        if (valid.length) { picks[rule.thenLayer] = pickWeighted(valid, ws); changed = true; }
-      } else {
-        if (rule.thenTraits.includes(picks[rule.thenLayer]?.stem)) continue;
-        const valid = thenLayer.assets.filter(
-          a => rule.thenTraits.includes(a.stem) && (ws[a.stem] ?? a.defaultWeight ?? 1) > 0
-        );
-        if (valid.length) { picks[rule.thenLayer] = pickWeighted(valid, ws); changed = true; }
-      }
-    }
-    if (!changed) break;
-  }
-}
-
-// ── Generate all N combos instantly (pure JS, no I/O) ─────────────────────────
-function generateAllCombos(supply, layers, weights, conflicts) {
-  const seen = new Set();
-  return Array.from({ length: supply }, () => {
-    let picks = {};
-    for (let attempt = 0; attempt < 3; attempt++) {
-      picks = {};
-      for (const layer of layers) {
-        const ws = weights[layer.folder] ?? {};
-        const pick = pickWeighted(layer.assets, ws);
-        if (pick) picks[layer.folder] = pick;
-      }
-      resolveConflicts(picks, conflicts, weights, layers);
-      const key = layers.map(l => picks[l.folder]?.stem ?? '').join('|');
-      if (!seen.has(key)) { seen.add(key); break; }
-    }
-    return picks;
-  });
-}
 
 // ── Sort + filter ─────────────────────────────────────────────────────────────
 function applyView(allCombos, sort, filter, layers) {
@@ -214,6 +144,7 @@ const SORT_LABELS = {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function PreviewPanel({ weights, layers, collection, conflicts }) {
+  const { getBlobUrl } = useLayerFiles();
   const supply = collection?.supply ?? 100;
   const srcW   = collection?.width  ?? 512;
   const srcH   = collection?.height ?? 512;
@@ -250,15 +181,24 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
     setLoadMsg(`Loading images… 0 / ${rels.length}`);
 
     await Promise.all(rels.map(async rel => {
-      if (bitmapCache.current[rel]) { setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`); return; }
+      if (bitmapCache.current[rel]) { loaded++; setLoadMsg(`Loading images… ${loaded} / ${rels.length}`); return; }
       try {
-        const res = await fetch(`/api/layer-img/${rel}?w=${canvasW}&h=${canvasH}`);
+        const blobUrl = getBlobUrl(rel);
+        const src = blobUrl ?? `/api/layer-img/${rel}?w=${canvasW}&h=${canvasH}`;
+        const res = await fetch(src);
         if (res.ok) {
           const blob = await res.blob();
-          bitmapCache.current[rel] = await createImageBitmap(blob);
+          try {
+            bitmapCache.current[rel] = await createImageBitmap(blob, {
+              resizeWidth: canvasW, resizeHeight: canvasH, resizeQuality: 'medium',
+            });
+          } catch {
+            bitmapCache.current[rel] = await createImageBitmap(blob);
+          }
         }
       } catch {}
-      setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`);
+      loaded++;
+      setLoadMsg(`Loading images… ${loaded} / ${rels.length}`);
     }));
 
     // ── Step 2: generate all combos instantly (pure JS) ──

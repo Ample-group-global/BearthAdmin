@@ -2,12 +2,14 @@
 'use client';
 import { useState } from 'react';
 import { getTier } from '../../../../lib/studio/tiers';
+import { useLayerFiles } from '../LayerFilesContext';
 
 function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onClose }) {
   const prob = totalWeight > 0 ? weight / totalWeight : 0;
   const tier = getTier(prob);
   const pct  = (prob * 100).toFixed(1);
   const exp  = Math.round(prob * supply);
+  const { getBlobUrl } = useLayerFiles();
 
   return (
     <div className="card-modal-overlay" onClick={onClose}>
@@ -16,7 +18,7 @@ function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onC
 
         <div className="card-modal-img-wrap">
           {asset.rel ? (
-            <img src={`/api/thumb/${asset.rel}`} alt={asset.stem} className="card-modal-img" />
+            <img src={getBlobUrl(asset.rel) ?? `/api/thumb/${asset.rel}`} alt={asset.stem} className="card-modal-img" />
           ) : (
             <div className="card-modal-none">NONE</div>
           )}
@@ -81,6 +83,7 @@ export default function AssetCard({ asset, weight, totalWeight, supply, onChange
   const prob = totalWeight > 0 ? weight / totalWeight : 0;
   const tier = getTier(prob);
   const pct  = (prob * 100).toFixed(1);
+  const { getBlobUrl } = useLayerFiles();
 
   function handleDelete(e) {
     e.stopPropagation();
@@ -98,7 +101,7 @@ export default function AssetCard({ asset, weight, totalWeight, supply, onChange
         <div className="thumb">
           {asset.rel ? (
             <img
-              src={`/api/thumb/${asset.rel}`}
+              src={getBlobUrl(asset.rel) ?? `/api/thumb/${asset.rel}`}
               alt={asset.stem}
               loading="lazy"
               onError={e => {
