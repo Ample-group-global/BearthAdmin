@@ -241,6 +241,7 @@
 .studio-wrap .step-btn:hover { background: var(--bg1); color: var(--muted); }
 .studio-wrap .step-active { background: var(--accent) !important; color: #fff !important; }
 .studio-wrap .step-icon { font-size: 14px; }
+.studio-wrap .step-sep { color: var(--border); font-size: 14px; user-select: none; pointer-events: none; }
 
 /* ── Layout (studio content area minus header) ── */
 .studio-wrap .layout {

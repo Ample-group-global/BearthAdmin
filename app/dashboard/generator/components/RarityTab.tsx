@@ -103,7 +103,7 @@ function FormulaSection({ supply }: { supply: number }) {
       </div>
       <div style={{ marginTop:14, padding:'10px 14px', background:'var(--bg2)', borderRadius:8, fontSize:11.5, color:'var(--dim)', lineHeight:1.6 }}>
         <b style={{ color:'var(--accent2)' }}>Tier thresholds:</b>
-        &nbsp;Legendary ≤2% &nbsp;·&nbsp; Epic ≤5% &nbsp;·&nbsp; Rare ≤15% &nbsp;·&nbsp; Uncommon ≤30% &nbsp;·&nbsp; Common &gt;30%
+        &nbsp;Legendary ≤5% &nbsp;·&nbsp; Epic ≤15% &nbsp;·&nbsp; Rare ≤35% &nbsp;·&nbsp; Common &gt;35%
         &nbsp;&nbsp;|&nbsp;&nbsp;
         <b style={{ color:'var(--accent2)' }}>Adjust weights</b> in the Organize tab or via the ⚙ gear button on each layer.
       </div>
@@ -232,11 +232,10 @@ export default function RarityTab({ layers, weights, collection }) {
         </div>
         <div className="rarity-tier-legend">
           {[
-            { label:'Legendary', color:'#f59e0b', range:'≤2%' },
-            { label:'Epic',      color:'#a78bfa', range:'≤5%' },
-            { label:'Rare',      color:'#60a5fa', range:'≤15%' },
-            { label:'Uncommon',  color:'#34d399', range:'≤30%' },
-            { label:'Common',    color:'#94a3b8', range:'>30%' },
+            { label:'Legendary', color:'#F59E0B', range:'≤5%' },
+            { label:'Epic',      color:'#A855F7', range:'≤15%' },
+            { label:'Rare',      color:'#3B82F6', range:'≤35%' },
+            { label:'Common',    color:'#6B7280', range:'>35%' },
           ].map(t => (
             <div key={t.label} className="rarity-legend-item">
               <span className="rarity-legend-dot" style={{ background:t.color }} />
