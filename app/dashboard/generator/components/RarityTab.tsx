@@ -3,19 +3,17 @@
 import { useState, useMemo } from 'react';
 
 function rarityTier(pct: number): { label: string; color: string } {
-  if (pct <= 2)  return { label: 'Legendary', color: '#f59e0b' };
-  if (pct <= 5)  return { label: 'Epic',      color: '#a78bfa' };
-  if (pct <= 15) return { label: 'Rare',      color: '#60a5fa' };
-  if (pct <= 30) return { label: 'Uncommon',  color: '#34d399' };
+  if (pct <= 5)  return { label: 'Legendary', color: '#f59e0b' };
+  if (pct <= 15) return { label: 'Epic',      color: '#a78bfa' };
+  if (pct <= 35) return { label: 'Rare',      color: '#60a5fa' };
   return          { label: 'Common',   color: '#94a3b8' };
 }
 
 const TIER_GUIDE = [
-  { icon:'🟡', label:'Legendary', color:'#f59e0b', range:'≤ 2%', desc:'Ultra-rare. Usually only 1–10 pieces in the entire collection. Highest collector value and prestige.' },
-  { icon:'🟠', label:'Epic',      color:'#a78bfa', range:'≤ 5%', desc:'Very rare traits. Strong collector demand. Often features special visuals or unique combinations.' },
-  { icon:'🔵', label:'Rare',      color:'#60a5fa', range:'≤ 15%', desc:'Clearly limited. More desirable to collectors. Noticeably harder to obtain than common traits.' },
-  { icon:'🟢', label:'Uncommon',  color:'#34d399', range:'≤ 30%', desc:'Slightly rarer than common. Moderate supply. Gives the NFT some distinction in the collection.' },
-  { icon:'⚪', label:'Common',    color:'#94a3b8', range:'> 30%', desc:'Most frequently appearing trait. Highest supply, lowest individual rarity score contribution.' },
+  { icon:'🟡', label:'Legendary', color:'#f59e0b', range:'≤ 5%',  desc:'Ultra-rare. Usually only 1–10 pieces in the entire collection. Highest collector value and prestige.' },
+  { icon:'🟠', label:'Epic',      color:'#a78bfa', range:'≤ 15%', desc:'Very rare traits. Strong collector demand. Often features special visuals or unique combinations.' },
+  { icon:'🔵', label:'Rare',      color:'#60a5fa', range:'≤ 35%', desc:'Clearly limited. More desirable to collectors. Noticeably harder to obtain than common traits.' },
+  { icon:'⚪', label:'Common',    color:'#94a3b8', range:'> 35%', desc:'Most frequently appearing trait. Highest supply, lowest individual rarity score contribution.' },
 ];
 
 function RarityGuideSection() {
@@ -38,7 +36,7 @@ function RarityGuideSection() {
       <div className="rarity-guide-note">
         <b>How rarity is calculated in this app:</b> Rarity tiers are assigned based on a trait's <b>probability of appearing</b> in the collection — calculated from the weights you set in the Organize tab.<br />
         Formula: <code style={{ background:'var(--bg0)', padding:'1px 5px', borderRadius:4, fontSize:11 }}>Probability = trait_weight ÷ layer_total_weight × 100%</code><br /><br />
-        <b>Important:</b> "Legendary" is not a universal standard — each NFT project defines its own thresholds. The values above (2%, 5%, 15%, 30%) are used by this generator and match common industry conventions. You control rarity by adjusting weights — lower weight = rarer trait = higher rarity score contribution in post-generation ranking.<br /><br />
+        <b>Important:</b> "Legendary" is not a universal standard — each NFT project defines its own thresholds. The values above (5%, 15%, 35%) are used by this generator and match common industry conventions. You control rarity by adjusting weights — lower weight = rarer trait = higher rarity score contribution in post-generation ranking.<br /><br />
         <b>Combination rarity matters:</b> An NFT with 3 "Rare" traits may outscore one with a single "Epic" trait in the post-generation Rarity Score ranking, because the score sums across ALL traits.
       </div>
     </div>
