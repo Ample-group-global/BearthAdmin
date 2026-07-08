@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Fragment } from "react";
 
 type PaymentCategory = "crypto" | "bank" | "local";
 
@@ -184,9 +184,9 @@ export default function PaymentMethodsPage() {
                 if (group.length === 0) return null;
                 const isOpen = expanded[catKey];
                 return (
-                  <>
+                  <Fragment key={catKey}>
                     {/* Category header row — clickable */}
-                    <tr key={`cat-${catKey}`}
+                    <tr
                       onClick={() => toggleCategory(catKey)}
                       className="cursor-pointer select-none"
                       style={{ background: meta.bg, borderTop: "1px solid #e5e7eb", borderBottom: isOpen ? `1px solid ${meta.color}20` : "none" }}>
@@ -229,7 +229,7 @@ export default function PaymentMethodsPage() {
                         </td>
                       </tr>
                     ))}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>
