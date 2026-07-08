@@ -3,7 +3,7 @@ import fs     from 'fs';
 import sharp  from 'sharp';
 import { NextResponse } from 'next/server';
 import { JOBS }        from '../../../lib/studio/jobs';
-import { scanLayers, LAYERS_DIR, getName } from '../../../lib/studio/layers';
+import { scanLayers, getLayersDir, getName } from '../../../lib/studio/layers';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +26,7 @@ function buildPngIndex() {
     idx[layer.folder] = {};
     for (const asset of layer.assets) {
       if (asset.rel !== null) {
-        idx[layer.folder][asset.stem] = path.join(LAYERS_DIR, asset.rel);
+        idx[layer.folder][asset.stem] = path.join(getLayersDir(), asset.rel);
       }
     }
   }

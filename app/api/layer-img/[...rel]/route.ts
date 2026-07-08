@@ -1,15 +1,16 @@
 import path  from 'path';
 import fs    from 'fs';
 import sharp from 'sharp';
-import { LAYERS_DIR } from '../../../../lib/studio/layers';
+import { getLayersDir } from '../../../../lib/studio/layers';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request, { params }: { params: Promise<{ rel: string[] }> }) {
-  const rel  = (await params).rel.join('/');
-  const file = path.join(LAYERS_DIR, rel);
+  const rel       = (await params).rel.join('/');
+  const layersDir = getLayersDir();
+  const file      = path.join(layersDir, rel);
 
-  if (!file.startsWith(LAYERS_DIR) || !fs.existsSync(file)) {
+  if (!file.startsWith(layersDir) || !fs.existsSync(file)) {
     return new Response(null, { status: 404 });
   }
 

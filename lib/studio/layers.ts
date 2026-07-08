@@ -2,21 +2,36 @@ import fs   from 'fs';
 import path from 'path';
 import { DEFAULT_WEIGHTS } from './default-weights';
 
-export const LAYERS_DIR = path.resolve(
-  process.cwd(),
-  '..',
-  'BearthLayersv1'
-);
+// ── Active layers folder (dynamic) ──────────────────────────────────────────
+// Stored in BearthAdmin/.layers-config.json so it persists across restarts.
+// Default falls back to 'BearthLayersv1' for backward compatibility.
+
+const LAYERS_CFG = path.join(process.cwd(), '.layers-config.json');
+
+export function getActiveFolder(): string {
+  try {
+    if (fs.existsSync(LAYERS_CFG)) {
+      const { folder } = JSON.parse(fs.readFileSync(LAYERS_CFG, 'utf8'));
+      if (folder && typeof folder === 'string') return folder;
+    }
+  } catch {}
+  return 'BearthLayersv1';
+}
+
+export function setActiveFolder(folder: string) {
+  fs.writeFileSync(LAYERS_CFG, JSON.stringify({ folder }), 'utf8');
+  clearLayersCache();
+}
+
+export function getLayersDir(): string {
+  return path.resolve(process.cwd(), '..', getActiveFolder());
+}
 
 // Derive a readable display name from any filesystem stem.
-// "red-hoodie" → "Red Hoodie", "bear_character" → "Bear Character"
-// For stems that encode the full folder path (e.g. "exported_layers_2_body_onemint_2_body_2_1"),
-// strips everything up to the last occurrence of the layer label word and returns the remainder.
 export function getName(folder: string, stem: string): string {
   const raw = stem.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim() || stem;
 
   if (raw.split(' ').length > 5) {
-    // e.g. folder "2-body" → label last word "Body"; folder "5-back-front" → "Front"
     const labelLastWord = folder
       .replace(/^\d+[-_]/, '')
       .replace(/[_-]+/g, ' ')
@@ -61,7 +76,6 @@ function collectPngs(dir: string, layerDir: string) {
         if (!isAscii(stem)) continue;
         results.push({ stem, rel: path.relative(layerDir, full).replace(/\\/g, '/') });
       } else if (ext === '') {
-        // No-extension file = NONE placeholder uploaded by artist
         const stem = e.name;
         if (!isAscii(stem)) continue;
         results.push({ stem, rel: null });
@@ -76,8 +90,6 @@ function deriveLabelFromFolder(fname: string): string {
     .replace(/\b\w/g, c => c.toUpperCase()).trim() || fname;
 }
 
-// Generates a virtual NONE stem that won't collide with real files.
-// Follows the convention "{prefix}-0" (e.g. folder "4-clothes" → "4-0").
 function virtualNoneStem(folderName: string): string {
   const m = folderName.match(/^(\d+)/);
   return m ? `${m[1]}-0` : 'none';
@@ -85,54 +97,48 @@ function virtualNoneStem(folderName: string): string {
 
 // ── Layer order ──────────────────────────────────────────────────────────────
 
-const LAYER_ORDER_FILE = path.join(LAYERS_DIR, '.layer-order.json');
-
 export function getLayerOrder() {
+  const file = path.join(getLayersDir(), '.layer-order.json');
   try {
-    if (fs.existsSync(LAYER_ORDER_FILE)) {
-      return JSON.parse(fs.readFileSync(LAYER_ORDER_FILE, 'utf8'));
-    }
-  } catch { }
+    if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {}
   return null;
 }
 
 export function saveLayerOrder(folders: string[]) {
-  if (!fs.existsSync(LAYERS_DIR)) return;
-  fs.writeFileSync(LAYER_ORDER_FILE, JSON.stringify(folders), 'utf8');
+  const dir = getLayersDir();
+  if (!fs.existsSync(dir)) return;
+  fs.writeFileSync(path.join(dir, '.layer-order.json'), JSON.stringify(folders), 'utf8');
   clearLayersCache();
 }
 
 // ── Layer config (optional layers) ──────────────────────────────────────────
-// Replaces hardcoded VIRTUAL_NONES — artist marks layers as optional via the UI.
-
-const LAYER_CONFIG_FILE = path.join(LAYERS_DIR, '.layer-config.json');
 
 export function getLayerConfig(): { optional: string[] } {
+  const file = path.join(getLayersDir(), '.layer-config.json');
   try {
-    if (fs.existsSync(LAYER_CONFIG_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(LAYER_CONFIG_FILE, 'utf8'));
+    if (fs.existsSync(file)) {
+      const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
       return { optional: Array.isArray(parsed.optional) ? parsed.optional : [] };
     }
-  } catch { }
+  } catch {}
   return { optional: [] };
 }
 
 export function saveLayerConfig(config: { optional: string[] }) {
-  if (!fs.existsSync(LAYERS_DIR)) return;
-  fs.writeFileSync(LAYER_CONFIG_FILE, JSON.stringify(config), 'utf8');
+  const dir = getLayersDir();
+  if (!fs.existsSync(dir)) return;
+  fs.writeFileSync(path.join(dir, '.layer-config.json'), JSON.stringify(config), 'utf8');
   clearLayersCache();
 }
 
 // ── Trait display names ──────────────────────────────────────────────────────
 
-const TRAIT_NAMES_FILE = path.join(LAYERS_DIR, '.trait-names.json');
-
 export function getTraitNames(): Record<string, Record<string, string>> {
+  const file = path.join(getLayersDir(), '.trait-names.json');
   try {
-    if (fs.existsSync(TRAIT_NAMES_FILE)) {
-      return JSON.parse(fs.readFileSync(TRAIT_NAMES_FILE, 'utf8'));
-    }
-  } catch { }
+    if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {}
   return {};
 }
 
@@ -145,27 +151,26 @@ export function saveTraitName(folder: string, stem: string, name: string | null)
     delete all[folder][stem];
     if (!Object.keys(all[folder]).length) delete all[folder];
   }
-  if (!fs.existsSync(LAYERS_DIR)) return;
-  fs.writeFileSync(TRAIT_NAMES_FILE, JSON.stringify(all), 'utf8');
+  const dir = getLayersDir();
+  if (!fs.existsSync(dir)) return;
+  fs.writeFileSync(path.join(dir, '.trait-names.json'), JSON.stringify(all), 'utf8');
   clearLayersCache();
 }
 
 // ── Conflict / force rules ───────────────────────────────────────────────────
 
-const CONFLICTS_FILE = path.join(LAYERS_DIR, '.conflicts.json');
-
 export function getConflicts() {
+  const file = path.join(getLayersDir(), '.conflicts.json');
   try {
-    if (fs.existsSync(CONFLICTS_FILE)) {
-      return JSON.parse(fs.readFileSync(CONFLICTS_FILE, 'utf8'));
-    }
-  } catch { }
+    if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {}
   return [];
 }
 
 export function saveConflicts(rules: unknown[]) {
-  if (!fs.existsSync(LAYERS_DIR)) return;
-  fs.writeFileSync(CONFLICTS_FILE, JSON.stringify(rules), 'utf8');
+  const dir = getLayersDir();
+  if (!fs.existsSync(dir)) return;
+  fs.writeFileSync(path.join(dir, '.conflicts.json'), JSON.stringify(rules), 'utf8');
 }
 
 // ── Layer scan ───────────────────────────────────────────────────────────────
@@ -173,7 +178,8 @@ export function saveConflicts(rules: unknown[]) {
 let _cache: ReturnType<typeof buildCache> | null = null;
 
 function buildCache() {
-  const diskFolders = fs.readdirSync(LAYERS_DIR, { withFileTypes: true })
+  const layersDir = getLayersDir();
+  const diskFolders = fs.readdirSync(layersDir, { withFileTypes: true })
     .filter(e => e.isDirectory())
     .map(e => e.name);
 
@@ -192,10 +198,9 @@ function buildCache() {
   const traitNames  = getTraitNames();
 
   return orderedNames.flatMap(fname => {
-    const fpath     = path.join(LAYERS_DIR, fname);
-    const rawAssets = collectPngs(fpath, LAYERS_DIR);
+    const fpath     = path.join(layersDir, fname);
+    const rawAssets = collectPngs(fpath, layersDir);
 
-    // If artist marked this layer optional and no on-disk NONE placeholder exists, inject one
     if (optionalSet.has(fname) && !rawAssets.some(a => a.rel === null)) {
       rawAssets.unshift({ stem: virtualNoneStem(fname), rel: null });
     }
@@ -222,7 +227,8 @@ export function clearLayersCache() { _cache = null; }
 
 export function scanLayers() {
   if (_cache) return _cache;
-  if (!fs.existsSync(LAYERS_DIR)) return [];
+  const layersDir = getLayersDir();
+  if (!fs.existsSync(layersDir)) return [];
   _cache = buildCache();
   return _cache;
 }
