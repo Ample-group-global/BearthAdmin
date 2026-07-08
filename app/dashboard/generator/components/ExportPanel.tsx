@@ -1,64 +1,222 @@
 // @ts-nocheck
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import JSZip from 'jszip';
+import { generateAllCombos, computeRarity, applyNameFormat } from '../../../../lib/studio/combos';
 
-function NftCard({ jobId, item }) {
+const BATCH = 16; // NFTs composited in parallel per tick
+
+// ── Canvas helpers ────────────────────────────────────────────────────────────
+function makeCanvas(w: number, h: number): OffscreenCanvas | HTMLCanvasElement {
+  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return c;
+}
+
+function canvasToBlob(canvas: any, type: string): Promise<Blob> {
+  if (canvas instanceof OffscreenCanvas) return canvas.convertToBlob({ type });
+  return new Promise(res => canvas.toBlob(res, type));
+}
+
+// ── Rarity card ───────────────────────────────────────────────────────────────
+function RarityCard({ item, jobBitmaps, layers, canvasW, canvasH, onClick }) {
+  const tierColor =
+    item.rank <= Math.ceil(item.total * 0.01) ? '#F59E0B' :
+    item.rank <= Math.ceil(item.total * 0.05) ? '#A855F7' :
+    item.rank <= Math.ceil(item.total * 0.15) ? '#3B82F6' : '#6B7280';
+
+  const canvasRef = useRef(null);
+  const drawn     = useRef(false);
+
+  function draw() {
+    if (drawn.current || !canvasRef.current) return;
+    drawn.current = true;
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.clearRect(0, 0, canvasW, canvasH);
+    for (const layer of layers) {
+      const pick = item.combo[layer.folder];
+      if (!pick?.rel) continue;
+      const bm = jobBitmaps.current[pick.rel];
+      if (bm) ctx.drawImage(bm, 0, 0, canvasW, canvasH);
+    }
+  }
+
   const [open, setOpen] = useState(false);
-  const tierColor = item.rank <= 50 ? '#f59e0b'
-    : item.rank <= 200 ? '#a78bfa'
-    : item.rank <= 500 ? '#60a5fa'
-    : '#94a3b8';
+
+  function handleClick() {
+    if (!drawn.current) draw();
+    const src = canvasRef.current?.toDataURL() ?? '';
+    onClick({ index: item.index, src, attrs: item.attrs, rank: item.rank, score: item.score });
+    setOpen(true);
+  }
 
   return (
-    <div className={`exp-nft-card${open ? ' exp-nft-open' : ''}`} onClick={() => setOpen(!open)}>
+    <div className={`exp-nft-card${open ? ' exp-nft-open' : ''}`} onClick={handleClick}>
       <div className="exp-nft-thumb">
-        <img
-          src={`/api/nft/${jobId}/${item.index}`}
-          alt={item.name}
-          loading="lazy"
-          onError={e => { e.currentTarget.parentElement.innerHTML = '<span class="no-img">🖼</span>'; }}
+        <canvas
+          ref={canvasRef}
+          width={canvasW}
+          height={canvasH}
+          style={{ width: '100%', height: '100%', display: 'block' }}
+          onMouseEnter={draw}
         />
         <div className="exp-nft-rank" style={{ color: tierColor }}>#{item.rank}</div>
       </div>
       <div className="exp-nft-info">
-        <div className="exp-nft-name">{item.name}</div>
-        <div className="exp-nft-score" style={{ color: tierColor }}>Score: {item.rarityScore}</div>
+        <div className="exp-nft-name">#{item.index}</div>
+        <div className="exp-nft-score" style={{ color: tierColor }}>Score: {item.score}</div>
       </div>
-      {open && (
-        <div className="exp-nft-traits">
-          {(item.attributes ?? []).map((a, i) => (
-            <div key={i} className="exp-trait-tag">
-              <span className="exp-trait-type">{a.trait_type}</span>
-              <span className="exp-trait-val">{a.value}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
 
-export default function ExportPanel({ weights, collection, conflicts, collectionId = null }) {
-  const [phase,   setPhase]   = useState('idle');
-  const [jobId,   setJobId]   = useState(null);
-  const [cid,     setCid]     = useState('');
-  const [metaOnly,setMetaOnly]= useState(false);
-  const [progress,setProgress]= useState({ done: 0, total: 0 });
-  const [error,   setError]   = useState('');
-  const [items,   setItems]   = useState([]);
-  const [page,    setPage]    = useState(1);
-  const [pages,   setPages]   = useState(1);
-  const [total,   setTotal]   = useState(0);
-  const [sortBy,  setSortBy]  = useState('rarity'); // 'rarity' | 'id'
-  const [dlLoading, setDlLoading] = useState(false);
+// ── Popup ─────────────────────────────────────────────────────────────────────
+function NftPopup({ item, onClose }) {
+  if (!item) return null;
+  const tierColor =
+    item.rank <= Math.ceil(item.total * 0.01) ? '#F59E0B' :
+    item.rank <= Math.ceil(item.total * 0.05) ? '#A855F7' :
+    item.rank <= Math.ceil(item.total * 0.15) ? '#3B82F6' : '#6B7280';
+  return (
+    <div className="nft-popup-overlay" onClick={onClose}>
+      <div className="nft-popup" onClick={e => e.stopPropagation()}>
+        <button className="nft-popup-close" onClick={onClose}>✕</button>
+        <div className="nft-popup-left">
+          <img src={item.src} alt={`#${item.index}`} className="nft-popup-img" />
+        </div>
+        <div className="nft-popup-right">
+          <div className="nft-popup-num">#{item.index}</div>
+          <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+            <span style={{ fontSize:12, color: tierColor, fontWeight:700 }}>Rank #{item.rank}</span>
+            <span style={{ fontSize:12, color:'var(--dim)' }}>Score: {item.score}</span>
+          </div>
+          <div className="nft-popup-attrs-title">Attributes</div>
+          <div className="nft-popup-attrs">
+            {item.attrs.map((a, i) => (
+              <div key={i} className="nft-attr-row">
+                <span className="nft-attr-type">{a.trait_type}</span>
+                <span className="nft-attr-val">{a.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const supply = collection?.supply ?? 100;
+// ── Main ExportPanel ──────────────────────────────────────────────────────────
+export default function ExportPanel({ weights, collection, conflicts, collectionId = null }) {
+  const supply      = collection?.supply      ?? 100;
+  const targetW     = collection?.width       ?? 2000;
+  const targetH     = collection?.height      ?? 2000;
+  const wantWebp    = collection?.format      === 'webp';
+  const imgExt      = wantWebp ? 'webp' : 'png';
+  const imgMime     = wantWebp ? 'image/webp' : 'image/png';
+  const nameFormat  = collection?.nameFormat  ?? '';
+  const description = collection?.description ?? '';
+  const collName    = collection?.name        ?? 'collection';
+
+  // Thumbnail size for the rarity grid display
+  const THUMB = Math.min(160, targetW);
+  const scale = Math.min(THUMB / targetW, THUMB / targetH, 1);
+  const tW    = Math.max(1, Math.round(targetW * scale));
+  const tH    = Math.max(1, Math.round(targetH * scale));
+
+  const [phase,     setPhase]     = useState<'idle'|'preload'|'combos'|'generating'|'done'>('idle');
+  const [loadMsg,   setLoadMsg]   = useState('');
+  const [progress,  setProgress]  = useState(0);
+  const [cid,       setCid]       = useState('');
+  const [metaOnly,  setMetaOnly]  = useState(false);
+  const [sortBy,    setSortBy]    = useState<'rarity'|'id'>('rarity');
+  const [page,      setPage]      = useState(1);
+  const [popup,     setPopup]     = useState(null);
+  const [dlLoading, setDlLoading] = useState(false);
+  const [error,     setError]     = useState('');
+
+  // Holds rarity-sorted results for the grid
+  const [rarityItems, setRarityItems] = useState<any[]>([]);
+  const [allCombos,   setAllCombos]   = useState<any[]>([]);
+
+  // Shared bitmap cache — pre-loaded at thumbnail size for grid display
+  const jobBitmaps = useRef<Record<string, ImageBitmap>>({});
+
+  // Layers are passed in via page.tsx — we import them via prop
+  // ExportPanel doesn't import layers directly; they come from weights keys
+  // But we need layer metadata for compositing — get it from the API
+  const [layers, setLayers] = useState<any[]>([]);
+  const cancelledRef = useRef(false);
+
+  const PAGE_SIZE = 24;
+  const totalPages = Math.ceil(rarityItems.length / PAGE_SIZE);
+  const pageItems  = rarityItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   async function generate() {
-    setPhase('generating'); setError(''); setProgress({ done: 0, total: supply });
+    cancelledRef.current = false;
+    setError('');
+    setPhase('preload');
+    setProgress(0);
+    setRarityItems([]);
+    setAllCombos([]);
+    jobBitmaps.current = {};
 
-    // Register job in DB if we have a collection
-    let dbJobId = null;
+    // ── 1. Fetch current layers from API ──────────────────────────────────────
+    let layerData: any[] = [];
+    try {
+      const r = await fetch('/api/layers');
+      layerData = await r.json();
+    } catch {
+      setError('Failed to load layers. Is the local server running?');
+      setPhase('idle');
+      return;
+    }
+    if (!layerData.length) {
+      setError('No layers found. Upload assets in the Organize tab first.');
+      setPhase('idle');
+      return;
+    }
+    setLayers(layerData);
+
+    // ── 2. Pre-load all unique layer images (thumbnail size for grid) ─────────
+    const rels = [...new Set(
+      layerData.flatMap((l: any) => l.assets.filter((a: any) => a.rel).map((a: any) => a.rel))
+    )] as string[];
+
+    let loaded = 0;
+    setLoadMsg(`Loading images… 0 / ${rels.length}`);
+
+    await Promise.all(rels.map(async (rel) => {
+      try {
+        const res = await fetch(`/api/layer-img/${rel}?w=${tW}&h=${tH}`);
+        if (res.ok) {
+          const blob = await res.blob();
+          jobBitmaps.current[rel] = await createImageBitmap(blob);
+        }
+      } catch {}
+      setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`);
+    }));
+
+    if (cancelledRef.current) { setPhase('idle'); return; }
+
+    // ── 3. Generate all combos (pure JS, instant) ─────────────────────────────
+    setPhase('combos');
+    setLoadMsg('Generating combinations…');
+    await new Promise(r => setTimeout(r, 0));
+
+    const combos = generateAllCombos(supply, layerData, weights, conflicts);
+
+    // ── 4. Compute rarity scores immediately (pure JS) ────────────────────────
+    const scored = computeRarity(combos, layerData).map(item => ({
+      ...item,
+      combo: combos[item.index - 1],
+      total: supply,
+    }));
+    setAllCombos(combos);
+    setRarityItems(scored);
+    setPhase('done');
+
+    // Register in DB if collection exists (non-fatal)
     if (collectionId) {
       try {
         const jr = await fetch(`/api/nft-gen/collections/${collectionId}/jobs`, {
@@ -67,211 +225,313 @@ export default function ExportPanel({ weights, collection, conflicts, collection
           body: JSON.stringify({ editionSize: supply }),
         });
         const jdata = await jr.json();
-        dbJobId = jdata?.job?.id ?? jdata?.id ?? null;
+        const dbJobId = jdata?.job?.id ?? jdata?.id ?? null;
         if (dbJobId) {
           await fetch(`/api/nft-gen/jobs/${dbJobId}/start`, { method: 'POST' });
+          await fetch(`/api/nft-gen/jobs/${dbJobId}/complete`, { method: 'POST' });
         }
-      } catch { /* non-fatal — local generation continues regardless */ }
+      } catch {}
     }
-
-    try {
-      const r = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          total:     supply,
-          config:    weights ?? {},
-          conflicts: conflicts ?? [],
-          collection: {
-            name:        collection?.name        ?? 'NFT',
-            description: collection?.description ?? '',
-            format:      collection?.format      ?? 'png',
-            nameFormat:  collection?.nameFormat  ?? '',
-          },
-        }),
-      });
-      const { job_id } = await r.json();
-      setJobId(job_id);
-
-      await new Promise((resolve, reject) => {
-        const es = new EventSource(`/api/progress/${job_id}`);
-        es.onmessage = e => {
-          const d = JSON.parse(e.data);
-          setProgress({ done: d.done ?? 0, total: d.total ?? supply });
-          if (d.status === 'done')  { es.close(); resolve(job_id); }
-          if (d.status === 'error') { es.close(); reject(new Error(d.error || 'Generation failed')); }
-        };
-        es.onerror = () => { es.close(); reject(new Error('Connection lost')); };
-      });
-
-      setPhase('done');
-      // Mark DB job complete
-      if (dbJobId) {
-        fetch(`/api/nft-gen/jobs/${dbJobId}/complete`, { method: 'POST' }).catch(() => {});
-      }
-      loadRarity(job_id, 1, 'rarity');
-    } catch(e) {
-      // Mark DB job failed
-      if (dbJobId) {
-        fetch(`/api/nft-gen/jobs/${dbJobId}/fail`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ errorMessage: e.message }),
-        }).catch(() => {});
-      }
-      setError(e.message);
-      setPhase('idle');
-    }
-  }
-
-  async function loadRarity(jid, p, sort) {
-    const r = await fetch(`/api/rarity/${jid}?page=${p}&limit=24`);
-    const d = await r.json();
-    let items = d.items ?? [];
-    if (sort === 'id') items = [...items].sort((a, b) => a.index - b.index);
-    setItems(items);
-    setPage(p);
-    setPages(d.pages ?? 1);
-    setTotal(d.total ?? 0);
-  }
-
-  function changeSort(s) {
-    setSortBy(s);
-    if (jobId) loadRarity(jobId, 1, s);
   }
 
   async function downloadZip() {
-    if (!jobId) return;
+    if (!allCombos.length || !layers.length) return;
     setDlLoading(true);
+    setError('');
+    cancelledRef.current = false;
+    setPhase('generating');
+    setProgress(0);
+
     try {
-      const r = await fetch(`/api/download/${jobId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cid: cid || 'PLACEHOLDER_CID',
-          format: collection?.format ?? 'png',
-          collectionName: collection?.name ?? 'collection',
-          metaOnly,
-        }),
-      });
-      if (!r.ok) { const e = await r.json(); throw new Error(e.error || 'Download failed'); }
-      const blob = await r.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href = url;
-      a.download = `${(collection?.name || 'collection').replace(/\s+/g,'_').toLowerCase()}_nfts.zip`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch(e) { setError(e.message); }
+      const zip  = new JSZip();
+      const imgs = metaOnly ? null : zip.folder('images');
+      const meta = zip.folder('metadata');
+      const resolvedCid = cid.trim() || 'PLACEHOLDER_CID';
+
+      // Pre-load images at FULL resolution for export (separate from thumb cache)
+      const exportBitmaps: Record<string, ImageBitmap> = {};
+      if (!metaOnly) {
+        const rels = [...new Set(
+          layers.flatMap((l: any) => l.assets.filter((a: any) => a.rel).map((a: any) => a.rel))
+        )] as string[];
+        let lCount = 0;
+        setLoadMsg(`Preparing images… 0 / ${rels.length}`);
+        await Promise.all(rels.map(async (rel) => {
+          try {
+            const res = await fetch(`/api/layer-img/${rel}?w=${targetW}&h=${targetH}`);
+            if (res.ok) {
+              const blob = await res.blob();
+              exportBitmaps[rel] = await createImageBitmap(blob);
+            }
+          } catch {}
+          setLoadMsg(`Preparing images… ${++lCount} / ${rels.length}`);
+        }));
+      }
+
+      if (cancelledRef.current) { setPhase('done'); setDlLoading(false); return; }
+
+      // Process NFTs in batches
+      let done = 0;
+      for (let i = 0; i < supply; i += BATCH) {
+        if (cancelledRef.current) break;
+        const end = Math.min(i + BATCH, supply);
+
+        await Promise.all(
+          Array.from({ length: end - i }, async (_, j) => {
+            const idx   = i + j;
+            const combo = allCombos[idx];
+            const num   = idx + 1;
+
+            // Composite image
+            if (!metaOnly) {
+              const canvas = makeCanvas(targetW, targetH);
+              const ctx    = (canvas as any).getContext('2d');
+              ctx.clearRect(0, 0, targetW, targetH);
+              for (const layer of layers) {
+                const pick = combo[layer.folder];
+                if (!pick?.rel) continue;
+                const bm = exportBitmaps[pick.rel];
+                if (bm) ctx.drawImage(bm, 0, 0, targetW, targetH);
+              }
+              const blob = await canvasToBlob(canvas, imgMime);
+              imgs!.file(`${num}.${imgExt}`, blob);
+            }
+
+            // Metadata
+            const attrs = layers
+              .filter(l => combo[l.folder] && combo[l.folder].rel !== null)
+              .map(l => ({ trait_type: l.label, value: combo[l.folder].name }));
+
+            meta!.file(`${num}.json`, JSON.stringify({
+              name:        applyNameFormat(nameFormat || `${collName} #{{id}}`, num),
+              description,
+              image:       `ipfs://${resolvedCid}/${num}.${imgExt}`,
+              edition:     num,
+              attributes:  attrs,
+            }, null, 2));
+          })
+        );
+
+        done = Math.min(i + BATCH, supply);
+        setProgress(done);
+      }
+
+      if (cancelledRef.current) { setPhase('done'); setDlLoading(false); return; }
+
+      // Generate ZIP
+      setLoadMsg('Compressing ZIP…');
+      const blob = await zip.generateAsync(
+        { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 1 } },
+        ({ percent }) => setLoadMsg(`Compressing… ${Math.round(percent)}%`)
+      );
+
+      // Download
+      const url = URL.createObjectURL(blob);
+      const a   = document.createElement('a');
+      a.href     = url;
+      a.download = `${collName.replace(/\s+/g, '_').toLowerCase()}_nfts.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (e: any) {
+      setError(e.message);
+    }
+
+    setPhase('done');
+    setLoadMsg('');
     setDlLoading(false);
   }
 
-  const pct = progress.total > 0 ? Math.min((progress.done / progress.total) * 100, 100) : 0;
+  function cancel() {
+    cancelledRef.current = true;
+  }
 
-  return (
-    <div className="export-page">
-      <div className={`export-card${phase === 'done' ? ' export-card-wide' : ''}`}>
-        <div className="export-title">Export Collection</div>
-        <div className="export-sub">
-          {phase === 'done'
-            ? `${total.toLocaleString()} NFTs generated — browse rarity rankings or download ZIP`
-            : `Generate all ${supply.toLocaleString()} NFTs and download as ZIP`}
+  const pct = supply > 0 ? Math.min((progress / supply) * 100, 100) : 0;
+
+  // ── Idle / settings ─────────────────────────────────────────────────────────
+  if (phase === 'idle') {
+    return (
+      <div className="export-page">
+        <div className="export-card">
+          <div className="export-title">Export Collection</div>
+          <div className="export-sub">Generate all {supply.toLocaleString()} NFTs and download as ZIP</div>
+
+          <div className="export-section">
+            <div className="export-section-title">Collection Summary</div>
+            <div className="export-info-grid">
+              <div className="export-info-item"><span className="export-info-label">Name</span><span className="export-info-val">{collName || '—'}</span></div>
+              <div className="export-info-item"><span className="export-info-label">Supply</span><span className="export-info-val">{supply.toLocaleString()}</span></div>
+              <div className="export-info-item"><span className="export-info-label">Blockchain</span><span className="export-info-val" style={{textTransform:'capitalize'}}>{collection?.blockchain || '—'}</span></div>
+              <div className="export-info-item"><span className="export-info-label">Format</span><span className="export-info-val">{imgExt.toUpperCase()}</span></div>
+              <div className="export-info-item"><span className="export-info-label">Resolution</span><span className="export-info-val">{targetW}×{targetH}px</span></div>
+            </div>
+          </div>
+
+          <div className="export-section">
+            <div className="export-section-title">IPFS CID <span style={{fontWeight:400,fontSize:11,color:'var(--dim)'}}>(optional — set after uploading images to IPFS)</span></div>
+            <div className="export-field">
+              <input
+                placeholder="ipfs://Qm... or leave blank for placeholder"
+                value={cid}
+                onChange={e => setCid(e.target.value)}
+              />
+              <span className="field-hint">Image URLs in metadata will be: ipfs://YOUR_CID/1.{imgExt}</span>
+            </div>
+          </div>
+
+          <div className="export-section">
+            <div className="export-section-title">Options</div>
+            <label className="export-check">
+              <input type="checkbox" checked={metaOnly} onChange={e => setMetaOnly(e.target.checked)} />
+              <span>Export metadata JSON only (skip image compositing)</span>
+            </label>
+          </div>
+
+          {error && <div className="export-error">❌ {error}</div>}
+
+          <div className="export-actions">
+            <button className="btn btn-primary btn-lg" onClick={generate}>
+              ⚡ Generate {supply.toLocaleString()} NFTs
+            </button>
+          </div>
         </div>
+      </div>
+    );
+  }
 
-        {phase === 'idle' && (
-          <>
-            <div className="export-section">
-              <div className="export-section-title">Collection Summary</div>
-              <div className="export-info-grid">
-                <div className="export-info-item"><span className="export-info-label">Name</span><span className="export-info-val">{collection?.name || '—'}</span></div>
-                <div className="export-info-item"><span className="export-info-label">Symbol</span><span className="export-info-val">{collection?.symbol || '—'}</span></div>
-                <div className="export-info-item"><span className="export-info-label">Blockchain</span><span className="export-info-val" style={{textTransform:'capitalize'}}>{collection?.blockchain || '—'}</span></div>
-                <div className="export-info-item"><span className="export-info-label">Supply</span><span className="export-info-val">{supply.toLocaleString()}</span></div>
-              </div>
-            </div>
+  // ── Preload / combo phase ────────────────────────────────────────────────────
+  if (phase === 'preload' || phase === 'combos') {
+    return (
+      <div className="export-page">
+        <div className="export-card">
+          <div className="export-title">Preparing…</div>
+          <div className="loading" style={{margin:'30px auto'}}><div className="spinner" /></div>
+          <div style={{textAlign:'center', color:'var(--dim)', fontSize:13}}>{loadMsg}</div>
+        </div>
+      </div>
+    );
+  }
 
-            <div className="export-section">
-              <div className="export-section-title">IPFS CID</div>
-              <div className="export-field">
-                <input placeholder="ipfs://Qm... or leave blank for placeholder" value={cid} onChange={e => setCid(e.target.value)} />
-                <span className="field-hint">Image URLs in metadata will update to ipfs://YOUR_CID/1.png</span>
-              </div>
-            </div>
-
-            <div className="export-section">
-              <div className="export-section-title">Options</div>
-              <label className="export-check">
-                <input type="checkbox" checked={metaOnly} onChange={e => setMetaOnly(e.target.checked)} />
-                <span>Export metadata JSON only (no images)</span>
-              </label>
-            </div>
-
-            {error && <div className="export-error">❌ {error}</div>}
-
-            <div className="export-actions">
-              <button className="btn btn-primary btn-lg" onClick={generate}>
-                ⚡ Generate {supply.toLocaleString()} NFTs
-              </button>
-            </div>
-          </>
-        )}
-
-        {phase === 'generating' && (
+  // ── Generating ZIP ───────────────────────────────────────────────────────────
+  if (phase === 'generating') {
+    return (
+      <div className="export-page">
+        <div className="export-card">
+          <div className="export-title">{metaOnly ? 'Generating metadata…' : 'Compositing NFTs…'}</div>
+          <div className="export-sub">{loadMsg || `${progress.toLocaleString()} / ${supply.toLocaleString()} NFTs`}</div>
           <div className="export-gen-progress">
             <div className="prog-bg" style={{marginBottom:10}}>
               <div className="prog-fill" style={{ width: `${pct.toFixed(1)}%` }} />
             </div>
-            <div className="prog-text">{progress.done.toLocaleString()} / {progress.total.toLocaleString()} NFTs</div>
-            <div style={{fontSize:12,color:'var(--xdim)',marginTop:4}}>{pct.toFixed(1)}% complete</div>
+            <div className="prog-text">{progress.toLocaleString()} / {supply.toLocaleString()}</div>
+            <div style={{fontSize:12, color:'var(--xdim)', marginTop:4}}>{pct.toFixed(1)}% complete</div>
+          </div>
+          <div style={{textAlign:'center', marginTop:16}}>
+            <button className="btn btn-ghost" onClick={cancel}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Done: rarity grid + download ─────────────────────────────────────────────
+  return (
+    <div className="export-page">
+      <div className="export-card export-card-wide">
+        <div className="export-title">
+          {supply.toLocaleString()} NFTs ready
+        </div>
+
+        {/* ── Controls bar ── */}
+        <div className="exp-done-bar">
+          <div className="exp-sort-row">
+            <span style={{fontSize:12, color:'var(--dim)'}}>Sort by:</span>
+            <button
+              className={`exp-sort-btn${sortBy==='rarity'?' exp-sort-active':''}`}
+              onClick={() => { setSortBy('rarity'); setPage(1); }}
+            >🏆 Rarity</button>
+            <button
+              className={`exp-sort-btn${sortBy==='id'?' exp-sort-active':''}`}
+              onClick={() => {
+                setSortBy('id');
+                setPage(1);
+                setRarityItems(prev => [...prev].sort((a, b) => a.index - b.index));
+              }}
+            ># ID</button>
+          </div>
+
+          <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
+            <label className="export-check" style={{margin:0}}>
+              <input type="checkbox" checked={metaOnly} onChange={e => setMetaOnly(e.target.checked)} />
+              <span style={{fontSize:12}}>Metadata only</span>
+            </label>
+            <input
+              style={{background:'var(--bg0)', border:'1px solid var(--border)', color:'var(--text)', padding:'5px 10px', borderRadius:7, fontSize:12, width:200}}
+              placeholder="IPFS CID (optional)"
+              value={cid}
+              onChange={e => setCid(e.target.value)}
+            />
+            <button className="btn btn-primary" onClick={downloadZip} disabled={dlLoading}>
+              {dlLoading ? `${loadMsg || 'Generating…'}` : `⬇ Download ZIP`}
+            </button>
+            {dlLoading && (
+              <>
+                <div className="prog-bg" style={{width:120, margin:0}}>
+                  <div className="prog-fill" style={{width:`${pct.toFixed(0)}%`}} />
+                </div>
+                <button className="btn btn-ghost" onClick={cancel}>Cancel</button>
+              </>
+            )}
+            <button className="btn btn-ghost" onClick={() => { setPhase('idle'); setRarityItems([]); setAllCombos([]); }}>
+              ↺ Regenerate
+            </button>
+          </div>
+        </div>
+
+        {error && <div className="export-error">❌ {error}</div>}
+
+        {/* ── Tier legend ── */}
+        <div style={{display:'flex', gap:16, padding:'8px 0', fontSize:11, color:'var(--dim)'}}>
+          {[
+            {label:'Top 1%',  color:'#F59E0B'},
+            {label:'Top 5%',  color:'#A855F7'},
+            {label:'Top 15%', color:'#3B82F6'},
+            {label:'Common',  color:'#6B7280'},
+          ].map(t => (
+            <span key={t.label} style={{display:'flex', alignItems:'center', gap:4}}>
+              <span style={{width:8, height:8, borderRadius:'50%', background:t.color, display:'inline-block'}} />
+              <span style={{color:t.color}}>{t.label}</span>
+            </span>
+          ))}
+        </div>
+
+        {/* ── NFT grid ── */}
+        <div className="exp-nft-grid">
+          {pageItems.map(item => (
+            <RarityCard
+              key={item.index}
+              item={item}
+              jobBitmaps={jobBitmaps}
+              layers={layers}
+              canvasW={tW}
+              canvasH={tH}
+              onClick={setPopup}
+            />
+          ))}
+        </div>
+
+        {/* ── Pagination ── */}
+        {totalPages > 1 && (
+          <div className="preview-pagination">
+            <button className="btn btn-ghost" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
+            <span className="page-info">Page {page} / {totalPages}</span>
+            <button className="btn btn-ghost" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
           </div>
         )}
-
-        {phase === 'done' && (
-          <>
-            <div className="exp-done-bar">
-              <div className="exp-sort-row">
-                <span style={{fontSize:12,color:'var(--dim)'}}>Sort by:</span>
-                <button className={`exp-sort-btn${sortBy==='rarity'?' exp-sort-active':''}`} onClick={() => changeSort('rarity')}>🏆 Rarity</button>
-                <button className={`exp-sort-btn${sortBy==='id'?' exp-sort-active':''}`} onClick={() => changeSort('id')}># ID</button>
-              </div>
-              <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                <label className="export-check" style={{margin:0}}>
-                  <input type="checkbox" checked={metaOnly} onChange={e => setMetaOnly(e.target.checked)} />
-                  <span style={{fontSize:12}}>Metadata only</span>
-                </label>
-                <input
-                  style={{background:'var(--bg0)',border:'1px solid var(--border)',color:'var(--text)',padding:'5px 10px',borderRadius:7,fontSize:12,width:200}}
-                  placeholder="IPFS CID (optional)"
-                  value={cid}
-                  onChange={e => setCid(e.target.value)}
-                />
-                <button className="btn btn-ghost" onClick={downloadZip} disabled={dlLoading}>
-                  {dlLoading ? 'Preparing…' : '⬇ Download ZIP'}
-                </button>
-                <button className="btn btn-ghost" onClick={() => { setPhase('idle'); setItems([]); setJobId(null); }}>
-                  ↺ Regenerate
-                </button>
-              </div>
-            </div>
-
-            {error && <div className="export-error">❌ {error}</div>}
-
-            <div className="exp-nft-grid">
-              {items.map(item => (
-                <NftCard key={item.index} jobId={jobId} item={item} />
-              ))}
-            </div>
-
-            {pages > 1 && (
-              <div className="preview-pagination">
-                <button className="btn btn-ghost" disabled={page <= 1} onClick={() => loadRarity(jobId, page-1, sortBy)}>← Prev</button>
-                <span className="page-info">Page {page} / {pages}</span>
-                <button className="btn btn-ghost" disabled={page >= pages} onClick={() => loadRarity(jobId, page+1, sortBy)}>Next →</button>
-              </div>
-            )}
-          </>
-        )}
       </div>
+
+      {popup && <NftPopup item={{...popup, total: supply}} onClose={() => setPopup(null)} />}
     </div>
   );
 }
