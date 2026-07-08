@@ -19,7 +19,7 @@ export function getActiveFolder(): string {
 }
 
 export function setActiveFolder(folder: string) {
-  fs.writeFileSync(LAYERS_CFG, JSON.stringify({ folder }), 'utf8');
+  try { fs.writeFileSync(LAYERS_CFG, JSON.stringify({ folder }), 'utf8'); } catch {}
   clearLayersCache();
 }
 

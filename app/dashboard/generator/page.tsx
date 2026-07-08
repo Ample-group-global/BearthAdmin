@@ -1,15 +1,16 @@
 'use client';
 import './studio.css';
 import { useState, useEffect, useCallback } from 'react';
-import StepNav         from './components/StepNav';
-import CollectionSetup from './components/CollectionSetup';
-import Sidebar         from './components/Sidebar';
-import LayerContent    from './components/LayerContent';
-import PreviewPanel    from './components/PreviewPanel';
-import ExportPanel     from './components/ExportPanel';
-import RarityModal     from './components/RarityModal';
-import RarityTab       from './components/RarityTab';
-import ConflictsPanel  from './components/ConflictsPanel';
+import StepNav             from './components/StepNav';
+import CollectionSetup     from './components/CollectionSetup';
+import Sidebar             from './components/Sidebar';
+import LayerContent        from './components/LayerContent';
+import PreviewPanel        from './components/PreviewPanel';
+import ExportPanel         from './components/ExportPanel';
+import RarityModal         from './components/RarityModal';
+import RarityTab           from './components/RarityTab';
+import ConflictsPanel      from './components/ConflictsPanel';
+import { LayerFilesProvider } from './LayerFilesContext';
 
 const DEFAULT_COLLECTION = {
   name:        '',
@@ -44,27 +45,35 @@ export default function Page() {
     setStep(newStep);
   }
 
-  const loadLayers = useCallback(() => {
+  const loadLayers = useCallback((localLayers?: any[]) => {
+    const applyLayers = (data: any[]) => {
+      setLayers(data);
+      setWeights(prev => {
+        const updated = { ...prev };
+        data.forEach(l => {
+          if (!updated[l.folder]) {
+            updated[l.folder] = Object.fromEntries(
+              l.assets.map((a: any) => [a.stem, a.defaultWeight ?? 1])
+            );
+          }
+        });
+        return updated;
+      });
+      if (data.length && !activeFolder) {
+        const best = data.find(l => l.count > 1) ?? data[0];
+        setActiveFolder(best.folder);
+      }
+    };
+
+    if (localLayers?.length) {
+      applyLayers(localLayers);
+      return;
+    }
+
     fetch('/api/layers')
       .then(r => r.json())
-      .then((data: any[]) => {
-        setLayers(data);
-        setWeights(prev => {
-          const updated = { ...prev };
-          data.forEach(l => {
-            if (!updated[l.folder]) {
-              updated[l.folder] = Object.fromEntries(
-                l.assets.map((a: any) => [a.stem, a.defaultWeight ?? 1])
-              );
-            }
-          });
-          return updated;
-        });
-        if (data.length && !activeFolder) {
-          const best = data.find(l => l.count > 1) ?? data[0];
-          setActiveFolder(best.folder);
-        }
-      });
+      .then((data: any[]) => { if (data.length) applyLayers(data); })
+      .catch(() => {});
   }, [activeFolder]);
 
   useEffect(() => {
@@ -172,6 +181,7 @@ export default function Page() {
   const activeLayer = layers.find(l => l.folder === activeFolder) ?? null;
 
   return (
+    <LayerFilesProvider>
     <div className="studio-wrap">
       {/* ── Header ── */}
       <header className="header">
@@ -276,6 +286,7 @@ export default function Page() {
       {step === 'export' && (
         <ExportPanel
           weights={weights}
+          layers={layers as any}
           collection={collection}
           conflicts={conflicts}
           collectionId={collectionId as any}
@@ -318,5 +329,6 @@ export default function Page() {
         );
       })()}
     </div>
+    </LayerFilesProvider>
   );
 }

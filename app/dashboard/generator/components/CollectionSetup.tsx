@@ -1,6 +1,53 @@
 // @ts-nocheck
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import { useLayerFiles } from '../LayerFilesContext';
+
+// Parse layer structure from dropped files client-side (mirrors server scanLayers)
+function parseLayersFromFiles(files) {
+  const groups = new Map(); // folder -> [{ file, stem, rel }]
+  const fileMap = new Map(); // rel -> File
+
+  for (const file of files) {
+    const wpath = file.webkitRelativePath || file.name;
+    const parts = wpath.split('/').filter(Boolean);
+    const layerIdx = parts.findIndex(p => /^\d+[-_]/.test(p));
+    if (layerIdx === -1) continue;
+    if (!file.name.match(/\.(png|webp|jpg|jpeg|gif)$/i)) continue;
+
+    const layerName = parts[layerIdx];
+    const rel = parts.slice(layerIdx).join('/');
+    const stem = file.name.replace(/\.(png|webp|jpg|jpeg|gif)$/i, '');
+
+    if (!groups.has(layerName)) groups.set(layerName, []);
+    groups.get(layerName).push({ file, stem, rel });
+    fileMap.set(rel, file);
+  }
+
+  const sorted = [...groups.entries()].sort((a, b) => {
+    const na = parseInt(a[0]), nb = parseInt(b[0]);
+    return (isNaN(na) ? 999 : na) - (isNaN(nb) ? 999 : nb);
+  });
+
+  const layers = sorted.map(([folder, entries]) => {
+    const label = folder
+      .replace(/^\d+[-_]/, '')
+      .replace(/[_-]+/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase())
+      .trim() || folder;
+    const assets = entries
+      .map(({ stem, rel }) => ({
+        stem,
+        name: stem.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim() || stem,
+        rel,
+        defaultWeight: 1,
+      }))
+      .sort((a, b) => a.stem.localeCompare(b.stem));
+    return { folder, label, count: assets.length, optional: false, assets };
+  });
+
+  return { layers, fileMap };
+}
 
 function applyNameFormat(fmt, idx) {
   if (!fmt) return `#${idx}`;
@@ -58,6 +105,7 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
   const [uploadMsg,     setUploadMsg]     = useState('');
   const [activeFolder,  setActiveFolder]  = useState('BearthLayersv1');
   const folderRef = useRef(null);
+  const { storeFiles } = useLayerFiles();
 
   useEffect(() => {
     fetch('/api/layers/root').then(r => r.json()).then(d => { if (d.folder) setActiveFolder(d.folder); }).catch(() => {});
@@ -70,8 +118,13 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
     setUploading(true);
     setUploadMsg('Reading files…');
 
-    // Detect root folder name from the uploaded path (e.g. "MyArtProject/1-background/red.png" → "MyArtProject")
-    let detectedRoot: string | null = null;
+    // ── 1. Parse layers client-side immediately ──────────────────────────────
+    const { layers: parsedLayers, fileMap } = parseLayersFromFiles(files);
+    storeFiles(fileMap);              // store blob URLs in context
+    onLayersChange?.(parsedLayers);   // update UI right away (no server round-trip)
+
+    // ── 2. Detect root folder name ────────────────────────────────────────────
+    let detectedRoot = null;
     for (const file of files) {
       const parts = (file.webkitRelativePath || file.name).split('/').filter(Boolean);
       const layerIdx = parts.findIndex(p => /^\d+[-_]/.test(p));
@@ -80,20 +133,20 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
     if (detectedRoot) {
       const safe = detectedRoot.replace(/[^a-zA-Z0-9\-_]/g, '');
       if (safe) {
-        await fetch('/api/layers/root', {
+        setActiveFolder(safe);
+        fetch('/api/layers/root', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ folder: safe }),
-        });
-        setActiveFolder(safe);
+        }).catch(() => {});
       }
     }
 
+    // ── 3. Upload to server in background (local dev only, silent on cloud) ──
     if (replace) {
-      setUploadMsg('Clearing existing layers…');
-      await fetch('/api/layers/clear', { method: 'POST' });
+      await fetch('/api/layers/clear', { method: 'POST' }).catch(() => {});
     }
-    const groups: Record<string, { file: File; subpath: string }[]> = {};
+    const groups = {};
     for (const file of files) {
       if (!file.type.startsWith('image/') && !file.name.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) continue;
       const parts = (file.webkitRelativePath || file.name).split('/').filter(Boolean);
@@ -114,12 +167,12 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
         form.append('files', file);
         form.append('subpaths', subpath);
       }
-      await fetch('/api/upload', { method: 'POST', body: form });
+      await fetch('/api/upload', { method: 'POST', body: form }).catch(() => {});
     }
+
     setUploading(false);
     setUploadDone(true);
-    setUploadMsg(`${layerNames.length} layers imported!`);
-    onLayersChange?.();
+    setUploadMsg(`${parsedLayers.length} layers imported!`);
   }
 
   async function handleDrop(e) {

@@ -18,24 +18,29 @@ export async function POST(request: Request) {
   if (!safe) return NextResponse.json({ error: 'invalid layer name' }, { status: 400 });
 
   const layerDir = path.join(getLayersDir(), safe);
-  fs.mkdirSync(layerDir, { recursive: true });
-
   const added: string[] = [];
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const sub = (subpaths[i] || '').replace(/\.\./g, '').replace(/^\//, '');
-    const safeSubDir = sub.split('/').slice(0, -1).join('/'); // directory portion only
-    // Extract basename only — drop any path prefix the browser may send
-    const baseName = file.name.split(/[\\/]/).pop() ?? file.name;
-    const name = baseName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-    if (!name.match(/\.(png|webp|jpg|jpeg|gif)$/i)) continue;
-    const targetDir = safeSubDir ? path.join(layerDir, safeSubDir) : layerDir;
-    fs.mkdirSync(targetDir, { recursive: true });
-    const buf = Buffer.from(await file.arrayBuffer());
-    fs.writeFileSync(path.join(targetDir, name), buf);
-    added.push(sub ? sub + '/' + name : name);
+
+  try {
+    fs.mkdirSync(layerDir, { recursive: true });
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const sub = (subpaths[i] || '').replace(/\.\./g, '').replace(/^\//, '');
+      const safeSubDir = sub.split('/').slice(0, -1).join('/');
+      const baseName = file.name.split(/[\\/]/).pop() ?? file.name;
+      const name = baseName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      if (!name.match(/\.(png|webp|jpg|jpeg|gif)$/i)) continue;
+      const targetDir = safeSubDir ? path.join(layerDir, safeSubDir) : layerDir;
+      fs.mkdirSync(targetDir, { recursive: true });
+      const buf = Buffer.from(await file.arrayBuffer());
+      fs.writeFileSync(path.join(targetDir, name), buf);
+      added.push(sub ? sub + '/' + name : name);
+    }
+
+    clearLayersCache();
+  } catch {
+    // Serverless / read-only filesystem — files are held client-side, this is non-fatal
   }
 
-  clearLayersCache();
   return NextResponse.json({ ok: true, added });
 }

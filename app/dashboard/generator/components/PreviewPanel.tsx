@@ -2,6 +2,7 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { generateAllCombos } from '../../../../lib/studio/combos';
+import { useLayerFiles } from '../LayerFilesContext';
 
 const THUMB    = 160;  // thumbnail px
 const PAGE_SIZE = 96;  // cards per page
@@ -143,6 +144,7 @@ const SORT_LABELS = {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function PreviewPanel({ weights, layers, collection, conflicts }) {
+  const { getBlobUrl } = useLayerFiles();
   const supply = collection?.supply ?? 100;
   const srcW   = collection?.width  ?? 512;
   const srcH   = collection?.height ?? 512;
@@ -179,15 +181,24 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
     setLoadMsg(`Loading images… 0 / ${rels.length}`);
 
     await Promise.all(rels.map(async rel => {
-      if (bitmapCache.current[rel]) { setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`); return; }
+      if (bitmapCache.current[rel]) { loaded++; setLoadMsg(`Loading images… ${loaded} / ${rels.length}`); return; }
       try {
-        const res = await fetch(`/api/layer-img/${rel}?w=${canvasW}&h=${canvasH}`);
+        const blobUrl = getBlobUrl(rel);
+        const src = blobUrl ?? `/api/layer-img/${rel}?w=${canvasW}&h=${canvasH}`;
+        const res = await fetch(src);
         if (res.ok) {
           const blob = await res.blob();
-          bitmapCache.current[rel] = await createImageBitmap(blob);
+          try {
+            bitmapCache.current[rel] = await createImageBitmap(blob, {
+              resizeWidth: canvasW, resizeHeight: canvasH, resizeQuality: 'medium',
+            });
+          } catch {
+            bitmapCache.current[rel] = await createImageBitmap(blob);
+          }
         }
       } catch {}
-      setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`);
+      loaded++;
+      setLoadMsg(`Loading images… ${loaded} / ${rels.length}`);
     }));
 
     // ── Step 2: generate all combos instantly (pure JS) ──

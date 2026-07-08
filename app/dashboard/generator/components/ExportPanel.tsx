@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import JSZip from 'jszip';
 import { generateAllCombos, computeRarity, applyNameFormat } from '../../../../lib/studio/combos';
+import { useLayerFiles } from '../LayerFilesContext';
 
 const BATCH = 16; // NFTs composited in parallel per tick
 
@@ -107,7 +108,7 @@ function NftPopup({ item, onClose }) {
 }
 
 // ── Main ExportPanel ──────────────────────────────────────────────────────────
-export default function ExportPanel({ weights, collection, conflicts, collectionId = null }) {
+export default function ExportPanel({ weights, layers: layersProp = [], collection, conflicts, collectionId = null }) {
   const supply      = collection?.supply      ?? 100;
   const targetW     = collection?.width       ?? 2000;
   const targetH     = collection?.height      ?? 2000;
@@ -135,6 +136,8 @@ export default function ExportPanel({ weights, collection, conflicts, collection
   const [dlLoading, setDlLoading] = useState(false);
   const [error,     setError]     = useState('');
 
+  const { getBlobUrl } = useLayerFiles();
+
   // Holds rarity-sorted results for the grid
   const [rarityItems, setRarityItems] = useState<any[]>([]);
   const [allCombos,   setAllCombos]   = useState<any[]>([]);
@@ -142,10 +145,8 @@ export default function ExportPanel({ weights, collection, conflicts, collection
   // Shared bitmap cache — pre-loaded at thumbnail size for grid display
   const jobBitmaps = useRef<Record<string, ImageBitmap>>({});
 
-  // Layers are passed in via page.tsx — we import them via prop
-  // ExportPanel doesn't import layers directly; they come from weights keys
-  // But we need layer metadata for compositing — get it from the API
-  const [layers, setLayers] = useState<any[]>([]);
+  // layers comes from props (passed from page.tsx); fallback to internal state for compat
+  const [layers, setLayers] = useState<any[]>(layersProp);
   const cancelledRef = useRef(false);
 
   const PAGE_SIZE = 24;
@@ -161,18 +162,16 @@ export default function ExportPanel({ weights, collection, conflicts, collection
     setAllCombos([]);
     jobBitmaps.current = {};
 
-    // ── 1. Fetch current layers from API ──────────────────────────────────────
-    let layerData: any[] = [];
-    try {
-      const r = await fetch('/api/layers');
-      layerData = await r.json();
-    } catch {
-      setError('Failed to load layers. Is the local server running?');
-      setPhase('idle');
-      return;
+    // ── 1. Resolve layers — prefer prop, fall back to API ────────────────────
+    let layerData: any[] = layersProp.length ? layersProp : layers;
+    if (!layerData.length) {
+      try {
+        const r = await fetch('/api/layers');
+        layerData = await r.json();
+      } catch {}
     }
     if (!layerData.length) {
-      setError('No layers found. Upload assets in the Organize tab first.');
+      setError('No layers found. Upload assets in the Settings tab first.');
       setPhase('idle');
       return;
     }
@@ -188,10 +187,18 @@ export default function ExportPanel({ weights, collection, conflicts, collection
 
     await Promise.all(rels.map(async (rel) => {
       try {
-        const res = await fetch(`/api/layer-img/${rel}?w=${tW}&h=${tH}`);
+        const blobUrl = getBlobUrl(rel);
+        const src = blobUrl ?? `/api/layer-img/${rel}?w=${tW}&h=${tH}`;
+        const res = await fetch(src);
         if (res.ok) {
           const blob = await res.blob();
-          jobBitmaps.current[rel] = await createImageBitmap(blob);
+          try {
+            jobBitmaps.current[rel] = await createImageBitmap(blob, {
+              resizeWidth: tW, resizeHeight: tH, resizeQuality: 'medium',
+            });
+          } catch {
+            jobBitmaps.current[rel] = await createImageBitmap(blob);
+          }
         }
       } catch {}
       setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`);
@@ -258,7 +265,9 @@ export default function ExportPanel({ weights, collection, conflicts, collection
         setLoadMsg(`Preparing images… 0 / ${rels.length}`);
         await Promise.all(rels.map(async (rel) => {
           try {
-            const res = await fetch(`/api/layer-raw/${rel}`);
+            const blobUrl = getBlobUrl(rel);
+            const src = blobUrl ?? `/api/layer-raw/${rel}`;
+            const res = await fetch(src);
             if (res.ok) {
               const blob = await res.blob();
               exportBitmaps[rel] = await createImageBitmap(blob);
