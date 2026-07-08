@@ -1,6 +1,6 @@
 // @ts-nocheck
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 function applyNameFormat(fmt, idx) {
   if (!fmt) return `#${idx}`;
@@ -52,11 +52,16 @@ function readEntry(entry) {
 }
 
 export default function CollectionSetup({ collection, onChange, onNext, onReset, onLayersChange, syncing = false, syncError = '' }) {
-  const [dragOver,   setDragOver]   = useState(false);
-  const [uploading,  setUploading]  = useState(false);
-  const [uploadDone, setUploadDone] = useState(false);
-  const [uploadMsg,  setUploadMsg]  = useState('');
+  const [dragOver,      setDragOver]      = useState(false);
+  const [uploading,     setUploading]     = useState(false);
+  const [uploadDone,    setUploadDone]    = useState(false);
+  const [uploadMsg,     setUploadMsg]     = useState('');
+  const [activeFolder,  setActiveFolder]  = useState('BearthLayersv1');
   const folderRef = useRef(null);
+
+  useEffect(() => {
+    fetch('/api/layers/root').then(r => r.json()).then(d => { if (d.folder) setActiveFolder(d.folder); }).catch(() => {});
+  }, []);
 
   const set = (k, v) => onChange({ ...collection, [k]: v });
 
@@ -64,6 +69,26 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
     if (!files.length) return;
     setUploading(true);
     setUploadMsg('Reading files…');
+
+    // Detect root folder name from the uploaded path (e.g. "MyArtProject/1-background/red.png" → "MyArtProject")
+    let detectedRoot: string | null = null;
+    for (const file of files) {
+      const parts = (file.webkitRelativePath || file.name).split('/').filter(Boolean);
+      const layerIdx = parts.findIndex(p => /^\d+[-_]/.test(p));
+      if (layerIdx > 0) { detectedRoot = parts[0]; break; }
+    }
+    if (detectedRoot) {
+      const safe = detectedRoot.replace(/[^a-zA-Z0-9\-_]/g, '');
+      if (safe) {
+        await fetch('/api/layers/root', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folder: safe }),
+        });
+        setActiveFolder(safe);
+      }
+    }
+
     if (replace) {
       setUploadMsg('Clearing existing layers…');
       await fetch('/api/layers/clear', { method: 'POST' });
@@ -205,9 +230,13 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
 
           {/* Artwork Optional */}
           <div className="setup-artwork">
-            <div className="setup-artwork-title">Artwork Optional</div>
+            <div className="setup-artwork-title">Import Artwork Layers</div>
             <div className="setup-artwork-hint">
-              Drag and Drop your assets folder into the box below. We will automatically generate your layers for you.
+              Drag and Drop your assets folder into the box below. We will automatically detect your folder name and import all layers.
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, padding:'6px 10px', background:'var(--bg2)', borderRadius:7, border:'1px solid var(--border)', fontSize:12 }}>
+              <span style={{ color:'var(--dim)' }}>Active layers folder:</span>
+              <span style={{ color:'var(--accent)', fontWeight:600, fontFamily:'monospace' }}>{activeFolder}</span>
             </div>
             <div
               className={`setup-drop-zone${dragOver ? ' drag-over' : ''}${uploadDone ? ' done' : ''}`}

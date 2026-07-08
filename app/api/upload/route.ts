@@ -1,7 +1,7 @@
 import path from 'path';
 import fs   from 'fs';
 import { NextResponse } from 'next/server';
-import { LAYERS_DIR, clearLayersCache } from '../../../lib/studio/layers';
+import { getLayersDir, clearLayersCache } from '../../../lib/studio/layers';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   const safe = layer.replace(/[^a-zA-Z0-9\-_]/g, '');
   if (!safe) return NextResponse.json({ error: 'invalid layer name' }, { status: 400 });
 
-  const layerDir = path.join(LAYERS_DIR, safe);
+  const layerDir = path.join(getLayersDir(), safe);
   fs.mkdirSync(layerDir, { recursive: true });
 
   const added: string[] = [];
