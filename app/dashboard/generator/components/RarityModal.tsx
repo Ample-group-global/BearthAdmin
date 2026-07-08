@@ -109,6 +109,16 @@ export default function RarityModal({ layer, weights, supply, onSave, onDelete, 
                       onChange={e => setW(asset.stem, Math.max(0, parseFloat(e.target.value) || 0))}
                     />
                   </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', padding:'0 2px', marginTop:2 }}>
+                    {[
+                      { label:'Legendary', color:'#F59E0B' },
+                      { label:'Epic',      color:'#A855F7' },
+                      { label:'Rare',      color:'#3B82F6' },
+                      { label:'Common',    color:'#6B7280' },
+                    ].map(t => (
+                      <span key={t.label} style={{ fontSize:9, color: t.color, fontWeight:600, letterSpacing:'0.02em' }}>{t.label}</span>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Toggle */}

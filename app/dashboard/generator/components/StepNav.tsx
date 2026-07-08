@@ -12,15 +12,20 @@ const STEPS = [
 export default function StepNav({ step, onStep }) {
   return (
     <nav className="step-nav">
-      {STEPS.map(s => (
-        <button
-          key={s.id}
-          className={`step-btn${step === s.id ? ' step-active' : ''}`}
-          onClick={() => onStep(s.id)}
-        >
-          <span className="step-icon">{s.icon}</span>
-          <span>{s.label}</span>
-        </button>
+      {STEPS.map((s, i) => (
+        <>
+          <button
+            key={s.id}
+            className={`step-btn${step === s.id ? ' step-active' : ''}`}
+            onClick={() => onStep(s.id)}
+          >
+            <span className="step-icon">{s.icon}</span>
+            <span>{s.label}</span>
+          </button>
+          {i < STEPS.length - 1 && (
+            <span key={`sep-${s.id}`} className="step-sep">›</span>
+          )}
+        </>
       ))}
     </nav>
   );
