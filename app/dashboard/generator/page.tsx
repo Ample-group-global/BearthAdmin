@@ -223,7 +223,19 @@ export default function Page() {
             }}
           />
           <div className="org-main">
-            {activeLayer ? (
+            {layers.length === 0 ? (
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:12, color:'var(--dim)', textAlign:'center', padding:40 }}>
+                <div style={{ fontSize:40 }}>🗂️</div>
+                <div style={{ fontSize:16, fontWeight:600, color:'var(--text)' }}>No layers found</div>
+                <div style={{ fontSize:13 }}>
+                  The layer organizer requires the <strong>BearthLayersv1</strong> folder on the same machine.<br />
+                  Run the generator locally to import and organize your layers.
+                </div>
+                <button className="btn btn-ghost" onClick={() => goToStep('settings')} style={{ marginTop:8 }}>
+                  ← Back to Settings
+                </button>
+              </div>
+            ) : activeLayer ? (
               <LayerContent
                 key={activeFolder}
                 layer={activeLayer}
