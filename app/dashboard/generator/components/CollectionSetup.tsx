@@ -118,61 +118,61 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
     setUploading(true);
     setUploadMsg('Reading files…');
 
-    // ── 1. Parse layers client-side immediately ──────────────────────────────
+    // ── 1. Parse layers client-side — instant ────────────────────────────────
     const { layers: parsedLayers, fileMap } = parseLayersFromFiles(files);
-    storeFiles(fileMap);              // store blob URLs in context
-    onLayersChange?.(parsedLayers);   // update UI right away (no server round-trip)
+    storeFiles(fileMap);
+    onLayersChange?.(parsedLayers);
 
-    // ── 2. Detect root folder name ────────────────────────────────────────────
-    let detectedRoot = null;
-    for (const file of files) {
-      const parts = (file.webkitRelativePath || file.name).split('/').filter(Boolean);
-      const layerIdx = parts.findIndex(p => /^\d+[-_]/.test(p));
-      if (layerIdx > 0) { detectedRoot = parts[0]; break; }
-    }
-    if (detectedRoot) {
-      const safe = detectedRoot.replace(/[^a-zA-Z0-9\-_]/g, '');
-      if (safe) {
-        setActiveFolder(safe);
-        fetch('/api/layers/root', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ folder: safe }),
-        }).catch(() => {});
-      }
-    }
-
-    // ── 3. Upload to server in background (local dev only, silent on cloud) ──
-    if (replace) {
-      await fetch('/api/layers/clear', { method: 'POST' }).catch(() => {});
-    }
-    const groups = {};
-    for (const file of files) {
-      if (!file.type.startsWith('image/') && !file.name.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) continue;
-      const parts = (file.webkitRelativePath || file.name).split('/').filter(Boolean);
-      const layerIdx = parts.findIndex(p => /^\d+[-_]/.test(p));
-      if (layerIdx === -1) continue;
-      const layerName = parts[layerIdx];
-      const subpath = parts.slice(layerIdx + 1).join('/');
-      if (!groups[layerName]) groups[layerName] = [];
-      groups[layerName].push({ file, subpath });
-    }
-    const layerNames = Object.keys(groups);
-    let done = 0;
-    for (const [layer, entries] of Object.entries(groups)) {
-      setUploadMsg(`Uploading ${layer} (${++done}/${layerNames.length})…`);
-      const form = new FormData();
-      form.append('layer', layer);
-      for (const { file, subpath } of entries) {
-        form.append('files', file);
-        form.append('subpaths', subpath);
-      }
-      await fetch('/api/upload', { method: 'POST', body: form }).catch(() => {});
-    }
-
+    // Show success immediately — no need to wait for server
     setUploading(false);
     setUploadDone(true);
     setUploadMsg(`${parsedLayers.length} layers imported!`);
+
+    // ── 2. Fire server uploads in background (local dev persistence only) ────
+    // These are intentionally NOT awaited — the UI is already updated above.
+    const doServerUpload = async () => {
+      let detectedRoot = null;
+      for (const file of files) {
+        const parts = (file.webkitRelativePath || file.name).split('/').filter(Boolean);
+        const layerIdx = parts.findIndex(p => /^\d+[-_]/.test(p));
+        if (layerIdx > 0) { detectedRoot = parts[0]; break; }
+      }
+      if (detectedRoot) {
+        const safe = detectedRoot.replace(/[^a-zA-Z0-9\-_]/g, '');
+        if (safe) {
+          setActiveFolder(safe);
+          await fetch('/api/layers/root', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder: safe }),
+          }).catch(() => {});
+        }
+      }
+      if (replace) {
+        await fetch('/api/layers/clear', { method: 'POST' }).catch(() => {});
+      }
+      const groups = {};
+      for (const file of files) {
+        if (!file.type.startsWith('image/') && !file.name.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) continue;
+        const parts = (file.webkitRelativePath || file.name).split('/').filter(Boolean);
+        const layerIdx = parts.findIndex(p => /^\d+[-_]/.test(p));
+        if (layerIdx === -1) continue;
+        const layerName = parts[layerIdx];
+        const subpath = parts.slice(layerIdx + 1).join('/');
+        if (!groups[layerName]) groups[layerName] = [];
+        groups[layerName].push({ file, subpath });
+      }
+      for (const [layer, entries] of Object.entries(groups)) {
+        const form = new FormData();
+        form.append('layer', layer);
+        for (const { file, subpath } of entries) {
+          form.append('files', file);
+          form.append('subpaths', subpath);
+        }
+        fetch('/api/upload', { method: 'POST', body: form }).catch(() => {});
+      }
+    };
+    doServerUpload(); // fire and forget — no await
   }
 
   async function handleDrop(e) {
