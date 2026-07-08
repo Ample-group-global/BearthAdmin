@@ -1,7 +1,11 @@
 // @ts-nocheck
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
+const THUMB    = 160;  // thumbnail px
+const PAGE_SIZE = 96;  // cards per page
+
+// ── Weighted pick ─────────────────────────────────────────────────────────────
 function pickWeighted(assets, ws) {
   const pool = assets.filter(a => (ws[a.stem] ?? a.defaultWeight ?? 1) > 0);
   if (!pool.length) return null;
@@ -14,132 +18,141 @@ function pickWeighted(assets, ws) {
   return pool[pool.length - 1];
 }
 
-const IMG_CACHE = {};
-function getImg(url) {
-  if (!IMG_CACHE[url]) {
-    IMG_CACHE[url] = new Promise(res => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload  = () => res(img);
-      img.onerror = () => res(null);
-      img.src = url;
-    });
-  }
-  return IMG_CACHE[url];
-}
+// ── Conflict resolution (mirrors server logic) ────────────────────────────────
+function resolveConflicts(picks, conflicts, weights, layers) {
+  if (!conflicts?.length) return;
+  const layerMap = Object.fromEntries(layers.map(l => [l.folder, l]));
+  const rules = conflicts
+    .map(r => ({
+      type:       r.type ?? 'exclude',
+      ifLayer:    r.ifLayer,
+      ifTrait:    r.ifTrait,
+      thenLayer:  r.thenLayer,
+      thenTraits: Array.isArray(r.thenTraits) ? r.thenTraits : (r.thenTrait ? [r.thenTrait] : []),
+    }))
+    .filter(r => r.thenTraits.length);
 
-async function composite(layers, weights, canvasW, canvasH, conflicts) {
-  const canvas = document.createElement('canvas');
-  canvas.width  = canvasW;
-  canvas.height = canvasH;
-  const ctx   = canvas.getContext('2d');
-  const attrs = [];
-
-  const picks = layers.map(layer => ({
-    layer,
-    pick: pickWeighted(layer.assets, weights[layer.folder] ?? {}),
-  }));
-
-  if (conflicts?.length) {
-    const byFolder = {};
-    picks.forEach(p => { byFolder[p.layer.folder] = p; });
-
-    const normalized = conflicts
-      .map(r => ({
-        type:       r.type ?? 'exclude',
-        ifLayer:    r.ifLayer,
-        ifTrait:    r.ifTrait,
-        thenLayer:  r.thenLayer,
-        thenTraits: Array.isArray(r.thenTraits) ? r.thenTraits : (r.thenTrait ? [r.thenTrait] : []),
-      }))
-      .filter(r => r.thenTraits.length);
-
-    for (let pass = 0; pass < 5; pass++) {
-      let changed = false;
-      for (const rule of normalized) {
-        const ifEntry   = byFolder[rule.ifLayer];
-        const thenEntry = byFolder[rule.thenLayer];
-        if (!ifEntry || !thenEntry) continue;
-        if (ifEntry.pick?.stem !== rule.ifTrait) continue;
-
-        const ws = weights[thenEntry.layer.folder] ?? {};
-
-        if (rule.type === 'exclude') {
-          if (!rule.thenTraits.includes(thenEntry.pick?.stem)) continue;
-          const valid = thenEntry.layer.assets.filter(
-            a => !rule.thenTraits.includes(a.stem) && (ws[a.stem] ?? a.defaultWeight ?? 1) > 0
-          );
-          if (valid.length) { thenEntry.pick = pickWeighted(valid, ws); changed = true; }
-        } else {
-          if (rule.thenTraits.includes(thenEntry.pick?.stem)) continue;
-          const valid = thenEntry.layer.assets.filter(
-            a => rule.thenTraits.includes(a.stem) && (ws[a.stem] ?? a.defaultWeight ?? 1) > 0
-          );
-          if (valid.length) { thenEntry.pick = pickWeighted(valid, ws); changed = true; }
-        }
+  for (let pass = 0; pass < 5; pass++) {
+    let changed = false;
+    for (const rule of rules) {
+      if (picks[rule.ifLayer]?.stem !== rule.ifTrait) continue;
+      const thenLayer = layerMap[rule.thenLayer];
+      if (!thenLayer) continue;
+      const ws = weights[rule.thenLayer] ?? {};
+      if (rule.type === 'exclude') {
+        if (!rule.thenTraits.includes(picks[rule.thenLayer]?.stem)) continue;
+        const valid = thenLayer.assets.filter(
+          a => !rule.thenTraits.includes(a.stem) && (ws[a.stem] ?? a.defaultWeight ?? 1) > 0
+        );
+        if (valid.length) { picks[rule.thenLayer] = pickWeighted(valid, ws); changed = true; }
+      } else {
+        if (rule.thenTraits.includes(picks[rule.thenLayer]?.stem)) continue;
+        const valid = thenLayer.assets.filter(
+          a => rule.thenTraits.includes(a.stem) && (ws[a.stem] ?? a.defaultWeight ?? 1) > 0
+        );
+        if (valid.length) { picks[rule.thenLayer] = pickWeighted(valid, ws); changed = true; }
       }
-      if (!changed) break;
     }
+    if (!changed) break;
   }
-
-  const imgs = await Promise.all(
-    picks.map(({ pick }) =>
-      pick?.rel
-        ? getImg(`/api/layer-img/${pick.rel}?w=${canvasW}&h=${canvasH}`)
-        : Promise.resolve(null)
-    )
-  );
-
-  picks.forEach(({ layer, pick }, i) => {
-    if (imgs[i]) ctx.drawImage(imgs[i], 0, 0, canvasW, canvasH);
-    if (pick && pick.rel !== null) {
-      attrs.push({ trait_type: layer.folder, trait_label: layer.label, value: pick.name });
-    }
-  });
-
-  return { src: canvas.toDataURL(), attrs };
 }
 
-function applyFilterSort(source, sort, f) {
-  let result = [...source];
-  if (sort === 'rare-first') result.sort((a, b) => b.attrs.length - a.attrs.length);
-  else if (sort === 'rare-last') result.sort((a, b) => a.attrs.length - b.attrs.length);
-  if (f) {
-    result = result.filter(item =>
-      item.attrs.some(a => a.trait_type === f.folder && a.value === f.assetName)
+// ── Generate all N combos instantly (pure JS, no I/O) ─────────────────────────
+function generateAllCombos(supply, layers, weights, conflicts) {
+  const seen = new Set();
+  return Array.from({ length: supply }, () => {
+    let picks = {};
+    for (let attempt = 0; attempt < 3; attempt++) {
+      picks = {};
+      for (const layer of layers) {
+        const ws = weights[layer.folder] ?? {};
+        const pick = pickWeighted(layer.assets, ws);
+        if (pick) picks[layer.folder] = pick;
+      }
+      resolveConflicts(picks, conflicts, weights, layers);
+      const key = layers.map(l => picks[l.folder]?.stem ?? '').join('|');
+      if (!seen.has(key)) { seen.add(key); break; }
+    }
+    return picks;
+  });
+}
+
+// ── Sort + filter ─────────────────────────────────────────────────────────────
+function applyView(allCombos, sort, filter, layers) {
+  let result = allCombos.map((combo, i) => ({ combo, index: i + 1 }));
+  if (filter) {
+    result = result.filter(({ combo }) => combo[filter.folder]?.stem === filter.stem);
+  }
+  if (sort === 'rare-first') {
+    result.sort((a, b) =>
+      Object.values(b.combo).filter(v => v?.rel !== null).length -
+      Object.values(a.combo).filter(v => v?.rel !== null).length
+    );
+  } else if (sort === 'rare-last') {
+    result.sort((a, b) =>
+      Object.values(a.combo).filter(v => v?.rel !== null).length -
+      Object.values(b.combo).filter(v => v?.rel !== null).length
     );
   }
   return result;
 }
 
-function ExpandableLayerRow({ layer, activeFilter, onTraitClick }) {
-  const [open, setOpen] = useState(false);
-  const isActive = activeFilter?.folder === layer.folder;
+// ── NFT Card — lazy composites via IntersectionObserver ───────────────────────
+function NFTCard({ index, combo, layers, bitmapCache, canvasW, canvasH, onClick }) {
+  const canvasRef  = useRef(null);
+  const composited = useRef(false);
+
+  function draw() {
+    if (composited.current || !canvasRef.current) return;
+    composited.current = true;
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.clearRect(0, 0, canvasW, canvasH);
+    for (const layer of layers) {
+      const pick = combo[layer.folder];
+      if (!pick?.rel) continue;
+      const bm = bitmapCache.current[pick.rel];
+      if (bm) ctx.drawImage(bm, 0, 0, canvasW, canvasH);
+    }
+  }
+
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { draw(); obs.disconnect(); } },
+      { rootMargin: '400px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  function handleClick() {
+    if (!composited.current) draw();
+    const src   = canvasRef.current?.toDataURL() ?? '';
+    const attrs = layers
+      .filter(l => combo[l.folder] && combo[l.folder].rel !== null)
+      .map(l => ({ trait_type: l.label, value: combo[l.folder].name }));
+    onClick({ index, src, attrs });
+  }
 
   return (
-    <div className="plr-group">
-      <div className="preview-layer-row" onClick={() => setOpen(o => !o)}>
-        <span className="plr-chevron">{open ? '▾' : '▸'}</span>
-        <span className="plr-name">{layer.label}</span>
-        <span className="plr-count">{layer.count}</span>
+    <div className="prev-card" onClick={handleClick}>
+      <div className="prev-thumb">
+        <canvas
+          ref={canvasRef}
+          width={canvasW}
+          height={canvasH}
+          style={{ width: '100%', height: '100%', display: 'block' }}
+        />
       </div>
-      {open && (
-        <div className="plr-traits">
-          {layer.assets.map(a => (
-            <div
-              key={a.stem}
-              className={`plr-trait-row${isActive && activeFilter?.assetName === a.name ? ' plr-trait-active' : ''}`}
-              onClick={() => onTraitClick(layer, a)}
-            >
-              <span className="plr-trait-name">{a.name}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="prev-card-body">
+        <div className="prev-card-name">#{index}</div>
+      </div>
     </div>
   );
 }
 
+// ── NFT Popup ─────────────────────────────────────────────────────────────────
 function NFTPopup({ item, onClose }) {
   return (
     <div className="nft-popup-overlay" onClick={onClose}>
@@ -154,7 +167,7 @@ function NFTPopup({ item, onClose }) {
           <div className="nft-popup-attrs">
             {item.attrs.map((a, i) => (
               <div key={i} className="nft-attr-row">
-                <span className="nft-attr-type">{a.trait_label ?? a.trait_type}</span>
+                <span className="nft-attr-type">{a.trait_type}</span>
                 <span className="nft-attr-val">{a.value}</span>
               </div>
             ))}
@@ -165,102 +178,131 @@ function NFTPopup({ item, onClose }) {
   );
 }
 
-const BATCH_SIZE = 8;
+// ── Layer filter sidebar row ──────────────────────────────────────────────────
+function ExpandableLayerRow({ layer, activeFilter, onTraitClick }) {
+  const [open, setOpen] = useState(false);
+  const isActive = activeFilter?.folder === layer.folder;
+  return (
+    <div className="plr-group">
+      <div className="preview-layer-row" onClick={() => setOpen(o => !o)}>
+        <span className="plr-chevron">{open ? '▾' : '▸'}</span>
+        <span className="plr-name">{layer.label}</span>
+        <span className="plr-count">{layer.count}</span>
+      </div>
+      {open && (
+        <div className="plr-traits">
+          {layer.assets.map(a => (
+            <div
+              key={a.stem}
+              className={`plr-trait-row${isActive && activeFilter?.stem === a.stem ? ' plr-trait-active' : ''}`}
+              onClick={() => onTraitClick(layer, a)}
+            >
+              <span className="plr-trait-name">{a.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
+const SORT_LABELS = {
+  shuffle:      'Shuffle',
+  'rare-first': 'Most rare first',
+  'rare-last':  'Most rare last',
+};
+
+// ── Main component ────────────────────────────────────────────────────────────
 export default function PreviewPanel({ weights, layers, collection, conflicts }) {
-  const supply  = collection?.supply ?? 100;
-  const srcW    = collection?.width  ?? 512;
-  const srcH    = collection?.height ?? 512;
-  const scale   = Math.min(512 / srcW, 512 / srcH, 1);
-  const canvasW = Math.round(srcW * scale);
-  const canvasH = Math.round(srcH * scale);
+  const supply = collection?.supply ?? 100;
+  const srcW   = collection?.width  ?? 512;
+  const srcH   = collection?.height ?? 512;
+  // Thumbnail canvas dims — keep aspect ratio, cap at THUMB
+  const scale  = Math.min(THUMB / srcW, THUMB / srcH, 1);
+  const canvasW = Math.max(1, Math.round(srcW * scale));
+  const canvasH = Math.max(1, Math.round(srcH * scale));
 
   const [phase,    setPhase]    = useState('idle');
-  const [items,    setItems]    = useState([]);
-  const [progress, setProgress] = useState(0);
+  const [loadMsg,  setLoadMsg]  = useState('');
+  const [visible,  setVisible]  = useState([]);   // filtered + sorted items
+  const [page,     setPage]     = useState(0);
   const [sortBy,   setSortBy]   = useState('shuffle');
   const [sortOpen, setSortOpen] = useState(false);
   const [filter,   setFilter]   = useState(null);
   const [popup,    setPopup]    = useState(null);
 
-  const genRef     = useRef(0);
-  const allRef     = useRef([]);
-  const runningRef = useRef(false);
-  const sortByRef  = useRef('shuffle');
-  const filterRef  = useRef(null);
+  const bitmapCache  = useRef({});
+  const allCombosRef = useRef([]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (layers.length > 0) run(); }, []);
+  const rebuild = useCallback((combos, sort, f) => {
+    setVisible(applyView(combos, sort, f, layers));
+    setPage(0);
+  }, [layers]);
 
   async function run() {
-    if (runningRef.current) return;
-    runningRef.current = true;
-    const gen = ++genRef.current;
+    setPhase('loading');
 
-    sortByRef.current = 'shuffle';
-    filterRef.current = null;
+    // ── Step 1: pre-load all unique layer images in parallel ──
+    const rels = [...new Set(
+      layers.flatMap(l => l.assets.filter(a => a.rel).map(a => a.rel))
+    )];
+    let loaded = 0;
+    setLoadMsg(`Loading images… 0 / ${rels.length}`);
+
+    await Promise.all(rels.map(async rel => {
+      if (bitmapCache.current[rel]) { setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`); return; }
+      try {
+        const res = await fetch(`/api/layer-img/${rel}?w=${canvasW}&h=${canvasH}`);
+        if (res.ok) {
+          const blob = await res.blob();
+          bitmapCache.current[rel] = await createImageBitmap(blob);
+        }
+      } catch {}
+      setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`);
+    }));
+
+    // ── Step 2: generate all combos instantly (pure JS) ──
+    setLoadMsg('Generating combinations…');
+    await new Promise(r => setTimeout(r, 0)); // flush paint
+    const combos = generateAllCombos(supply, layers, weights, conflicts);
+    allCombosRef.current = combos;
+
+    // ── Step 3: show ──
     setSortBy('shuffle');
     setFilter(null);
-    setPopup(null);
-    setPhase('running');
-    setItems([]);
-    setProgress(0);
-    allRef.current = [];
-
-    try {
-      for (let start = 0; start < supply; start += BATCH_SIZE) {
-        if (gen !== genRef.current) return;
-        const end   = Math.min(start + BATCH_SIZE, supply);
-        const batch = await Promise.all(
-          Array.from({ length: end - start }, (_, i) =>
-            composite(layers, weights, canvasW, canvasH, conflicts).then(r => ({ ...r, index: start + i + 1 }))
-          )
-        );
-        if (gen !== genRef.current) return;
-        allRef.current = [...allRef.current, ...batch];
-        setItems(applyFilterSort(allRef.current, sortByRef.current, filterRef.current));
-        setProgress(allRef.current.length);
-      }
-      setPhase('done');
-    } finally {
-      runningRef.current = false;
-    }
+    rebuild(combos, 'shuffle', null);
+    setPhase('ready');
   }
 
+  // Auto-run on mount if layers available
+  useEffect(() => { if (layers.length > 0) run(); }, []);
+
   function handleSort(s) {
-    sortByRef.current = s;
     setSortBy(s);
     setSortOpen(false);
     if (s === 'shuffle') {
-      run();
+      // Re-randomize combos
+      const combos = generateAllCombos(supply, layers, weights, conflicts);
+      allCombosRef.current = combos;
+      rebuild(combos, s, filter);
     } else {
-      setItems(applyFilterSort(allRef.current, s, filterRef.current));
+      rebuild(allCombosRef.current, s, filter);
     }
   }
 
   function handleTraitClick(layer, asset) {
-    const newFilter =
-      filterRef.current?.folder === layer.folder && filterRef.current?.assetName === asset.name
+    const next =
+      filter?.folder === layer.folder && filter?.stem === asset.stem
         ? null
-        : { folder: layer.folder, layerLabel: layer.label, assetName: asset.name, displayName: asset.name };
-    filterRef.current = newFilter;
-    setFilter(newFilter);
-    setItems(applyFilterSort(allRef.current, sortByRef.current, newFilter));
+        : { folder: layer.folder, stem: asset.stem, layerLabel: layer.label, assetName: asset.name };
+    setFilter(next);
+    rebuild(allCombosRef.current, sortBy, next);
   }
 
   function clearFilter() {
-    filterRef.current = null;
     setFilter(null);
-    setItems(applyFilterSort(allRef.current, sortByRef.current, null));
+    rebuild(allCombosRef.current, sortBy, null);
   }
-
-  const SORT_LABELS = {
-    shuffle:      'Shuffle',
-    'rare-first': 'Most rare first',
-    'rare-last':  'Most rare last',
-  };
-
-  const isRunning = phase === 'running';
 
   if (layers.length === 0) {
     return (
@@ -272,21 +314,16 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
     );
   }
 
+  const pages    = Math.ceil(visible.length / PAGE_SIZE);
+  const pageItems = visible.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
   return (
     <div className="preview-layout">
       {/* ── Left panel ── */}
       <div className="preview-left-panel">
-        <button className="randomize-btn" onClick={run} disabled={isRunning}>
-          {isRunning ? `Generating… ${progress}/${supply}` : 'Randomize'}
+        <button className="randomize-btn" onClick={run} disabled={phase === 'loading'}>
+          {phase === 'loading' ? loadMsg : 'Randomize'}
         </button>
-
-        {isRunning && (
-          <div style={{ marginTop: -4 }}>
-            <div className="prog-bg" style={{ margin: 0 }}>
-              <div className="prog-fill" style={{ width: `${supply > 0 ? (progress / supply * 100).toFixed(1) : 0}%` }} />
-            </div>
-          </div>
-        )}
 
         <div className="preview-count-row">
           <span className="preview-count-num">{supply.toLocaleString()}</span>
@@ -294,13 +331,16 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
         </div>
 
         <div className="preview-sample-note">
-          Showing {supply.toLocaleString()} random samples.<br />
-          Full {supply.toLocaleString()} NFTs generate on Export.
+          {phase === 'ready'
+            ? visible.length < supply
+              ? `${visible.length.toLocaleString()} shown (filtered)`
+              : `All ${supply.toLocaleString()} NFTs`
+            : 'Generating…'}
         </div>
 
         {filter && (
           <div className="plr-filter-badge">
-            <span>Filter: <b>{filter.layerLabel ?? filter.folder} › {filter.displayName}</b></span>
+            <span>Filter: <b>{filter.layerLabel} › {filter.assetName}</b></span>
             <button onClick={clearFilter} className="plr-filter-clear">✕</button>
           </div>
         )}
@@ -317,63 +357,80 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
         </div>
       </div>
 
-      {/* ── Right: NFT grid ── */}
+      {/* ── Right: grid ── */}
       <div className="preview-right-panel">
-        {(phase !== 'idle' || items.length > 0) && (
-          <div className="prev-controls-bar">
-            <div className="prev-tokens-badge">{supply.toLocaleString()} Tokens</div>
-            {items.length > 0 && (
-              <div className="prev-sort-wrap" style={{ position: 'relative' }}>
+        {phase === 'loading' && (
+          <div className="preview-empty">
+            <div className="loading"><div className="spinner" /></div>
+            <div style={{ color:'var(--dim)', fontSize:13, marginTop:12 }}>{loadMsg}</div>
+          </div>
+        )}
+
+        {phase === 'ready' && (
+          <>
+            <div className="prev-controls-bar">
+              <div className="prev-tokens-badge">
+                {visible.length.toLocaleString()} tokens
+                {pages > 1 && (
+                  <span style={{ color:'var(--dim)', marginLeft:8, fontSize:11 }}>
+                    — page {page + 1} of {pages}
+                  </span>
+                )}
+              </div>
+              <div className="prev-sort-wrap" style={{ position:'relative' }}>
                 <button className="prev-sort-btn" onClick={() => setSortOpen(o => !o)}>
-                  Sort by: {SORT_LABELS[sortBy]} ▾
+                  Sort: {SORT_LABELS[sortBy]} ▾
                 </button>
                 {sortOpen && (
                   <div className="prev-sort-dropdown">
-                    {Object.entries(SORT_LABELS).map(([key, label]) => (
+                    {Object.entries(SORT_LABELS).map(([k, l]) => (
                       <button
-                        key={key}
-                        className={`prev-sort-option${sortBy === key ? ' active' : ''}`}
-                        onClick={() => handleSort(key)}
-                      >{label}</button>
+                        key={k}
+                        className={`prev-sort-option${sortBy === k ? ' active' : ''}`}
+                        onClick={() => handleSort(k)}
+                      >{l}</button>
                     ))}
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        )}
-
-        {isRunning && items.length === 0 && (
-          <div className="preview-empty">
-            <div className="loading"><div className="spinner" /></div>
-            <div style={{ color: 'var(--dim)', fontSize: 13, marginTop: 12 }}>
-              Generating preview…
             </div>
-          </div>
-        )}
 
-        {phase === 'done' && items.length === 0 && filter && (
-          <div className="preview-empty">
-            <div style={{ fontSize: 13, color: 'var(--dim)' }}>
-              No NFTs in this sample contain <b>{filter.displayName}</b>.<br />
-              Try <button className="link-btn" onClick={run}>Randomize</button> for a new sample.
-            </div>
-          </div>
-        )}
-
-        {items.length > 0 && (
-          <div className="prev-grid">
-            {items.map(item => (
-              <div key={item.index} className="prev-card" onClick={() => setPopup(item)}>
-                <div className="prev-thumb">
-                  <img src={item.src} alt={`#${item.index}`} />
-                </div>
-                <div className="prev-card-body">
-                  <div className="prev-card-name">#{item.index}</div>
+            {visible.length === 0 && filter && (
+              <div className="preview-empty">
+                <div style={{ fontSize:13, color:'var(--dim)' }}>
+                  No NFTs in this sample contain <b>{filter.assetName}</b>.{' '}
+                  <button className="link-btn" onClick={run}>Randomize</button>
                 </div>
               </div>
-            ))}
-          </div>
+            )}
+
+            <div className="prev-grid">
+              {pageItems.map(({ combo, index }) => (
+                <NFTCard
+                  key={index}
+                  index={index}
+                  combo={combo}
+                  layers={layers}
+                  bitmapCache={bitmapCache}
+                  canvasW={canvasW}
+                  canvasH={canvasH}
+                  onClick={setPopup}
+                />
+              ))}
+            </div>
+
+            {pages > 1 && (
+              <div className="preview-pagination">
+                <button className="btn btn-ghost" disabled={page <= 0} onClick={() => setPage(p => p - 1)}>
+                  ← Prev
+                </button>
+                <span className="page-info">Page {page + 1} / {pages}</span>
+                <button className="btn btn-ghost" disabled={page >= pages - 1} onClick={() => setPage(p => p + 1)}>
+                  Next →
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
