@@ -258,7 +258,7 @@ export default function ExportPanel({ weights, collection, conflicts, collection
         setLoadMsg(`Preparing images… 0 / ${rels.length}`);
         await Promise.all(rels.map(async (rel) => {
           try {
-            const res = await fetch(`/api/layer-img/${rel}?w=${targetW}&h=${targetH}`);
+            const res = await fetch(`/api/layer-raw/${rel}`);
             if (res.ok) {
               const blob = await res.blob();
               exportBitmaps[rel] = await createImageBitmap(blob);
