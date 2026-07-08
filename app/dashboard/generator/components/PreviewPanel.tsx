@@ -262,6 +262,16 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
 
   const isRunning = phase === 'running';
 
+  if (layers.length === 0) {
+    return (
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:12, color:'var(--dim)', textAlign:'center', padding:40 }}>
+        <div style={{ fontSize:40 }}>👁️</div>
+        <div style={{ fontSize:16, fontWeight:600, color:'var(--text)' }}>No layers to preview</div>
+        <div style={{ fontSize:13 }}>Import and organize your layers first to generate a preview.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="preview-layout">
       {/* ── Left panel ── */}
