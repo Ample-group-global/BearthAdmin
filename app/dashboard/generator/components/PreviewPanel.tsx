@@ -4,8 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { generateAllCombos } from '../../../../lib/studio/combos';
 import { useLayerFiles } from '../LayerFilesContext';
 
-const THUMB    = 160;  // thumbnail px
-const PAGE_SIZE = 96;  // cards per page
+const THUMB = 160; // thumbnail px
 
 // ── Sort + filter ─────────────────────────────────────────────────────────────
 function applyView(allCombos, sort, filter, layers) {
@@ -156,7 +155,6 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
   const [phase,    setPhase]    = useState('idle');
   const [loadMsg,  setLoadMsg]  = useState('');
   const [visible,  setVisible]  = useState([]);   // filtered + sorted items
-  const [page,     setPage]     = useState(0);
   const [sortBy,   setSortBy]   = useState('shuffle');
   const [sortOpen, setSortOpen] = useState(false);
   const [filter,   setFilter]   = useState(null);
@@ -167,7 +165,6 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
 
   const rebuild = useCallback((combos, sort, f) => {
     setVisible(applyView(combos, sort, f, layers));
-    setPage(0);
   }, [layers]);
 
   async function run() {
@@ -254,9 +251,6 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
     );
   }
 
-  const pages    = Math.ceil(visible.length / PAGE_SIZE);
-  const pageItems = visible.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
   return (
     <div className="preview-layout">
       {/* ── Left panel ── */}
@@ -311,11 +305,6 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
             <div className="prev-controls-bar">
               <div className="prev-tokens-badge">
                 {visible.length.toLocaleString()} tokens
-                {pages > 1 && (
-                  <span style={{ color:'var(--dim)', marginLeft:8, fontSize:11 }}>
-                    — page {page + 1} of {pages}
-                  </span>
-                )}
               </div>
               <div className="prev-sort-wrap" style={{ position:'relative' }}>
                 <button className="prev-sort-btn" onClick={() => setSortOpen(o => !o)}>
@@ -345,7 +334,7 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
             )}
 
             <div className="prev-grid">
-              {pageItems.map(({ combo, index }) => (
+              {visible.map(({ combo, index }) => (
                 <NFTCard
                   key={index}
                   index={index}
@@ -359,17 +348,6 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
               ))}
             </div>
 
-            {pages > 1 && (
-              <div className="preview-pagination">
-                <button className="btn btn-ghost" disabled={page <= 0} onClick={() => setPage(p => p - 1)}>
-                  ← Prev
-                </button>
-                <span className="page-info">Page {page + 1} / {pages}</span>
-                <button className="btn btn-ghost" disabled={page >= pages - 1} onClick={() => setPage(p => p + 1)}>
-                  Next →
-                </button>
-              </div>
-            )}
           </>
         )}
       </div>
