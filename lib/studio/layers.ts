@@ -75,9 +75,13 @@ function isAscii(s: string): boolean {
   catch { return false; }
 }
 
+const natSort = (a: string, b: string) =>
+  a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+
 function collectPngs(dir: string, layerDir: string) {
   const results: { stem: string; rel: string | null }[] = [];
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const entries = fs.readdirSync(dir, { withFileTypes: true })
+    .sort((a, b) => natSort(a.name, b.name)); // natural sort: file2 before file10
   for (const e of entries) {
     const full = path.join(dir, e.name);
     if (e.isDirectory()) {

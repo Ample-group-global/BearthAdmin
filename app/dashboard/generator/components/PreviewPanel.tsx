@@ -124,7 +124,7 @@ function ExpandableLayerRow({ layer, activeFilter, onTraitClick }) {
       </div>
       {open && (
         <div className="plr-traits">
-          {layer.assets.map(a => (
+          {[...layer.assets].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(a => (
             <div
               key={a.stem}
               className={`plr-trait-row${isActive && activeFilter?.stem === a.stem ? ' plr-trait-active' : ''}`}

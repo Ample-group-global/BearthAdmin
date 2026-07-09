@@ -71,7 +71,7 @@ function parseLayersFromFiles(files) {
         rel,
         defaultWeight: 1,
       }))
-      .sort((a, b) => a.stem.localeCompare(b.stem));
+      .sort((a, b) => a.stem.localeCompare(b.stem, undefined, { numeric: true, sensitivity: 'base' }));
 
     // Disambiguate duplicate display names (same logic as server-side buildCache)
     const nameCounts = {};
