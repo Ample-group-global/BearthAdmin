@@ -279,14 +279,26 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       // ── Image compositing ─────────────────────────────────────────────────
       if (!metaOnly && imgsFolder) {
 
-        // Collect unique rel → URL map (blob URL takes priority; falls back to API)
+        // Collect unique rels
         const rels = [...new Set(
           layers.flatMap((l: any) => l.assets.filter((a: any) => a.rel).map((a: any) => a.rel))
         )] as string[];
-        const layerUrls: Record<string, string> = {};
-        for (const rel of rels) {
-          layerUrls[rel] = getBlobUrl(rel) ?? `/api/layer-raw/${rel}`;
-        }
+
+        // Pre-load ALL images as ArrayBuffers on main thread ONCE — workers get
+        // raw bytes directly so they never make network requests themselves.
+        const imageBuffers: Record<string, ArrayBuffer> = {};
+        let imgLoaded = 0;
+        setLoadMsg(`Loading images… 0 / ${rels.length}`);
+        await Promise.all(rels.map(async (rel) => {
+          try {
+            const src = getBlobUrl(rel) ?? `/api/layer-raw/${rel}`;
+            const res = await fetch(src);
+            if (res.ok) imageBuffers[rel] = await res.arrayBuffer();
+          } catch {}
+          setLoadMsg(`Loading images… ${++imgLoaded} / ${rels.length}`);
+        }));
+
+        if (cancelledRef.current) { setPhase('done'); setDlLoading(false); return; }
 
         const useWorkers = typeof Worker !== 'undefined';
         const numWorkers = useWorkers ? Math.min(navigator.hardwareConcurrency || 4, 8) : 0;
@@ -350,7 +362,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
 
               worker.postMessage({
                 combos: allCombos.slice(start, end),
-                layerUrls,
+                imageBuffers,
                 layers,
                 targetW,
                 targetH,
@@ -363,19 +375,12 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           });
 
         } else {
-          // ── Fallback: main-thread compositing ───────────────────────────────
+          // ── Fallback: main-thread compositing (decode pre-loaded buffers) ───
           const exportBitmaps: Record<string, ImageBitmap> = {};
-          let lCount = 0;
-          setLoadMsg(`Preparing images… 0 / ${rels.length}`);
-          await Promise.all(rels.map(async (rel) => {
+          await Promise.all(Object.keys(imageBuffers).map(async (rel) => {
             try {
-              const res = await fetch(layerUrls[rel]);
-              if (res.ok) {
-                const blob = await res.blob();
-                exportBitmaps[rel] = await createImageBitmap(blob);
-              }
+              exportBitmaps[rel] = await createImageBitmap(new Blob([imageBuffers[rel]]));
             } catch {}
-            setLoadMsg(`Preparing images… ${++lCount} / ${rels.length}`);
           }));
 
           let done = 0;

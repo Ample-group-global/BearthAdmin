@@ -1,38 +1,31 @@
 /**
  * NFT Export Worker
- * Runs in a background thread — composites layer images onto OffscreenCanvas,
- * encodes to PNG/WebP, and streams ArrayBuffer chunks back to the main thread.
+ * Receives pre-loaded image ArrayBuffers from main thread (no network calls here).
  *
- * Messages IN  (from main):
- *   { type: 'run', combos, layerUrls, layers, targetW, targetH, imgMime, startIdx }
+ * Messages IN:
+ *   { combos, imageBuffers, layers, targetW, targetH, imgMime, startIdx }
  *
- * Messages OUT (to main):
- *   { type: 'chunk', results: [{ idx, buffer }] }   — transferable ArrayBuffers
+ * Messages OUT:
+ *   { type: 'chunk',    results: [{ idx, buffer }] }  — transferable ArrayBuffers
  *   { type: 'progress', count }
  *   { type: 'done' }
- *   { type: 'error', message }
+ *   { type: 'error',   message }
  */
 
-const INNER_BATCH = 8; // concurrent encodes per worker
+const INNER_BATCH = 8;
 
 self.onmessage = async (e) => {
-  const { combos, layerUrls, layers, targetW, targetH, imgMime, startIdx } = e.data;
+  const { combos, imageBuffers, layers, targetW, targetH, imgMime, startIdx } = e.data;
 
   try {
-    // Load all required layer images once (blob URLs or /api/ URLs are same-origin)
+    // Decode pre-loaded ArrayBuffers into ImageBitmaps — no network needed
     const bitmaps = {};
-    const rels = Object.keys(layerUrls);
-    await Promise.all(rels.map(async (rel) => {
+    await Promise.all(Object.keys(imageBuffers).map(async (rel) => {
       try {
-        const res = await fetch(layerUrls[rel]);
-        if (res.ok) {
-          const blob = await res.blob();
-          bitmaps[rel] = await createImageBitmap(blob);
-        }
+        bitmaps[rel] = await createImageBitmap(new Blob([imageBuffers[rel]]));
       } catch {}
     }));
 
-    // Process combos in small internal batches so encoding is pipelined
     for (let i = 0; i < combos.length; i += INNER_BATCH) {
       const slice = combos.slice(i, Math.min(i + INNER_BATCH, combos.length));
 
@@ -53,7 +46,6 @@ self.onmessage = async (e) => {
         return { idx: startIdx + i + j, buffer };
       }));
 
-      // Transfer ArrayBuffers zero-copy back to main thread
       const transfers = results.map(r => r.buffer);
       self.postMessage({ type: 'chunk', results }, transfers);
       self.postMessage({ type: 'progress', count: slice.length });
