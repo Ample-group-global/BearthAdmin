@@ -24,7 +24,6 @@ function TierOverview() {
       <div className="rt-section-header">
         <span className="rt-section-icon">✨</span>
         <span className="rt-section-title">Rarity Tiers</span>
-        <span className="rt-section-sub">Pre-gen by probability · Post-gen by rank</span>
       </div>
       <div className="rt-tiers-grid">
         {TIERS.map(t => (
@@ -293,7 +292,6 @@ export default function RarityTab({ layers, weights, collection }) {
         <div className="rt-section-header">
           <span className="rt-section-icon">🗂️</span>
           <span className="rt-section-title">Layer Breakdown</span>
-          <span className="rt-section-sub">Click any layer to expand trait details</span>
         </div>
 
         {analysis.length === 0 ? (

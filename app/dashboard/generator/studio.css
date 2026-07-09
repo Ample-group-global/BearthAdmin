@@ -1038,37 +1038,42 @@
 /* ── Stats bar ─────────────────────────────────────────────────────────────── */
 .studio-wrap .rt-stats-bar {
   display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   background: var(--bg1);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 14px 22px;
+  border-radius: 12px;
+  padding: 10px 16px;
   box-shadow: 0 2px 12px rgba(99,102,241,.07);
+  overflow: hidden;
 }
 .studio-wrap .rt-stat {
   display: flex;
   flex-direction: column;
   align-items: center;
   flex: 1;
-  min-width: 70px;
-  padding: 4px 10px;
+  min-width: 0;
+  padding: 3px 8px;
   border-right: 1px solid var(--border);
 }
 .studio-wrap .rt-stat:last-child { border-right: none; }
 .studio-wrap .rt-stat-value {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 800;
   line-height: 1;
-  letter-spacing: -.5px;
+  letter-spacing: -.4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 .studio-wrap .rt-stat-label {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   color: var(--dim);
   text-transform: uppercase;
-  letter-spacing: .7px;
-  margin-top: 4px;
+  letter-spacing: .6px;
+  margin-top: 3px;
+  white-space: nowrap;
 }
 
 /* ── Section wrapper ───────────────────────────────────────────────────────── */
