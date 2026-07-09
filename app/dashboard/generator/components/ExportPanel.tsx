@@ -117,7 +117,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const imgMime     = wantWebp ? 'image/webp' : 'image/png';
   const nameFormat  = collection?.nameFormat  ?? '';
   const description = collection?.description ?? '';
-  const collName    = collection?.name        ?? 'collection';
+  const collName    = collection?.name        ?? '';
 
   // Thumbnail size for the rarity grid display
   const THUMB = Math.min(160, targetW);
@@ -312,7 +312,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
               .map(l => ({ trait_type: l.label, value: combo[l.folder].name }));
 
             meta!.file(`${num}.json`, JSON.stringify({
-              name:        applyNameFormat(nameFormat || `${collName} #{{id}}`, num),
+              name:        applyNameFormat(nameFormat || (collName ? `${collName} #{{id}}` : '#{{id}}'), num),
               description,
               image:       `ipfs://${resolvedCid}/${num}.${imgExt}`,
               edition:     num,

@@ -3,6 +3,35 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLayerFiles } from '../LayerFilesContext';
 
+// Client-side display name derivation — mirrors server-side getName in lib/studio/layers.ts
+function deriveLabelFromFolder(fname) {
+  return fname.replace(/^\d+[-_]/, '').replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase()).trim() || fname;
+}
+
+function clientGetName(folder, stem, rel) {
+  // Nested path (e.g. "10-hand/10-6-panda/10-6-7.png") → extract name from parent dir
+  if (rel) {
+    const parts = rel.split('/');
+    if (parts.length >= 3) {
+      const parentDir = parts[parts.length - 2];
+      const d2 = parentDir.replace(/^\d+[-_]\d+[-_]/, '').trim();
+      if (d2 && /[a-zA-Z]/.test(d2))
+        return d2.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim();
+      const d1 = parentDir.replace(/^\d+[-_]/, '').trim();
+      if (d1 && /[a-zA-Z]/.test(d1))
+        return d1.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim();
+    }
+  }
+  // Flat numeric stem (e.g. "0-1", "2-5") → "LayerLabel N"
+  const folderNum = (folder.match(/^(\d+)/) || [])[1] || '';
+  const inner = folderNum ? stem.replace(new RegExp('^' + folderNum + '[-_]'), '') : stem;
+  const firstSeg = inner.split(/[-_]/)[0];
+  if (firstSeg && /^\d+$/.test(firstSeg))
+    return deriveLabelFromFolder(folder) + ' ' + firstSeg;
+  return inner.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim() || stem;
+}
+
 // Parse layer structure from dropped files client-side (mirrors server scanLayers)
 function parseLayersFromFiles(files) {
   const groups = new Map(); // folder -> [{ file, stem, rel }]
@@ -38,7 +67,7 @@ function parseLayersFromFiles(files) {
     const assets = entries
       .map(({ stem, rel }) => ({
         stem,
-        name: stem.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim() || stem,
+        name: clientGetName(folder, stem, rel),
         rel,
         defaultWeight: 1,
       }))
@@ -118,61 +147,61 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
     setUploading(true);
     setUploadMsg('Reading files…');
 
-    // ── 1. Parse layers client-side immediately ──────────────────────────────
+    // ── 1. Parse layers client-side — instant ────────────────────────────────
     const { layers: parsedLayers, fileMap } = parseLayersFromFiles(files);
-    storeFiles(fileMap);              // store blob URLs in context
-    onLayersChange?.(parsedLayers);   // update UI right away (no server round-trip)
+    storeFiles(fileMap);
+    onLayersChange?.(parsedLayers);
 
-    // ── 2. Detect root folder name ────────────────────────────────────────────
-    let detectedRoot = null;
-    for (const file of files) {
-      const parts = (file.webkitRelativePath || file.name).split('/').filter(Boolean);
-      const layerIdx = parts.findIndex(p => /^\d+[-_]/.test(p));
-      if (layerIdx > 0) { detectedRoot = parts[0]; break; }
-    }
-    if (detectedRoot) {
-      const safe = detectedRoot.replace(/[^a-zA-Z0-9\-_]/g, '');
-      if (safe) {
-        setActiveFolder(safe);
-        fetch('/api/layers/root', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ folder: safe }),
-        }).catch(() => {});
-      }
-    }
-
-    // ── 3. Upload to server in background (local dev only, silent on cloud) ──
-    if (replace) {
-      await fetch('/api/layers/clear', { method: 'POST' }).catch(() => {});
-    }
-    const groups = {};
-    for (const file of files) {
-      if (!file.type.startsWith('image/') && !file.name.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) continue;
-      const parts = (file.webkitRelativePath || file.name).split('/').filter(Boolean);
-      const layerIdx = parts.findIndex(p => /^\d+[-_]/.test(p));
-      if (layerIdx === -1) continue;
-      const layerName = parts[layerIdx];
-      const subpath = parts.slice(layerIdx + 1).join('/');
-      if (!groups[layerName]) groups[layerName] = [];
-      groups[layerName].push({ file, subpath });
-    }
-    const layerNames = Object.keys(groups);
-    let done = 0;
-    for (const [layer, entries] of Object.entries(groups)) {
-      setUploadMsg(`Uploading ${layer} (${++done}/${layerNames.length})…`);
-      const form = new FormData();
-      form.append('layer', layer);
-      for (const { file, subpath } of entries) {
-        form.append('files', file);
-        form.append('subpaths', subpath);
-      }
-      await fetch('/api/upload', { method: 'POST', body: form }).catch(() => {});
-    }
-
+    // Show success immediately — no need to wait for server
     setUploading(false);
     setUploadDone(true);
     setUploadMsg(`${parsedLayers.length} layers imported!`);
+
+    // ── 2. Fire server uploads in background (local dev persistence only) ────
+    // These are intentionally NOT awaited — the UI is already updated above.
+    const doServerUpload = async () => {
+      let detectedRoot = null;
+      for (const file of files) {
+        const parts = (file.webkitRelativePath || file.name).split('/').filter(Boolean);
+        const layerIdx = parts.findIndex(p => /^\d+[-_]/.test(p));
+        if (layerIdx > 0) { detectedRoot = parts[0]; break; }
+      }
+      if (detectedRoot) {
+        const safe = detectedRoot.replace(/[^a-zA-Z0-9\-_]/g, '');
+        if (safe) {
+          setActiveFolder(safe);
+          await fetch('/api/layers/root', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder: safe }),
+          }).catch(() => {});
+        }
+      }
+      if (replace) {
+        await fetch('/api/layers/clear', { method: 'POST' }).catch(() => {});
+      }
+      const groups = {};
+      for (const file of files) {
+        if (!file.type.startsWith('image/') && !file.name.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) continue;
+        const parts = (file.webkitRelativePath || file.name).split('/').filter(Boolean);
+        const layerIdx = parts.findIndex(p => /^\d+[-_]/.test(p));
+        if (layerIdx === -1) continue;
+        const layerName = parts[layerIdx];
+        const subpath = parts.slice(layerIdx + 1).join('/');
+        if (!groups[layerName]) groups[layerName] = [];
+        groups[layerName].push({ file, subpath });
+      }
+      for (const [layer, entries] of Object.entries(groups)) {
+        const form = new FormData();
+        form.append('layer', layer);
+        for (const { file, subpath } of entries) {
+          form.append('files', file);
+          form.append('subpaths', subpath);
+        }
+        fetch('/api/upload', { method: 'POST', body: form }).catch(() => {});
+      }
+    };
+    doServerUpload(); // fire and forget — no await
   }
 
   async function handleDrop(e) {
