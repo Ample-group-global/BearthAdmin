@@ -113,10 +113,22 @@ export function computeRarity(
       score += supply / (traitCounts[key] ?? 1);
       attrs.push({ trait_type: layer.label, value: pick.name });
     }
-    return { index: i + 1, score: Math.round(score * 10) / 10, attrs, rank: 0 };
+    return { index: i + 1, score: Math.round(score * 100) / 100, attrs, rank: 0 };
   });
 
   scored.sort((a, b) => b.score - a.score);
-  scored.forEach((item, i) => { item.rank = i + 1; });
+
+  // Standard competition ranking: tied scores share the same rank.
+  // e.g. scores [100, 90, 90, 80] → ranks [1, 2, 2, 4]
+  let rank = 1;
+  for (let i = 0; i < scored.length; i++) {
+    if (i > 0 && scored[i].score === scored[i - 1].score) {
+      scored[i].rank = scored[i - 1].rank; // same rank as previous
+    } else {
+      scored[i].rank = rank;
+    }
+    rank++;
+  }
+
   return scored;
 }
