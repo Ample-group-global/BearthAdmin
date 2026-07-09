@@ -290,7 +290,7 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
           <div className="setup-field">
             <label>Export Format</label>
             <div className="setup-format-row">
-              {[{v:'png',l:'PNG'},{v:'webp',l:'WebP'}].map(f => (
+              {[{v:'png',l:'PNG'},{v:'webp',l:'Webp'}].map(f => (
                 <button
                   key={f.v}
                   className={`fmt-sel-btn${collection.format === f.v ? ' fmt-sel-active' : ''}`}
