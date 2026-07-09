@@ -131,8 +131,8 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const description = collection?.description ?? '';
   const collName    = collection?.name        ?? '';
 
-  // Thumbnail size for the rarity grid display
-  const THUMB = Math.min(160, targetW);
+  // Thumbnail size for the rarity grid display — 280px matches industry NFT card size
+  const THUMB = Math.min(280, targetW);
   const scale = Math.min(THUMB / targetW, THUMB / targetH, 1);
   const tW    = Math.max(1, Math.round(targetW * scale));
   const tH    = Math.max(1, Math.round(targetH * scale));
