@@ -64,7 +64,7 @@ export function generateAllCombos(
   const seen = new Set<string>();
   return Array.from({ length: supply }, () => {
     let picks: Record<string, any> = {};
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 10; attempt++) {
       picks = {};
       for (const layer of layers) {
         const ws = weights[layer.folder] ?? {};

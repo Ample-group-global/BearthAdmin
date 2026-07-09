@@ -3,6 +3,35 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLayerFiles } from '../LayerFilesContext';
 
+// Client-side display name derivation — mirrors server-side getName in lib/studio/layers.ts
+function deriveLabelFromFolder(fname) {
+  return fname.replace(/^\d+[-_]/, '').replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase()).trim() || fname;
+}
+
+function clientGetName(folder, stem, rel) {
+  // Nested path (e.g. "10-hand/10-6-panda/10-6-7.png") → extract name from parent dir
+  if (rel) {
+    const parts = rel.split('/');
+    if (parts.length >= 3) {
+      const parentDir = parts[parts.length - 2];
+      const d2 = parentDir.replace(/^\d+[-_]\d+[-_]/, '').trim();
+      if (d2 && /[a-zA-Z]/.test(d2))
+        return d2.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim();
+      const d1 = parentDir.replace(/^\d+[-_]/, '').trim();
+      if (d1 && /[a-zA-Z]/.test(d1))
+        return d1.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim();
+    }
+  }
+  // Flat numeric stem (e.g. "0-1", "2-5") → "LayerLabel N"
+  const folderNum = (folder.match(/^(\d+)/) || [])[1] || '';
+  const inner = folderNum ? stem.replace(new RegExp('^' + folderNum + '[-_]'), '') : stem;
+  const firstSeg = inner.split(/[-_]/)[0];
+  if (firstSeg && /^\d+$/.test(firstSeg))
+    return deriveLabelFromFolder(folder) + ' ' + firstSeg;
+  return inner.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim() || stem;
+}
+
 // Parse layer structure from dropped files client-side (mirrors server scanLayers)
 function parseLayersFromFiles(files) {
   const groups = new Map(); // folder -> [{ file, stem, rel }]
@@ -38,7 +67,7 @@ function parseLayersFromFiles(files) {
     const assets = entries
       .map(({ stem, rel }) => ({
         stem,
-        name: stem.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim() || stem,
+        name: clientGetName(folder, stem, rel),
         rel,
         defaultWeight: 1,
       }))

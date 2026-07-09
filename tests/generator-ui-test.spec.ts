@@ -21,6 +21,7 @@ import { test, expect, Page } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import zlib from 'zlib';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const BASE       = 'https://bearth-admin-pi.vercel.app';
@@ -30,11 +31,26 @@ const PASSWORD   = 'amplecapitalholding@123';
 const SUPPLY     = 9999;   // full-size collection for combo generation
 const MAX_STUBS  = 2;      // max stub images per directory level
 
-// Minimal valid 1×1 transparent PNG – 67 bytes
-const TINY_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-  'base64'
-);
+// Generate a truly transparent 1×1 RGBA PNG at runtime.
+// The old hardcoded base64 was an opaque blue pixel, making all export images solid blue.
+function makeTinyTransparentPng(): Buffer {
+  function crc32(d: Buffer) {
+    let c = 0xffffffff;
+    for (const b of d) { c ^= b; for (let i = 0; i < 8; i++) c = (c >>> 1) ^ (c & 1 ? 0xedb88320 : 0); }
+    return (~c) >>> 0;
+  }
+  function u32(n: number) { const b = Buffer.alloc(4); b.writeUInt32BE(n); return b; }
+  function ch(type: string, data: Buffer) {
+    const t = Buffer.from(type, 'ascii');
+    return Buffer.concat([u32(data.length), t, data, u32(crc32(Buffer.concat([t, data])))]);
+  }
+  const sig  = Buffer.from([137,80,78,71,13,10,26,10]);
+  const ihdr = ch('IHDR', Buffer.from([0,0,0,1,0,0,0,1,8,6,0,0,0])); // 1×1 RGBA
+  const idat = ch('IDAT', zlib.deflateSync(Buffer.from([0,0,0,0,0]))); // transparent pixel
+  const iend = ch('IEND', Buffer.alloc(0));
+  return Buffer.concat([sig, ihdr, idat, iend]);
+}
+const TINY_PNG = makeTinyTransparentPng();
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

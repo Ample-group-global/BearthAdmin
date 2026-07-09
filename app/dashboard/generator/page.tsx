@@ -19,7 +19,7 @@ const DEFAULT_COLLECTION = {
   supply:      100,
   blockchain:  'ethereum',
   format:      'png',
-  nameFormat:  '#{{id}}',
+  nameFormat:  '',
   width:       undefined as number | undefined,
   height:      undefined as number | undefined,
 };
