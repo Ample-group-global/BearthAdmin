@@ -225,6 +225,19 @@ function buildCache() {
       defaultWeight: DEFAULT_WEIGHTS[fname]?.[stem] ?? 1,
     }));
 
+    // When multiple files in the same layer derive the same display name
+    // (e.g. three PNGs inside "3-luna/" all become "Luna"), append a number
+    // so each appears as a distinct selectable trait: Luna 1 / Luna 2 / Luna 3.
+    const nameCounts: Record<string, number> = {};
+    for (const a of assets) nameCounts[a.name] = (nameCounts[a.name] ?? 0) + 1;
+    const nameIdx: Record<string, number> = {};
+    for (const a of assets) {
+      if (nameCounts[a.name] > 1) {
+        nameIdx[a.name] = (nameIdx[a.name] ?? 0) + 1;
+        a.name = `${a.name} ${nameIdx[a.name]}`;
+      }
+    }
+
     if (!assets.length) return [];
     return [{
       folder:   fname,

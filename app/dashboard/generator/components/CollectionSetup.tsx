@@ -72,6 +72,18 @@ function parseLayersFromFiles(files) {
         defaultWeight: 1,
       }))
       .sort((a, b) => a.stem.localeCompare(b.stem));
+
+    // Disambiguate duplicate display names (same logic as server-side buildCache)
+    const nameCounts = {};
+    for (const a of assets) nameCounts[a.name] = (nameCounts[a.name] ?? 0) + 1;
+    const nameIdx = {};
+    for (const a of assets) {
+      if (nameCounts[a.name] > 1) {
+        nameIdx[a.name] = (nameIdx[a.name] ?? 0) + 1;
+        a.name = `${a.name} ${nameIdx[a.name]}`;
+      }
+    }
+
     return { folder, label, count: assets.length, optional: false, assets };
   });
 
