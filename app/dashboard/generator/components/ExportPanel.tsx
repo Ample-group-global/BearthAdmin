@@ -5,7 +5,7 @@ import JSZip from 'jszip';
 import { generateAllCombos, computeRarity, applyNameFormat } from '../../../../lib/studio/combos';
 import { useLayerFiles } from '../LayerFilesContext';
 
-const BATCH = 16; // NFTs composited in parallel per tick
+const BATCH = 64; // NFTs composited in parallel per tick
 
 // ── Canvas helpers ────────────────────────────────────────────────────────────
 function makeCanvas(w: number, h: number): OffscreenCanvas | HTMLCanvasElement {
@@ -303,7 +303,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
                 if (bm) ctx.drawImage(bm, 0, 0, targetW, targetH);
               }
               const blob = await canvasToBlob(canvas, imgMime);
-              imgs!.file(`${num}.${imgExt}`, blob);
+              imgs!.file(`${num}.${imgExt}`, blob, { compression: 'STORE' });
             }
 
             // Metadata
@@ -323,6 +323,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
 
         done = Math.min(i + BATCH, supply);
         setProgress(done);
+        await new Promise(r => setTimeout(r, 0)); // yield to browser between batches
       }
 
       if (cancelledRef.current) { setPhase('done'); setDlLoading(false); return; }
