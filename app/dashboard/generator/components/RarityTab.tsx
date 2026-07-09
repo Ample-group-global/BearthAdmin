@@ -2,18 +2,27 @@
 'use client';
 import { useState, useMemo } from 'react';
 
+// Pre-generation tier: based on trait weight probability within a layer
 function rarityTier(pct: number): { label: string; color: string } {
-  if (pct <= 5)  return { label: 'Legendary', color: '#f59e0b' };
-  if (pct <= 15) return { label: 'Epic',      color: '#a78bfa' };
-  if (pct <= 35) return { label: 'Rare',      color: '#60a5fa' };
-  return          { label: 'Common',   color: '#94a3b8' };
+  if (pct <= 5)  return { label: 'Legendary', color: '#F59E0B' };
+  if (pct <= 15) return { label: 'Epic',      color: '#A855F7' };
+  if (pct <= 35) return { label: 'Rare',      color: '#3B82F6' };
+  return          { label: 'Common',   color: '#6B7280' };
+}
+
+// Post-generation tier: based on rank position across the full supply
+function postGenTier(rank: number, supply: number): { label: string; color: string } {
+  if (rank <= Math.ceil(supply * 0.01)) return { label: 'Legendary', color: '#F59E0B' };
+  if (rank <= Math.ceil(supply * 0.05)) return { label: 'Epic',      color: '#A855F7' };
+  if (rank <= Math.ceil(supply * 0.15)) return { label: 'Rare',      color: '#3B82F6' };
+  return                                        { label: 'Common',   color: '#6B7280' };
 }
 
 const TIER_GUIDE = [
-  { icon:'🟡', label:'Legendary', color:'#f59e0b', range:'≤ 5%',  desc:'Ultra-rare. Usually only 1–10 pieces in the entire collection. Highest collector value and prestige.' },
-  { icon:'🟠', label:'Epic',      color:'#a78bfa', range:'≤ 15%', desc:'Very rare traits. Strong collector demand. Often features special visuals or unique combinations.' },
-  { icon:'🔵', label:'Rare',      color:'#60a5fa', range:'≤ 35%', desc:'Clearly limited. More desirable to collectors. Noticeably harder to obtain than common traits.' },
-  { icon:'⚪', label:'Common',    color:'#94a3b8', range:'> 35%', desc:'Most frequently appearing trait. Highest supply, lowest individual rarity score contribution.' },
+  { icon:'🟡', label:'Legendary', color:'#F59E0B', range:'≤ 5%',  desc:'Ultra-rare. Usually only 1–10 pieces in the entire collection. Highest collector value and prestige.' },
+  { icon:'🟠', label:'Epic',      color:'#A855F7', range:'≤ 15%', desc:'Very rare traits. Strong collector demand. Often features special visuals or unique combinations.' },
+  { icon:'🔵', label:'Rare',      color:'#3B82F6', range:'≤ 35%', desc:'Clearly limited. More desirable to collectors. Noticeably harder to obtain than common traits.' },
+  { icon:'⚪', label:'Common',    color:'#6B7280', range:'> 35%', desc:'Most frequently appearing trait. Highest supply, lowest individual rarity score contribution.' },
 ];
 
 function RarityGuideSection() {
@@ -101,11 +110,21 @@ function FormulaSection({ supply }: { supply: number }) {
         </div>
 
       </div>
-      <div style={{ marginTop:14, padding:'10px 14px', background:'var(--bg2)', borderRadius:8, fontSize:11.5, color:'var(--dim)', lineHeight:1.6 }}>
-        <b style={{ color:'var(--accent2)' }}>Tier thresholds:</b>
-        &nbsp;Legendary ≤5% &nbsp;·&nbsp; Epic ≤15% &nbsp;·&nbsp; Rare ≤35% &nbsp;·&nbsp; Common &gt;35%
-        &nbsp;&nbsp;|&nbsp;&nbsp;
-        <b style={{ color:'var(--accent2)' }}>Adjust weights</b> in the Organize tab or via the ⚙ gear button on each layer.
+      <div style={{ marginTop:14, padding:'10px 14px', background:'var(--bg2)', borderRadius:8, fontSize:11.5, color:'var(--dim)', lineHeight:1.8 }}>
+        <div><b style={{ color:'#F59E0B' }}>Pre-generation tiers</b> (by trait probability within its layer):
+          &nbsp;<span style={{color:'#F59E0B'}}>Legendary ≤5%</span> &nbsp;·&nbsp;
+          <span style={{color:'#A855F7'}}>Epic ≤15%</span> &nbsp;·&nbsp;
+          <span style={{color:'#3B82F6'}}>Rare ≤35%</span> &nbsp;·&nbsp;
+          <span style={{color:'#6B7280'}}>Common &gt;35%</span>
+        </div>
+        <div><b style={{ color:'#F59E0B' }}>Post-generation tiers</b> (by rank across the full supply):
+          &nbsp;<span style={{color:'#F59E0B'}}>Legendary top 1%</span> &nbsp;·&nbsp;
+          <span style={{color:'#A855F7'}}>Epic top 5%</span> &nbsp;·&nbsp;
+          <span style={{color:'#3B82F6'}}>Rare top 15%</span> &nbsp;·&nbsp;
+          <span style={{color:'#6B7280'}}>Common rest</span>
+          &nbsp;—&nbsp; tied scores share the same rank
+        </div>
+        <div style={{marginTop:4}}><b style={{ color:'var(--accent2)' }}>Adjust weights</b> in the Organize tab or via the ⚙ gear button on each layer.</div>
       </div>
     </div>
   );
@@ -226,23 +245,45 @@ export default function RarityTab({ layers, weights, collection }) {
             <span className="rarity-badge-icon">✅</span>
             <div>
               <div className="rarity-badge-label">Post-Generation Rarity — Active</div>
-              <div className="rarity-badge-desc">Rarity Score ranking calculated after Export → ranked highest to lowest</div>
+              <div className="rarity-badge-desc">
+                Rarity Score (Σ supply÷occurrence per trait) computed in <b>Preview</b> and <b>Export</b>.
+                NFTs ranked highest to lowest — tied scores share the same rank.
+              </div>
             </div>
           </div>
         </div>
-        <div className="rarity-tier-legend">
-          {[
-            { label:'Legendary', color:'#F59E0B', range:'≤5%' },
-            { label:'Epic',      color:'#A855F7', range:'≤15%' },
-            { label:'Rare',      color:'#3B82F6', range:'≤35%' },
-            { label:'Common',    color:'#6B7280', range:'>35%' },
-          ].map(t => (
-            <div key={t.label} className="rarity-legend-item">
-              <span className="rarity-legend-dot" style={{ background:t.color }} />
-              <span className="rarity-legend-label" style={{ color:t.color }}>{t.label}</span>
-              <span className="rarity-legend-range">{t.range}</span>
-            </div>
-          ))}
+
+        <div style={{ marginTop:14, fontSize:11.5, color:'var(--dim)' }}>
+          <div style={{ fontWeight:600, marginBottom:6, color:'var(--text)' }}>Pre-generation — by trait probability</div>
+          <div className="rarity-tier-legend">
+            {[
+              { label:'Legendary', color:'#F59E0B', range:'≤ 5%' },
+              { label:'Epic',      color:'#A855F7', range:'≤ 15%' },
+              { label:'Rare',      color:'#3B82F6', range:'≤ 35%' },
+              { label:'Common',    color:'#6B7280', range:'> 35%' },
+            ].map(t => (
+              <div key={t.label} className="rarity-legend-item">
+                <span className="rarity-legend-dot" style={{ background:t.color }} />
+                <span className="rarity-legend-label" style={{ color:t.color }}>{t.label}</span>
+                <span className="rarity-legend-range">{t.range}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontWeight:600, margin:'10px 0 6px', color:'var(--text)' }}>Post-generation — by rank position</div>
+          <div className="rarity-tier-legend">
+            {[
+              { label:'Legendary', color:'#F59E0B', range:'Top 1%' },
+              { label:'Epic',      color:'#A855F7', range:'Top 5%' },
+              { label:'Rare',      color:'#3B82F6', range:'Top 15%' },
+              { label:'Common',    color:'#6B7280', range:'Rest' },
+            ].map(t => (
+              <div key={t.label} className="rarity-legend-item">
+                <span className="rarity-legend-dot" style={{ background:t.color }} />
+                <span className="rarity-legend-label" style={{ color:t.color }}>{t.label}</span>
+                <span className="rarity-legend-range">{t.range}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
