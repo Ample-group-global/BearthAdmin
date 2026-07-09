@@ -1,11 +1,11 @@
 // @ts-nocheck
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import JSZip from 'jszip';
 import { generateAllCombos, computeRarity, applyNameFormat } from '../../../../lib/studio/combos';
 import { useLayerFiles } from '../LayerFilesContext';
 
-const BATCH = 16; // NFTs composited in parallel per tick
+const BATCH = 64; // fallback batch size when Web Workers not available
 
 // ── Canvas helpers ────────────────────────────────────────────────────────────
 function makeCanvas(w: number, h: number): OffscreenCanvas | HTMLCanvasElement {
@@ -28,6 +28,7 @@ function RarityCard({ item, jobBitmaps, layers, canvasW, canvasH, onClick }) {
     item.rank <= Math.ceil(item.total * 0.15) ? '#3B82F6' : '#6B7280';
 
   const canvasRef = useRef(null);
+  const cardRef   = useRef(null);
   const drawn     = useRef(false);
 
   function draw() {
@@ -43,6 +44,18 @@ function RarityCard({ item, jobBitmaps, layers, canvasW, canvasH, onClick }) {
     }
   }
 
+  // Draw as soon as card scrolls into view (200px lookahead)
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { draw(); obs.disconnect(); } },
+      { rootMargin: '200px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
   const [open, setOpen] = useState(false);
 
   function handleClick() {
@@ -53,14 +66,13 @@ function RarityCard({ item, jobBitmaps, layers, canvasW, canvasH, onClick }) {
   }
 
   return (
-    <div className={`exp-nft-card${open ? ' exp-nft-open' : ''}`} onClick={handleClick}>
+    <div ref={cardRef} className={`exp-nft-card${open ? ' exp-nft-open' : ''}`} onClick={handleClick}>
       <div className="exp-nft-thumb">
         <canvas
           ref={canvasRef}
           width={canvasW}
           height={canvasH}
           style={{ width: '100%', height: '100%', display: 'block' }}
-          onMouseEnter={draw}
         />
         <div className="exp-nft-rank" style={{ color: tierColor }}>#{item.rank}</div>
       </div>
@@ -131,27 +143,20 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const [cid,       setCid]       = useState('');
   const [metaOnly,  setMetaOnly]  = useState(false);
   const [sortBy,    setSortBy]    = useState<'rarity'|'id'>('rarity');
-  const [page,      setPage]      = useState(1);
   const [popup,     setPopup]     = useState(null);
   const [dlLoading, setDlLoading] = useState(false);
   const [error,     setError]     = useState('');
 
   const { getBlobUrl } = useLayerFiles();
 
-  // Holds rarity-sorted results for the grid
   const [rarityItems, setRarityItems] = useState<any[]>([]);
   const [allCombos,   setAllCombos]   = useState<any[]>([]);
 
   // Shared bitmap cache — pre-loaded at thumbnail size for grid display
   const jobBitmaps = useRef<Record<string, ImageBitmap>>({});
 
-  // layers comes from props (passed from page.tsx); fallback to internal state for compat
   const [layers, setLayers] = useState<any[]>(layersProp);
   const cancelledRef = useRef(false);
-
-  const PAGE_SIZE = 24;
-  const totalPages = Math.ceil(rarityItems.length / PAGE_SIZE);
-  const pageItems  = rarityItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   async function generate() {
     cancelledRef.current = false;
@@ -162,7 +167,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     setAllCombos([]);
     jobBitmaps.current = {};
 
-    // ── 1. Resolve layers — prefer prop, fall back to API ────────────────────
+    // ── 1. Resolve layers ─────────────────────────────────────────────────────
     let layerData: any[] = layersProp.length ? layersProp : layers;
     if (!layerData.length) {
       try {
@@ -206,14 +211,14 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
 
     if (cancelledRef.current) { setPhase('idle'); return; }
 
-    // ── 3. Generate all combos (pure JS, instant) ─────────────────────────────
+    // ── 3. Generate all combos ────────────────────────────────────────────────
     setPhase('combos');
     setLoadMsg('Generating combinations…');
     await new Promise(r => setTimeout(r, 0));
 
     const combos = generateAllCombos(supply, layerData, weights, conflicts);
 
-    // ── 4. Compute rarity scores immediately (pure JS) ────────────────────────
+    // ── 4. Compute rarity scores ──────────────────────────────────────────────
     const scored = computeRarity(combos, layerData).map(item => ({
       ...item,
       combo: combos[item.index - 1],
@@ -250,85 +255,161 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     setProgress(0);
 
     try {
-      const zip  = new JSZip();
-      const imgs = metaOnly ? null : zip.folder('images');
-      const meta = zip.folder('metadata');
+      const zip         = new JSZip();
+      const imgsFolder  = metaOnly ? null : zip.folder('images');
+      const metaFolder  = zip.folder('metadata');
       const resolvedCid = cid.trim() || 'PLACEHOLDER_CID';
 
-      // Pre-load images at FULL resolution for export (separate from thumb cache)
-      const exportBitmaps: Record<string, ImageBitmap> = {};
-      if (!metaOnly) {
+      // Build all metadata upfront (pure JS, instant)
+      for (let idx = 0; idx < supply; idx++) {
+        const num   = idx + 1;
+        const combo = allCombos[idx];
+        const attrs = layers
+          .filter(l => combo[l.folder] && combo[l.folder].rel !== null)
+          .map(l => ({ trait_type: l.label, value: combo[l.folder].name }));
+        metaFolder!.file(`${num}.json`, JSON.stringify({
+          name:       applyNameFormat(nameFormat || (collName ? `${collName} #{{id}}` : '#{{id}}'), num),
+          description,
+          image:      `ipfs://${resolvedCid}/${num}.${imgExt}`,
+          edition:    num,
+          attributes: attrs,
+        }, null, 2));
+      }
+
+      // ── Image compositing ─────────────────────────────────────────────────
+      if (!metaOnly && imgsFolder) {
+
+        // Collect unique rel → URL map (blob URL takes priority; falls back to API)
         const rels = [...new Set(
           layers.flatMap((l: any) => l.assets.filter((a: any) => a.rel).map((a: any) => a.rel))
         )] as string[];
-        let lCount = 0;
-        setLoadMsg(`Preparing images… 0 / ${rels.length}`);
-        await Promise.all(rels.map(async (rel) => {
-          try {
-            const blobUrl = getBlobUrl(rel);
-            const src = blobUrl ?? `/api/layer-raw/${rel}`;
-            const res = await fetch(src);
-            if (res.ok) {
-              const blob = await res.blob();
-              exportBitmaps[rel] = await createImageBitmap(blob);
+        const layerUrls: Record<string, string> = {};
+        for (const rel of rels) {
+          layerUrls[rel] = getBlobUrl(rel) ?? `/api/layer-raw/${rel}`;
+        }
+
+        const useWorkers = typeof Worker !== 'undefined';
+        const numWorkers = useWorkers ? Math.min(navigator.hardwareConcurrency || 4, 8) : 0;
+
+        if (useWorkers && numWorkers > 0) {
+          // ── Web Worker pool: true multi-core parallelism ────────────────────
+          setLoadMsg(`Compositing with ${numWorkers} threads…`);
+
+          const chunkSize = Math.ceil(supply / numWorkers);
+          let done = 0;
+          let workersDone = 0;
+          let firstError: string | null = null;
+
+          await new Promise<void>((resolve, reject) => {
+            let activeWorkers = 0;
+
+            for (let w = 0; w < numWorkers; w++) {
+              const start = w * chunkSize;
+              const end   = Math.min(start + chunkSize, supply);
+              if (start >= supply) continue;
+              activeWorkers++;
+
+              const worker = new Worker('/nft-export-worker.js');
+
+              worker.onmessage = (e) => {
+                if (cancelledRef.current) {
+                  worker.terminate();
+                  workersDone++;
+                  if (workersDone >= activeWorkers) resolve();
+                  return;
+                }
+                if (e.data.type === 'chunk') {
+                  for (const { idx, buffer } of e.data.results) {
+                    imgsFolder.file(`${idx + 1}.${imgExt}`, buffer, { compression: 'STORE' });
+                  }
+                } else if (e.data.type === 'progress') {
+                  done += e.data.count;
+                  setProgress(done);
+                } else if (e.data.type === 'done') {
+                  worker.terminate();
+                  workersDone++;
+                  if (workersDone >= activeWorkers) resolve();
+                } else if (e.data.type === 'error') {
+                  if (!firstError) firstError = e.data.message;
+                  worker.terminate();
+                  workersDone++;
+                  if (workersDone >= activeWorkers) {
+                    firstError ? reject(new Error(firstError)) : resolve();
+                  }
+                }
+              };
+
+              worker.onerror = (ev) => {
+                if (!firstError) firstError = ev.message;
+                worker.terminate();
+                workersDone++;
+                if (workersDone >= activeWorkers) {
+                  firstError ? reject(new Error(firstError)) : resolve();
+                }
+              };
+
+              worker.postMessage({
+                combos: allCombos.slice(start, end),
+                layerUrls,
+                layers,
+                targetW,
+                targetH,
+                imgMime,
+                startIdx: start,
+              });
             }
-          } catch {}
-          setLoadMsg(`Preparing images… ${++lCount} / ${rels.length}`);
-        }));
-      }
 
-      if (cancelledRef.current) { setPhase('done'); setDlLoading(false); return; }
+            if (activeWorkers === 0) resolve();
+          });
 
-      // Process NFTs in batches
-      let done = 0;
-      for (let i = 0; i < supply; i += BATCH) {
-        if (cancelledRef.current) break;
-        const end = Math.min(i + BATCH, supply);
-
-        await Promise.all(
-          Array.from({ length: end - i }, async (_, j) => {
-            const idx   = i + j;
-            const combo = allCombos[idx];
-            const num   = idx + 1;
-
-            // Composite image
-            if (!metaOnly) {
-              const canvas = makeCanvas(targetW, targetH);
-              const ctx    = (canvas as any).getContext('2d');
-              ctx.clearRect(0, 0, targetW, targetH);
-              for (const layer of layers) {
-                const pick = combo[layer.folder];
-                if (!pick?.rel) continue;
-                const bm = exportBitmaps[pick.rel];
-                if (bm) ctx.drawImage(bm, 0, 0, targetW, targetH);
+        } else {
+          // ── Fallback: main-thread compositing ───────────────────────────────
+          const exportBitmaps: Record<string, ImageBitmap> = {};
+          let lCount = 0;
+          setLoadMsg(`Preparing images… 0 / ${rels.length}`);
+          await Promise.all(rels.map(async (rel) => {
+            try {
+              const res = await fetch(layerUrls[rel]);
+              if (res.ok) {
+                const blob = await res.blob();
+                exportBitmaps[rel] = await createImageBitmap(blob);
               }
-              const blob = await canvasToBlob(canvas, imgMime);
-              imgs!.file(`${num}.${imgExt}`, blob);
-            }
+            } catch {}
+            setLoadMsg(`Preparing images… ${++lCount} / ${rels.length}`);
+          }));
 
-            // Metadata
-            const attrs = layers
-              .filter(l => combo[l.folder] && combo[l.folder].rel !== null)
-              .map(l => ({ trait_type: l.label, value: combo[l.folder].name }));
-
-            meta!.file(`${num}.json`, JSON.stringify({
-              name:        applyNameFormat(nameFormat || (collName ? `${collName} #{{id}}` : '#{{id}}'), num),
-              description,
-              image:       `ipfs://${resolvedCid}/${num}.${imgExt}`,
-              edition:     num,
-              attributes:  attrs,
-            }, null, 2));
-          })
-        );
-
-        done = Math.min(i + BATCH, supply);
-        setProgress(done);
+          let done = 0;
+          for (let i = 0; i < supply; i += BATCH) {
+            if (cancelledRef.current) break;
+            const end = Math.min(i + BATCH, supply);
+            await Promise.all(
+              Array.from({ length: end - i }, async (_, j) => {
+                const idx   = i + j;
+                const combo = allCombos[idx];
+                const canvas = makeCanvas(targetW, targetH);
+                const ctx    = (canvas as any).getContext('2d');
+                ctx.clearRect(0, 0, targetW, targetH);
+                for (const layer of layers) {
+                  const pick = combo[layer.folder];
+                  if (!pick?.rel) continue;
+                  const bm = exportBitmaps[pick.rel];
+                  if (bm) ctx.drawImage(bm, 0, 0, targetW, targetH);
+                }
+                const blob = await canvasToBlob(canvas, imgMime);
+                imgsFolder!.file(`${idx + 1}.${imgExt}`, blob, { compression: 'STORE' });
+              })
+            );
+            done = Math.min(i + BATCH, supply);
+            setProgress(done);
+            await new Promise(r => setTimeout(r, 0));
+          }
+        }
       }
 
       if (cancelledRef.current) { setPhase('done'); setDlLoading(false); return; }
 
       // Generate ZIP
-      setLoadMsg('Compressing ZIP…');
+      setLoadMsg('Building ZIP…');
       const blob = await zip.generateAsync(
         { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 1 } },
         ({ percent }) => setLoadMsg(`Compressing… ${Math.round(percent)}%`)
@@ -338,7 +419,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       const url = URL.createObjectURL(blob);
       const a   = document.createElement('a');
       a.href     = url;
-      a.download = `${collName.replace(/\s+/g, '_').toLowerCase()}_nfts.zip`;
+      a.download = `${(collName || 'collection').replace(/\s+/g, '_').toLowerCase()}_nfts.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -458,13 +539,12 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
             <span style={{fontSize:12, color:'var(--dim)'}}>Sort by:</span>
             <button
               className={`exp-sort-btn${sortBy==='rarity'?' exp-sort-active':''}`}
-              onClick={() => { setSortBy('rarity'); setPage(1); }}
+              onClick={() => { setSortBy('rarity'); setRarityItems(prev => [...prev].sort((a, b) => a.rank - b.rank)); }}
             >🏆 Rarity</button>
             <button
               className={`exp-sort-btn${sortBy==='id'?' exp-sort-active':''}`}
               onClick={() => {
                 setSortBy('id');
-                setPage(1);
                 setRarityItems(prev => [...prev].sort((a, b) => a.index - b.index));
               }}
             ># ID</button>
@@ -515,9 +595,9 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           ))}
         </div>
 
-        {/* ── NFT grid ── */}
+        {/* ── NFT grid — all items, lazy-rendered via IntersectionObserver ── */}
         <div className="exp-nft-grid">
-          {pageItems.map(item => (
+          {rarityItems.map(item => (
             <RarityCard
               key={item.index}
               item={item}
@@ -529,15 +609,6 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
             />
           ))}
         </div>
-
-        {/* ── Pagination ── */}
-        {totalPages > 1 && (
-          <div className="preview-pagination">
-            <button className="btn btn-ghost" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
-            <span className="page-info">Page {page} / {totalPages}</span>
-            <button className="btn btn-ghost" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
-          </div>
-        )}
       </div>
 
       {popup && <NftPopup item={{...popup, total: supply}} onClose={() => setPopup(null)} />}
