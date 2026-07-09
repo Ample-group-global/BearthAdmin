@@ -9,7 +9,8 @@ export default defineConfig({
   timeout: 60000,
   use: {
     baseURL: "http://localhost:3000",
-    trace: "retain-on-failure",
+    actionTimeout: 5000,
+    trace: "off",
     screenshot: "on",
     video: "off",
     headless: true,
@@ -18,7 +19,16 @@ export default defineConfig({
   projects: [
     {
       name: "Desktop Chrome",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: {
+          args: [
+            "--disable-dev-shm-usage",
+            "--no-sandbox",
+            "--js-flags=--max-old-space-size=4096",
+          ],
+        },
+      },
     },
     {
       name: "Mobile Safari",

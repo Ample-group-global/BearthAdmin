@@ -28,28 +28,41 @@ export function getLayersDir(): string {
 }
 
 // Derive a readable display name from any filesystem stem.
-export function getName(folder: string, stem: string): string {
-  const raw = stem.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim() || stem;
-
-  if (raw.split(' ').length > 5) {
-    const labelLastWord = folder
-      .replace(/^\d+[-_]/, '')
-      .replace(/[_-]+/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase())
-      .trim()
-      .split(' ')
-      .pop() ?? '';
-
-    if (labelLastWord) {
-      const idx = raw.lastIndexOf(labelLastWord);
-      if (idx !== -1) {
-        const after = raw.slice(idx + labelLastWord.length).trim();
-        if (after) return after;
+// rel is the full relative path from the layers root (e.g. "10-hand/10-6-panda/10-6-7.png").
+// When the file lives inside a descriptive subdirectory, we extract the human name from it.
+export function getName(folder: string, stem: string, rel?: string | null): string {
+  // Extract descriptive name from parent subdirectory for nested files.
+  // e.g. rel="10-hand/10-6-panda/10-6-7.png" → parentDir="10-6-panda" → strip "10-6-" → "Panda"
+  if (rel) {
+    const parts = rel.split('/');
+    if (parts.length >= 3) {
+      const parentDir = parts[parts.length - 2];
+      // Strip leading digits-dash-digits-dash prefix (e.g. "10-6-" from "10-6-panda")
+      const descriptive = parentDir.replace(/^\d+[-_]\d+[-_]/, '').trim();
+      if (descriptive && /[a-zA-Z]/.test(descriptive)) {
+        return descriptive.replace(/[-_]+/g, ' ')
+          .replace(/\b\w/g, c => c.toUpperCase()).trim();
+      }
+      // Also try stripping a single leading number prefix (e.g. "8-Andy" → "Andy")
+      const singlePrefix = parentDir.replace(/^\d+[-_]/, '').trim();
+      if (singlePrefix && /[a-zA-Z]/.test(singlePrefix)) {
+        return singlePrefix.replace(/[-_]+/g, ' ')
+          .replace(/\b\w/g, c => c.toUpperCase()).trim();
       }
     }
   }
 
-  return raw;
+  // For flat numeric stems (e.g. "0-1", "2-5", "6-1-0"), produce "LayerLabel N" format.
+  // Strip the folder number prefix from the stem, then take the first segment.
+  const folderNum = folder.match(/^(\d+)/)?.[1] ?? '';
+  const inner = folderNum ? stem.replace(new RegExp(`^${folderNum}[-_]`), '') : stem;
+  const firstSeg = inner.split(/[-_]/)[0];
+  if (firstSeg && /^\d+$/.test(firstSeg)) {
+    return `${deriveLabelFromFolder(folder)} ${firstSeg}`;
+  }
+
+  // Fallback: humanise whatever remains
+  return inner.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim() || stem;
 }
 
 function sortKey(name: string): number {
@@ -207,7 +220,7 @@ function buildCache() {
 
     const assets = rawAssets.map(({ stem, rel }) => ({
       stem,
-      name:          traitNames[fname]?.[stem] ?? getName(fname, stem),
+      name:          traitNames[fname]?.[stem] ?? getName(fname, stem, rel),
       rel,
       defaultWeight: DEFAULT_WEIGHTS[fname]?.[stem] ?? 1,
     }));
