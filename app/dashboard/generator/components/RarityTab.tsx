@@ -2,111 +2,156 @@
 'use client';
 import { useState, useMemo } from 'react';
 
-function rarityTier(pct: number): { label: string; color: string } {
-  if (pct <= 5)  return { label: 'Legendary', color: '#f59e0b' };
-  if (pct <= 15) return { label: 'Epic',      color: '#a78bfa' };
-  if (pct <= 35) return { label: 'Rare',      color: '#60a5fa' };
-  return          { label: 'Common',   color: '#94a3b8' };
+// ── Tier helpers ──────────────────────────────────────────────────────────────
+function rarityTier(pct: number) {
+  if (pct <= 5)  return { label: 'Legendary', color: '#F59E0B', glow: '#F59E0B' };
+  if (pct <= 15) return { label: 'Epic',      color: '#A855F7', glow: '#A855F7' };
+  if (pct <= 35) return { label: 'Rare',      color: '#3B82F6', glow: '#3B82F6' };
+  return          { label: 'Common',   color: '#6B7280', glow: '#6B7280' };
 }
 
-const TIER_GUIDE = [
-  { icon:'🟡', label:'Legendary', color:'#f59e0b', range:'≤ 5%',  desc:'Ultra-rare. Usually only 1–10 pieces in the entire collection. Highest collector value and prestige.' },
-  { icon:'🟠', label:'Epic',      color:'#a78bfa', range:'≤ 15%', desc:'Very rare traits. Strong collector demand. Often features special visuals or unique combinations.' },
-  { icon:'🔵', label:'Rare',      color:'#60a5fa', range:'≤ 35%', desc:'Clearly limited. More desirable to collectors. Noticeably harder to obtain than common traits.' },
-  { icon:'⚪', label:'Common',    color:'#94a3b8', range:'> 35%', desc:'Most frequently appearing trait. Highest supply, lowest individual rarity score contribution.' },
+const TIERS = [
+  { label: 'Legendary', color: '#F59E0B', icon: '👑', preRange: '≤ 5%',  postRange: 'Top 1%',  desc: 'Ultra-rare. Highest collector value.' },
+  { label: 'Epic',      color: '#A855F7', icon: '💎', preRange: '≤ 15%', postRange: 'Top 5%',  desc: 'Very rare. Strong collector demand.' },
+  { label: 'Rare',      color: '#3B82F6', icon: '⭐', preRange: '≤ 35%', postRange: 'Top 15%', desc: 'Clearly limited. Noticeably scarce.' },
+  { label: 'Common',    color: '#6B7280', icon: '🔹', preRange: '> 35%', postRange: 'Rest',     desc: 'Most frequent. Baseline traits.' },
 ];
 
-function RarityGuideSection() {
+// ── Tier overview cards ───────────────────────────────────────────────────────
+function TierOverview() {
   return (
-    <div className="rarity-guide-card">
-      <div className="rarity-guide-title">🎓 What Are NFT Rarity Tiers?</div>
-
-      <div className="rarity-guide-grid">
-        {TIER_GUIDE.map(t => (
-          <div key={t.label} className="rarity-guide-tier"
-            style={{ background: t.color + '18', borderColor: t.color + '44' }}>
-            <div className="rarity-guide-tier-icon">{t.icon}</div>
-            <div className="rarity-guide-tier-label" style={{ color: t.color }}>{t.label}</div>
-            <div className="rarity-guide-tier-range" style={{ color: t.color }}>{t.range}</div>
-            <div className="rarity-guide-tier-desc" style={{ color: t.color }}>{t.desc}</div>
+    <div className="rt-section">
+      <div className="rt-section-header">
+        <span className="rt-section-icon">✨</span>
+        <span className="rt-section-title">Rarity Tiers</span>
+        <span className="rt-section-sub">Pre-gen by probability · Post-gen by rank</span>
+      </div>
+      <div className="rt-tiers-grid">
+        {TIERS.map(t => (
+          <div key={t.label} className="rt-tier-card" style={{
+            '--tc': t.color,
+            borderColor: t.color + '55',
+            background: `linear-gradient(135deg, ${t.color}12 0%, ${t.color}06 100%)`,
+          } as any}>
+            <div className="rt-tier-icon">{t.icon}</div>
+            <div className="rt-tier-label" style={{ color: t.color }}>{t.label}</div>
+            <div className="rt-tier-ranges">
+              <div className="rt-tier-range-row">
+                <span className="rt-tier-range-tag">Pre</span>
+                <span style={{ color: t.color, fontWeight: 700 }}>{t.preRange}</span>
+              </div>
+              <div className="rt-tier-range-row">
+                <span className="rt-tier-range-tag">Post</span>
+                <span style={{ color: t.color, fontWeight: 700 }}>{t.postRange}</span>
+              </div>
+            </div>
+            <div className="rt-tier-desc">{t.desc}</div>
           </div>
         ))}
-      </div>
-
-      <div className="rarity-guide-note">
-        <b>How rarity is calculated in this app:</b> Rarity tiers are assigned based on a trait's <b>probability of appearing</b> in the collection — calculated from the weights you set in the Organize tab.<br />
-        Formula: <code style={{ background:'var(--bg0)', padding:'1px 5px', borderRadius:4, fontSize:11 }}>Probability = trait_weight ÷ layer_total_weight × 100%</code><br /><br />
-        <b>Important:</b> "Legendary" is not a universal standard — each NFT project defines its own thresholds. The values above (5%, 15%, 35%) are used by this generator and match common industry conventions. You control rarity by adjusting weights — lower weight = rarer trait = higher rarity score contribution in post-generation ranking.<br /><br />
-        <b>Combination rarity matters:</b> An NFT with 3 "Rare" traits may outscore one with a single "Epic" trait in the post-generation Rarity Score ranking, because the score sums across ALL traits.
       </div>
     </div>
   );
 }
 
-function FormulaSection({ supply }: { supply: number }) {
-  const exSupply = Math.min(supply, 100);
-
-  const EX_TRAITS = [
-    { name: 'Trait A', weight: 5 },
-    { name: 'Trait B', weight: 10 },
-    { name: 'Trait C', weight: 3 },
-    { name: 'Trait D', weight: 2 },
+// ── Formula section ───────────────────────────────────────────────────────────
+function FormulaSection({ supply }) {
+  const ex = Math.min(supply, 100);
+  const EX = [
+    { name: 'Trait A', w: 5  },
+    { name: 'Trait B', w: 10 },
+    { name: 'Trait C', w: 3  },
+    { name: 'Trait D', w: 2  },
   ];
-  const exTotalW = EX_TRAITS.reduce((s, t) => s + t.weight, 0);
+  const totalW = EX.reduce((s, t) => s + t.w, 0);
 
   return (
-    <div className="rarity-formula-card">
-      <div className="rarity-formula-title">📐 Rarity Formulas Used In This App</div>
-      <div className="rarity-formula-grid">
+    <div className="rt-section">
+      <div className="rt-section-header">
+        <span className="rt-section-icon">📐</span>
+        <span className="rt-section-title">How Rarity Is Calculated</span>
+      </div>
+      <div className="rt-formula-grid">
 
-        <div className="rarity-formula-block">
-          <div className="rarity-formula-block-title">Pre-Generation — weight-based probability</div>
-          <div className="rarity-formula-eq">
-            Probability (%) =<br />
-            &nbsp;&nbsp;trait_weight ÷ layer_total_weight × 100
+        {/* Pre-gen */}
+        <div className="rt-formula-card rt-formula-pre">
+          <div className="rt-formula-phase-badge" style={{ background:'#34D39922', color:'#34D399', borderColor:'#34D39944' }}>
+            Pre-Generation
           </div>
-          <div className="rarity-formula-desc">
-            Each trait's rarity is set by its weight relative to other traits in the same layer. Lower weight = rarer. Weight 0 disables the trait completely.
+          <div className="rt-formula-name">Weight-Based Probability</div>
+          <div className="rt-formula-eq">
+            <span className="rt-eq-result">Probability</span> = trait_weight ÷ layer_total_weight × 100%
           </div>
-          <div className="rarity-formula-example">
-            <div className="rarity-formula-ex-title">
-              Example — {EX_TRAITS.length} traits, total weight {exTotalW} ({EX_TRAITS.map(t => t.weight).join('+')})
-            </div>
-            {EX_TRAITS.map(t => (
-              <div key={t.name} className="rarity-formula-ex-row">
-                <span>{t.name} (w={t.weight})</span>
-                <span>{t.weight}÷{exTotalW} = {((t.weight / exTotalW) * 100).toFixed(0)}%</span>
+          <div className="rt-formula-note">
+            Lower weight = rarer trait. Weight 0 disables completely. Set in Organize tab ⚙
+          </div>
+          <div className="rt-formula-example">
+            <div className="rt-ex-header">Example — {EX.length} traits, total weight {totalW}</div>
+            {EX.map(t => {
+              const pct = (t.w / totalW) * 100;
+              const tier = rarityTier(pct);
+              return (
+                <div key={t.name} className="rt-ex-row">
+                  <span className="rt-ex-name">{t.name} (w={t.w})</span>
+                  <span className="rt-ex-calc">{t.w}÷{totalW}</span>
+                  <span className="rt-ex-result" style={{ color: tier.color }}>{pct.toFixed(0)}%</span>
+                  <span className="rt-ex-tier" style={{ color: tier.color, background: tier.color + '20', border: `1px solid ${tier.color}44` }}>{tier.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Post-gen */}
+        <div className="rt-formula-card rt-formula-post">
+          <div className="rt-formula-phase-badge" style={{ background:'#6366F122', color:'#818CF8', borderColor:'#6366F144' }}>
+            Post-Generation
+          </div>
+          <div className="rt-formula-name">Rarity Score (Industry Standard)</div>
+          <div className="rt-formula-eq">
+            <span className="rt-eq-result">NFT Score</span> = Σ ( supply ÷ trait_occurrence ) per trait
+          </div>
+          <div className="rt-formula-note">
+            After generation, each NFT is scored across all traits. Rarer traits = higher score. Tied scores share the same rank. Used in Preview &amp; Export.
+          </div>
+          <div className="rt-formula-example">
+            <div className="rt-ex-header">Example — supply {ex}</div>
+            {[
+              { name: 'Red Hoodie', count: 10 },
+              { name: 'Gold Hat',   count: 50 },
+              { name: 'Blue Eyes',  count: 25 },
+            ].map(t => (
+              <div key={t.name} className="rt-ex-row">
+                <span className="rt-ex-name">{t.name} ({t.count} NFTs)</span>
+                <span className="rt-ex-calc">{ex}÷{t.count}</span>
+                <span className="rt-ex-result" style={{ color:'var(--accent2)' }}>= {ex/t.count}</span>
+                <span className="rt-ex-tier" style={{ color:'var(--dim)', background:'var(--bg0)', border:'1px solid var(--border)' }}>score</span>
               </div>
             ))}
-          </div>
-        </div>
-
-        <div className="rarity-formula-block">
-          <div className="rarity-formula-block-title">Post-Generation — Rarity Score algorithm</div>
-          <div className="rarity-formula-eq">
-            NFT Rarity Score =<br />
-            &nbsp;&nbsp;Σ ( total_supply ÷ trait_occurrence_count )<br />
-            &nbsp;&nbsp;for every trait on the NFT
-          </div>
-          <div className="rarity-formula-desc">
-            After generating the full collection, each NFT is scored by summing the inverse frequency of all its traits. Traits appearing in fewer NFTs contribute a higher value. This is the industry-standard <b>Rarity Score</b> method (used by Rarity.tools, etc.).
-          </div>
-          <div className="rarity-formula-example">
-            <div className="rarity-formula-ex-title">Example — supply {exSupply.toLocaleString()}</div>
-            <div className="rarity-formula-ex-row"><span>Red Hoodie (10 NFTs)</span><span>{exSupply}÷10 = {exSupply/10}</span></div>
-            <div className="rarity-formula-ex-row"><span>Gold Hat (50 NFTs)</span><span>{exSupply}÷50 = {exSupply/50}</span></div>
-            <div className="rarity-formula-ex-row"><span>Blue Eyes (25 NFTs)</span><span>{exSupply}÷25 = {exSupply/25}</span></div>
-            <div className="rarity-formula-ex-row"><span>Rarity Score</span><span>{exSupply/10 + exSupply/50 + exSupply/25}</span></div>
+            <div className="rt-ex-row rt-ex-total">
+              <span className="rt-ex-name">Total Rarity Score</span>
+              <span />
+              <span className="rt-ex-result" style={{ color:'#F59E0B' }}>{ex/10 + ex/50 + ex/25}</span>
+              <span />
+            </div>
           </div>
         </div>
 
       </div>
-      <div style={{ marginTop:14, padding:'10px 14px', background:'var(--bg2)', borderRadius:8, fontSize:11.5, color:'var(--dim)', lineHeight:1.6 }}>
-        <b style={{ color:'var(--accent2)' }}>Tier thresholds:</b>
-        &nbsp;Legendary ≤5% &nbsp;·&nbsp; Epic ≤15% &nbsp;·&nbsp; Rare ≤35% &nbsp;·&nbsp; Common &gt;35%
-        &nbsp;&nbsp;|&nbsp;&nbsp;
-        <b style={{ color:'var(--accent2)' }}>Adjust weights</b> in the Organize tab or via the ⚙ gear button on each layer.
-      </div>
+    </div>
+  );
+}
+
+// ── Layer accordion ───────────────────────────────────────────────────────────
+function TierDistBar({ traits }) {
+  const total = traits.filter(t => !t.isNone).length || 1;
+  const counts = { Legendary: 0, Epic: 0, Rare: 0, Common: 0 };
+  traits.filter(t => !t.isNone).forEach(t => { counts[t.tier.label] = (counts[t.tier.label] ?? 0) + 1; });
+  return (
+    <div className="rt-dist-bar">
+      {TIERS.map(t => counts[t.label] > 0 && (
+        <div key={t.label} title={`${t.label}: ${counts[t.label]}`}
+          style={{ flex: counts[t.label], background: t.color, minWidth: 4, borderRadius: 3 }} />
+      ))}
     </div>
   );
 }
@@ -114,64 +159,74 @@ function FormulaSection({ supply }: { supply: number }) {
 function LayerAccordion({ layer, traits, totalW, supply }) {
   const [open, setOpen] = useState(false);
 
-  // Dominant tier for header badge
   const tierCounts: Record<string, number> = {};
-  traits.forEach(t => { tierCounts[t.tier.label] = (tierCounts[t.tier.label] ?? 0) + 1; });
-  const dominantTier = traits.reduce((best, t) =>
-    (tierCounts[t.tier.label] > (tierCounts[best?.tier?.label] ?? 0)) ? t : best
-  , traits[0]);
+  traits.filter(t => !t.isNone).forEach(t => {
+    tierCounts[t.tier.label] = (tierCounts[t.tier.label] ?? 0) + 1;
+  });
+  const topTier = TIERS.find(t => tierCounts[t.label] > 0);
 
   return (
-    <div className="rarity-accordion">
-      {/* ── Header (always visible) ── */}
-      <div className="rarity-accordion-header" onClick={() => setOpen(o => !o)}>
-        <span className="rarity-acc-chevron">{open ? '▾' : '▸'}</span>
-        <span className="rarity-acc-name">{layer.label}</span>
-        {layer.optional && <span className="rarity-optional-chip">Optional</span>}
-        <span className="rarity-acc-meta">{layer.count} traits · total weight {totalW}</span>
-        <div className="rarity-acc-tiers">
-          {Object.entries(tierCounts).map(([label, count]) => {
-            const t = traits.find(t => t.tier.label === label);
-            return (
-              <span key={label} className="rarity-acc-tier-chip"
-                style={{ background: (t?.tier.color ?? '#94a3b8') + '22', color: t?.tier.color ?? '#94a3b8', border: `1px solid ${(t?.tier.color ?? '#94a3b8')}44` }}>
-                {label} ×{count}
-              </span>
-            );
-          })}
+    <div className="rt-layer-row" style={{ '--accent-c': topTier?.color ?? '#6B7280' } as any}>
+      <div className="rt-layer-header" onClick={() => setOpen(o => !o)}>
+        <span className="rt-layer-chevron">{open ? '▾' : '▸'}</span>
+        <div className="rt-layer-info">
+          <span className="rt-layer-name">{layer.label}</span>
+          {layer.optional && <span className="rt-optional-tag">Optional</span>}
+          <span className="rt-layer-meta">{layer.count} traits · weight {totalW}</span>
+        </div>
+        <TierDistBar traits={traits} />
+        <div className="rt-layer-chips">
+          {TIERS.filter(t => tierCounts[t.label]).map(t => (
+            <span key={t.label} className="rt-layer-chip"
+              style={{ color: t.color, background: t.color + '1a', border: `1px solid ${t.color}44` }}>
+              {t.label[0]} ×{tierCounts[t.label]}
+            </span>
+          ))}
         </div>
       </div>
 
-      {/* ── Expanded table ── */}
       {open && (
-        <div className="rarity-accordion-body">
-          <table className="rarity-table">
+        <div className="rt-layer-body">
+          <table className="rt-table">
             <thead>
               <tr>
                 <th>Trait</th>
-                <th style={{ width:70, textAlign:'center' }}>Weight</th>
+                <th style={{ width:60, textAlign:'center' }}>Wt</th>
                 <th>Probability</th>
-                <th style={{ width:120, textAlign:'center' }}>~Expected</th>
-                <th style={{ width:110, textAlign:'center' }}>Tier</th>
+                <th style={{ width:90, textAlign:'center' }}>~Count</th>
+                <th style={{ width:100, textAlign:'center' }}>Tier</th>
               </tr>
             </thead>
             <tbody>
               {traits.map(t => (
-                <tr key={t.stem} className={t.isNone ? 'rarity-row-none' : ''}>
-                  <td className="rarity-trait-name">{t.name}</td>
-                  <td className="rarity-weight-cell">{t.weight}</td>
+                <tr key={t.stem} className={t.isNone ? 'rt-row-none' : ''}>
+                  <td className="rt-trait-name" style={ !t.isNone && t.tier.label === 'Legendary'
+                    ? { color: t.tier.color, textShadow: `0 0 8px ${t.tier.color}66` } : {} }>
+                    {t.name}
+                  </td>
+                  <td style={{ textAlign:'center', color:'var(--dim)', fontSize:11 }}>{t.weight}</td>
                   <td>
-                    <div className="rarity-pct-row">
-                      <div className="rarity-bar-bg">
-                        <div className="rarity-bar-fill" style={{ width:`${Math.min(t.pct,100)}%`, background:t.tier.color }} />
+                    <div className="rt-bar-row">
+                      <div className="rt-bar-bg">
+                        <div className="rt-bar-fill" style={{
+                          width: `${Math.min(t.pct, 100)}%`,
+                          background: t.tier.color,
+                          boxShadow: t.tier.label !== 'Common' ? `0 0 6px ${t.tier.color}88` : 'none',
+                        }} />
                       </div>
-                      <span className="rarity-pct-num" style={{ color:t.tier.color }}>{t.pct.toFixed(1)}%</span>
+                      <span className="rt-pct" style={{ color: t.tier.color }}>{t.pct.toFixed(1)}%</span>
                     </div>
                   </td>
-                  <td className="rarity-exp-cell">{t.isNone ? '—' : `~${t.expectedCount.toLocaleString()}`}</td>
+                  <td style={{ textAlign:'center', fontSize:11.5, color:'var(--muted)' }}>
+                    {t.isNone ? '—' : `~${t.expectedCount.toLocaleString()}`}
+                  </td>
                   <td style={{ textAlign:'center' }}>
-                    <span className="rarity-tier-chip"
-                      style={{ background:t.tier.color+'22', color:t.tier.color, border:`1px solid ${t.tier.color}44` }}>
+                    <span className="rt-tier-chip" style={{
+                      color: t.tier.color,
+                      background: t.tier.color + '1a',
+                      border: `1px solid ${t.tier.color}44`,
+                      boxShadow: t.tier.label !== 'Common' ? `0 0 8px ${t.tier.color}33` : 'none',
+                    }}>
                       {t.tier.label}
                     </span>
                   </td>
@@ -185,83 +240,75 @@ function LayerAccordion({ layer, traits, totalW, supply }) {
   );
 }
 
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function RarityTab({ layers, weights, collection }) {
   const supply = collection?.supply ?? 100;
 
-  const analysis = useMemo(() => {
-    return layers.map(layer => {
-      const ws     = weights[layer.folder] ?? {};
-      const totalW = layer.assets.reduce((s, a) => s + (ws[a.stem] ?? a.defaultWeight ?? 1), 0);
-      const traits = layer.assets.map(a => {
-        const w   = ws[a.stem] ?? a.defaultWeight ?? 1;
-        const pct = totalW > 0 ? (w / totalW) * 100 : 0;
-        const tier = a.rel === null ? { label: 'None', color: '#9ca3af' } : rarityTier(pct);
-        return { stem:a.stem, name:a.name, weight:w, pct, expectedCount:Math.round(pct/100*supply), tier, isNone:a.rel===null };
-      }).sort((a, b) => a.pct - b.pct);
-      return { layer, traits, totalW };
-    });
-  }, [layers, weights, supply]);
+  const analysis = useMemo(() => layers.map(layer => {
+    const ws     = weights[layer.folder] ?? {};
+    const totalW = layer.assets.reduce((s, a) => s + (ws[a.stem] ?? a.defaultWeight ?? 1), 0);
+    const traits = layer.assets.map(a => {
+      const w   = ws[a.stem] ?? a.defaultWeight ?? 1;
+      const pct = totalW > 0 ? (w / totalW) * 100 : 0;
+      const tier = a.rel === null ? { label: 'None', color: '#9ca3af', glow: '#9ca3af' } : rarityTier(pct);
+      return { stem: a.stem, name: a.name, weight: w, pct, expectedCount: Math.round(pct / 100 * supply), tier, isNone: a.rel === null };
+    }).sort((a, b) => a.pct - b.pct);
+    return { layer, traits, totalW };
+  }), [layers, weights, supply]);
+
+  // Collection-wide stats
+  const totalTraits    = analysis.reduce((s, a) => s + a.traits.filter(t => !t.isNone).length, 0);
+  const legendaryCount = analysis.reduce((s, a) => s + a.traits.filter(t => t.tier.label === 'Legendary').length, 0);
+  const epicCount      = analysis.reduce((s, a) => s + a.traits.filter(t => t.tier.label === 'Epic').length, 0);
 
   return (
-    <div className="rarity-page">
+    <div className="rt-page">
 
-      {/* ── Educational guide ── */}
-      <RarityGuideSection />
-
-      {/* ── Formula reference ── */}
-      <FormulaSection supply={supply} />
-
-      {/* ── Implementation status ── */}
-      <div className="rarity-info-card">
-        <div className="rarity-info-title">Rarity Implementation Status</div>
-        <div className="rarity-info-badges">
-          <div className="rarity-badge rarity-badge-pre">
-            <span className="rarity-badge-icon">✅</span>
-            <div>
-              <div className="rarity-badge-label">Pre-Generation Rarity — Active</div>
-              <div className="rarity-badge-desc">Weight-based probability per trait, configured in the Organize tab</div>
-            </div>
-          </div>
-          <div className="rarity-badge rarity-badge-post">
-            <span className="rarity-badge-icon">✅</span>
-            <div>
-              <div className="rarity-badge-label">Post-Generation Rarity — Active</div>
-              <div className="rarity-badge-desc">Rarity Score ranking calculated after Export → ranked highest to lowest</div>
-            </div>
-          </div>
-        </div>
-        <div className="rarity-tier-legend">
+      {/* ── Stats bar ── */}
+      {analysis.length > 0 && (
+        <div className="rt-stats-bar">
           {[
-            { label:'Legendary', color:'#F59E0B', range:'≤5%' },
-            { label:'Epic',      color:'#A855F7', range:'≤15%' },
-            { label:'Rare',      color:'#3B82F6', range:'≤35%' },
-            { label:'Common',    color:'#6B7280', range:'>35%' },
-          ].map(t => (
-            <div key={t.label} className="rarity-legend-item">
-              <span className="rarity-legend-dot" style={{ background:t.color }} />
-              <span className="rarity-legend-label" style={{ color:t.color }}>{t.label}</span>
-              <span className="rarity-legend-range">{t.range}</span>
+            { label: 'Layers',      value: analysis.length,   color: 'var(--accent2)' },
+            { label: 'Total Traits',value: totalTraits,        color: 'var(--text)' },
+            { label: 'Legendary',   value: legendaryCount,     color: '#F59E0B' },
+            { label: 'Epic',        value: epicCount,          color: '#A855F7' },
+            { label: 'Supply',      value: supply.toLocaleString(), color: 'var(--accent)' },
+          ].map(s => (
+            <div key={s.label} className="rt-stat">
+              <div className="rt-stat-value" style={{ color: s.color }}>{s.value}</div>
+              <div className="rt-stat-label">{s.label}</div>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Per-layer accordion ── */}
-      {analysis.length === 0 ? (
-        <div style={{ textAlign:'center', color:'var(--dim)', fontSize:14, padding:'30px 0',
-          background:'var(--bg1)', borderRadius:12, border:'1px solid var(--border)' }}>
-          No layers found. Upload assets in the <b>Organize</b> tab first.
-        </div>
-      ) : (
-        <div className="rarity-accordion-list">
-          <div style={{ fontSize:11, color:'var(--dim)', marginBottom:8 }}>
-            Click any layer to expand its trait breakdown ↓
-          </div>
-          {analysis.map(({ layer, traits, totalW }) => (
-            <LayerAccordion key={layer.folder} layer={layer} traits={traits} totalW={totalW} supply={supply} />
           ))}
         </div>
       )}
+
+      {/* ── Tier overview ── */}
+      <TierOverview />
+
+      {/* ── Formulas ── */}
+      <FormulaSection supply={supply} />
+
+      {/* ── Layer breakdown ── */}
+      <div className="rt-section">
+        <div className="rt-section-header">
+          <span className="rt-section-icon">🗂️</span>
+          <span className="rt-section-title">Layer Breakdown</span>
+          <span className="rt-section-sub">Click any layer to expand trait details</span>
+        </div>
+
+        {analysis.length === 0 ? (
+          <div className="rt-empty">
+            No layers found. Upload assets in the <b>Organize</b> tab first.
+          </div>
+        ) : (
+          <div className="rt-layers-list">
+            {analysis.map(({ layer, traits, totalW }) => (
+              <LayerAccordion key={layer.folder} layer={layer} traits={traits} totalW={totalW} supply={supply} />
+            ))}
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }

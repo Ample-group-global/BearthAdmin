@@ -1020,3 +1020,417 @@
 .studio-wrap .rarity-guide-tier-desc { font-size: 10px; line-height: 1.5; opacity: .8; }
 .studio-wrap .rarity-guide-note { background: var(--bg2); border-radius: 8px; padding: 12px 14px; font-size: 11.5px; color: var(--dim); line-height: 1.7; }
 .studio-wrap .rarity-guide-note b { color: var(--accent2); }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   RARITY TAB  —  rt-* class namespace
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.studio-wrap .rt-page {
+  padding: 22px 26px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Stats bar ─────────────────────────────────────────────────────────────── */
+.studio-wrap .rt-stats-bar {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 22px;
+  box-shadow: 0 2px 12px rgba(99,102,241,.07);
+}
+.studio-wrap .rt-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 70px;
+  padding: 4px 10px;
+  border-right: 1px solid var(--border);
+}
+.studio-wrap .rt-stat:last-child { border-right: none; }
+.studio-wrap .rt-stat-value {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -.5px;
+}
+.studio-wrap .rt-stat-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: .7px;
+  margin-top: 4px;
+}
+
+/* ── Section wrapper ───────────────────────────────────────────────────────── */
+.studio-wrap .rt-section {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(99,102,241,.06);
+}
+.studio-wrap .rt-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, var(--bg2) 0%, var(--bg1) 100%);
+}
+.studio-wrap .rt-section-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+.studio-wrap .rt-section-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--accent2);
+  text-transform: uppercase;
+  letter-spacing: .6px;
+}
+.studio-wrap .rt-section-sub {
+  font-size: 11px;
+  color: var(--xdim);
+  margin-left: auto;
+  font-weight: 500;
+}
+
+/* ── Tier overview cards ───────────────────────────────────────────────────── */
+.studio-wrap .rt-tiers-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  padding: 18px 18px 20px;
+}
+.studio-wrap .rt-tier-card {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 16px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform .14s, box-shadow .14s;
+}
+.studio-wrap .rt-tier-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.1), 0 0 0 1px var(--tc, #6366f1);
+}
+.studio-wrap .rt-tier-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+.studio-wrap .rt-tier-label {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -.2px;
+}
+.studio-wrap .rt-tier-ranges {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(0,0,0,.04);
+  border-radius: 7px;
+  padding: 8px 10px;
+}
+.studio-wrap .rt-tier-range-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11.5px;
+}
+.studio-wrap .rt-tier-range-tag {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--xdim);
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+.studio-wrap .rt-tier-desc {
+  font-size: 10.5px;
+  color: var(--dim);
+  line-height: 1.5;
+}
+
+/* ── Formula section ───────────────────────────────────────────────────────── */
+.studio-wrap .rt-formula-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 18px 18px 20px;
+}
+.studio-wrap .rt-formula-card {
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  padding: 16px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--bg0);
+}
+.studio-wrap .rt-formula-phase-badge {
+  display: inline-block;
+  width: fit-content;
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  padding: 3px 11px;
+}
+.studio-wrap .rt-formula-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+}
+.studio-wrap .rt-formula-eq {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--bg1);
+  border: 1px solid var(--border2);
+  border-radius: 7px;
+  padding: 9px 12px;
+  line-height: 1.65;
+  word-break: break-word;
+}
+.studio-wrap .rt-eq-result {
+  font-weight: 800;
+  color: var(--accent2);
+}
+.studio-wrap .rt-formula-note {
+  font-size: 11px;
+  color: var(--dim);
+  line-height: 1.6;
+  background: var(--bg2);
+  border-radius: 7px;
+  padding: 8px 11px;
+}
+.studio-wrap .rt-formula-example {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.studio-wrap .rt-ex-header {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: var(--xdim);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg0);
+}
+.studio-wrap .rt-ex-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11.5px;
+}
+.studio-wrap .rt-ex-row:last-child { border-bottom: none; }
+.studio-wrap .rt-ex-total {
+  background: var(--bg0);
+  font-weight: 700;
+}
+.studio-wrap .rt-ex-name { color: var(--muted); }
+.studio-wrap .rt-ex-calc { font-size: 10.5px; color: var(--xdim); font-family: monospace; }
+.studio-wrap .rt-ex-result { font-weight: 800; font-size: 12px; }
+.studio-wrap .rt-ex-tier {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  white-space: nowrap;
+}
+
+/* ── Tier distribution bar ─────────────────────────────────────────────────── */
+.studio-wrap .rt-dist-bar {
+  display: flex;
+  height: 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  gap: 2px;
+  flex: 1;
+  min-width: 60px;
+  max-width: 140px;
+  background: var(--bg2);
+}
+
+/* ── Layer accordion list ──────────────────────────────────────────────────── */
+.studio-wrap .rt-layers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 16px;
+}
+.studio-wrap .rt-layer-row {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg1);
+  transition: box-shadow .14s;
+}
+.studio-wrap .rt-layer-row:hover { box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+.studio-wrap .rt-layer-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .12s;
+}
+.studio-wrap .rt-layer-header:hover { background: var(--bg2); }
+.studio-wrap .rt-layer-chevron {
+  font-size: 10px;
+  color: var(--dim);
+  flex-shrink: 0;
+  width: 12px;
+}
+.studio-wrap .rt-layer-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 180px;
+}
+.studio-wrap .rt-layer-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent2);
+}
+.studio-wrap .rt-optional-tag {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid rgba(99,102,241,.25);
+  border-radius: 6px;
+  padding: 2px 7px;
+}
+.studio-wrap .rt-layer-meta {
+  font-size: 10.5px;
+  color: var(--xdim);
+  font-weight: 500;
+}
+.studio-wrap .rt-layer-chips {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.studio-wrap .rt-layer-chip {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.studio-wrap .rt-layer-body {
+  border-top: 1px solid var(--border);
+  overflow: auto;
+}
+
+/* ── Trait table ───────────────────────────────────────────────────────────── */
+.studio-wrap .rt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.studio-wrap .rt-table th {
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  padding: 8px 14px;
+  text-align: left;
+  background: var(--bg0);
+  border-bottom: 1px solid var(--border);
+}
+.studio-wrap .rt-table td {
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.studio-wrap .rt-table tr:last-child td { border-bottom: none; }
+.studio-wrap .rt-table tbody tr:hover td { background: var(--bg2); }
+.studio-wrap .rt-row-none td { opacity: .5; font-style: italic; }
+.studio-wrap .rt-trait-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  transition: color .12s;
+}
+.studio-wrap .rt-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.studio-wrap .rt-bar-bg {
+  flex: 1;
+  height: 5px;
+  background: var(--bg2);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.studio-wrap .rt-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .3s ease;
+}
+.studio-wrap .rt-pct {
+  font-size: 11.5px;
+  font-weight: 700;
+  min-width: 40px;
+  text-align: right;
+}
+.studio-wrap .rt-tier-chip {
+  display: inline-block;
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 9px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  white-space: nowrap;
+}
+
+/* ── Empty state ───────────────────────────────────────────────────────────── */
+.studio-wrap .rt-empty {
+  padding: 32px 24px;
+  text-align: center;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* ── Responsive: collapse to 2-col tiers on narrower panels ────────────────── */
+@media (max-width: 900px) {
+  .studio-wrap .rt-tiers-grid { grid-template-columns: repeat(2, 1fr); }
+  .studio-wrap .rt-formula-grid { grid-template-columns: 1fr; }
+}
