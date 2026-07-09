@@ -650,6 +650,10 @@
 }
 .studio-wrap .prev-card-body { padding: 8px 10px 10px; }
 .studio-wrap .prev-card-name { font-size: 11px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.studio-wrap .prev-rank-badge {
+  position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,.6); color: #F59E0B;
+  font-size: 10px; font-weight: 700; padding: 2px 5px; border-radius: 4px; pointer-events: none; line-height: 1.4;
+}
 
 /* ══════════════════════════════
    RARITY MODAL

@@ -1,33 +1,29 @@
 // @ts-nocheck
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { generateAllCombos } from '../../../../lib/studio/combos';
+import { generateAllCombos, computeRarity } from '../../../../lib/studio/combos';
 import { useLayerFiles } from '../LayerFilesContext';
 
 const THUMB = 160; // thumbnail px
 
 // ── Sort + filter ─────────────────────────────────────────────────────────────
-function applyView(allCombos, sort, filter, layers) {
-  let result = allCombos.map((combo, i) => ({ combo, index: i + 1 }));
-  if (filter) {
-    result = result.filter(({ combo }) => combo[filter.folder]?.stem === filter.stem);
-  }
+function applyView(items, sort, filter) {
+  // items: [{ combo, index, score, rank }]
+  let result = filter
+    ? items.filter(({ combo }) => combo[filter.folder]?.stem === filter.stem)
+    : [...items];
+
   if (sort === 'rare-first') {
-    result.sort((a, b) =>
-      Object.values(b.combo).filter(v => v?.rel !== null).length -
-      Object.values(a.combo).filter(v => v?.rel !== null).length
-    );
+    result.sort((a, b) => b.score - a.score); // highest rarity score first
   } else if (sort === 'rare-last') {
-    result.sort((a, b) =>
-      Object.values(a.combo).filter(v => v?.rel !== null).length -
-      Object.values(b.combo).filter(v => v?.rel !== null).length
-    );
+    result.sort((a, b) => a.score - b.score); // lowest rarity score first
   }
+  // 'shuffle' = insertion order (randomised by generateAllCombos)
   return result;
 }
 
 // ── NFT Card — lazy composites via IntersectionObserver ───────────────────────
-function NFTCard({ index, combo, layers, bitmapCache, canvasW, canvasH, onClick }) {
+function NFTCard({ index, rank, combo, layers, bitmapCache, canvasW, canvasH, onClick }) {
   const canvasRef  = useRef(null);
   const composited = useRef(false);
 
@@ -61,7 +57,7 @@ function NFTCard({ index, combo, layers, bitmapCache, canvasW, canvasH, onClick 
     const attrs = layers
       .filter(l => combo[l.folder] && combo[l.folder].rel !== null)
       .map(l => ({ trait_type: l.label, value: combo[l.folder].name }));
-    onClick({ index, src, attrs });
+    onClick({ index, rank, src, attrs });
   }
 
   return (
@@ -73,6 +69,9 @@ function NFTCard({ index, combo, layers, bitmapCache, canvasW, canvasH, onClick 
           height={canvasH}
           style={{ width: '100%', height: '100%', display: 'block' }}
         />
+        {rank && (
+          <div className="prev-rank-badge">#{rank}</div>
+        )}
       </div>
       <div className="prev-card-body">
         <div className="prev-card-name">#{index}</div>
@@ -92,6 +91,11 @@ function NFTPopup({ item, onClose }) {
         </div>
         <div className="nft-popup-right">
           <div className="nft-popup-num">#{item.index}</div>
+          {item.rank && (
+            <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 8 }}>
+              Rarity rank #{item.rank}
+            </div>
+          )}
           <div className="nft-popup-attrs-title">Attributes</div>
           <div className="nft-popup-attrs">
             {item.attrs.map((a, i) => (
@@ -144,33 +148,48 @@ const SORT_LABELS = {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function PreviewPanel({ weights, layers, collection, conflicts }) {
   const { getBlobUrl } = useLayerFiles();
-  const supply = collection?.supply ?? 100;
-  const srcW   = collection?.width  ?? 512;
-  const srcH   = collection?.height ?? 512;
-  // Thumbnail canvas dims — keep aspect ratio, cap at THUMB
-  const scale  = Math.min(THUMB / srcW, THUMB / srcH, 1);
+  const supply  = collection?.supply ?? 100;
+  const srcW    = collection?.width  ?? 512;
+  const srcH    = collection?.height ?? 512;
+  const scale   = Math.min(THUMB / srcW, THUMB / srcH, 1);
   const canvasW = Math.max(1, Math.round(srcW * scale));
   const canvasH = Math.max(1, Math.round(srcH * scale));
 
   const [phase,    setPhase]    = useState('idle');
   const [loadMsg,  setLoadMsg]  = useState('');
-  const [visible,  setVisible]  = useState([]);   // filtered + sorted items
+  const [visible,  setVisible]  = useState([]);
   const [sortBy,   setSortBy]   = useState('shuffle');
   const [sortOpen, setSortOpen] = useState(false);
   const [filter,   setFilter]   = useState(null);
   const [popup,    setPopup]    = useState(null);
 
-  const bitmapCache  = useRef({});
-  const allCombosRef = useRef([]);
+  const bitmapCache = useRef({});
+  // Scored items: [{ combo, index, score, rank }] — stable across filter/sort changes
+  const scoredRef   = useRef([]);
+  const sortRef     = useRef('shuffle');
+  const filterRef   = useRef(null);
 
-  const rebuild = useCallback((combos, sort, f) => {
-    setVisible(applyView(combos, sort, f, layers));
-  }, [layers]);
+  // Close sort dropdown when clicking outside
+  const sortWrapRef = useRef(null);
+  useEffect(() => {
+    if (!sortOpen) return;
+    function onDoc(e) {
+      if (sortWrapRef.current && !sortWrapRef.current.contains(e.target)) {
+        setSortOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [sortOpen]);
+
+  const rebuild = useCallback((scored, sort, f) => {
+    setVisible(applyView(scored, sort, f));
+  }, []);
 
   async function run() {
     setPhase('loading');
 
-    // ── Step 1: pre-load all unique layer images in parallel ──
+    // ── 1. Pre-load all unique layer images ───────────────────────────────────
     const rels = [...new Set(
       layers.flatMap(l => l.assets.filter(a => a.rel).map(a => a.rel))
     )];
@@ -178,7 +197,7 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
     setLoadMsg(`Loading images… 0 / ${rels.length}`);
 
     await Promise.all(rels.map(async rel => {
-      if (bitmapCache.current[rel]) { loaded++; setLoadMsg(`Loading images… ${loaded} / ${rels.length}`); return; }
+      if (bitmapCache.current[rel]) { setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`); return; }
       try {
         const blobUrl = getBlobUrl(rel);
         const src = blobUrl ?? `/api/layer-img/${rel}?w=${canvasW}&h=${canvasH}`;
@@ -194,51 +213,68 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
           }
         }
       } catch {}
-      loaded++;
-      setLoadMsg(`Loading images… ${loaded} / ${rels.length}`);
+      setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`);
     }));
 
-    // ── Step 2: generate all combos instantly (pure JS) ──
+    // ── 2. Generate combos + compute real rarity scores ───────────────────────
     setLoadMsg('Generating combinations…');
-    await new Promise(r => setTimeout(r, 0)); // flush paint
-    const combos = generateAllCombos(supply, layers, weights, conflicts);
-    allCombosRef.current = combos;
+    await new Promise(r => setTimeout(r, 0));
 
-    // ── Step 3: show ──
+    const combos  = generateAllCombos(supply, layers, weights, conflicts);
+    const rarity  = computeRarity(combos, layers); // [{ index, score, rank, attrs }]
+
+    // Build scored items array (index is 1-based, matching rarity output)
+    const scored = combos.map((combo, i) => {
+      const r = rarity.find(x => x.index === i + 1);
+      return { combo, index: i + 1, score: r?.score ?? 0, rank: r?.rank ?? i + 1 };
+    });
+
+    scoredRef.current  = scored;
+    sortRef.current    = 'shuffle';
+    filterRef.current  = null;
     setSortBy('shuffle');
     setFilter(null);
-    rebuild(combos, 'shuffle', null);
+    rebuild(scored, 'shuffle', null);
     setPhase('ready');
   }
 
-  // Auto-run on mount if layers available
+  // Auto-run on mount
   useEffect(() => { if (layers.length > 0) run(); }, []);
 
   function handleSort(s) {
     setSortBy(s);
+    sortRef.current = s;
     setSortOpen(false);
+
     if (s === 'shuffle') {
-      // Re-randomize combos
-      const combos = generateAllCombos(supply, layers, weights, conflicts);
-      allCombosRef.current = combos;
-      rebuild(combos, s, filter);
+      // Re-randomise: new combos + new rarity scores
+      const combos  = generateAllCombos(supply, layers, weights, conflicts);
+      const rarity  = computeRarity(combos, layers);
+      const scored  = combos.map((combo, i) => {
+        const r = rarity.find(x => x.index === i + 1);
+        return { combo, index: i + 1, score: r?.score ?? 0, rank: r?.rank ?? i + 1 };
+      });
+      scoredRef.current = scored;
+      rebuild(scored, s, filterRef.current);
     } else {
-      rebuild(allCombosRef.current, s, filter);
+      rebuild(scoredRef.current, s, filterRef.current);
     }
   }
 
   function handleTraitClick(layer, asset) {
-    const next =
-      filter?.folder === layer.folder && filter?.stem === asset.stem
-        ? null
-        : { folder: layer.folder, stem: asset.stem, layerLabel: layer.label, assetName: asset.name };
+    const same = filter?.folder === layer.folder && filter?.stem === asset.stem;
+    const next = same
+      ? null
+      : { folder: layer.folder, stem: asset.stem, layerLabel: layer.label, assetName: asset.name };
+    filterRef.current = next;
     setFilter(next);
-    rebuild(allCombosRef.current, sortBy, next);
+    rebuild(scoredRef.current, sortRef.current, next);
   }
 
   function clearFilter() {
+    filterRef.current = null;
     setFilter(null);
-    rebuild(allCombosRef.current, sortBy, null);
+    rebuild(scoredRef.current, sortRef.current, null);
   }
 
   if (layers.length === 0) {
@@ -306,12 +342,12 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
               <div className="prev-tokens-badge">
                 {visible.length.toLocaleString()} tokens
               </div>
-              <div className="prev-sort-wrap" style={{ position:'relative' }}>
+              <div ref={sortWrapRef} style={{ position: 'relative' }}>
                 <button className="prev-sort-btn" onClick={() => setSortOpen(o => !o)}>
                   Sort: {SORT_LABELS[sortBy]} ▾
                 </button>
                 {sortOpen && (
-                  <div className="prev-sort-dropdown">
+                  <div className="prev-sort-dropdown" style={{ position:'absolute', right:0, top:'110%', zIndex:100 }}>
                     {Object.entries(SORT_LABELS).map(([k, l]) => (
                       <button
                         key={k}
@@ -334,10 +370,11 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
             )}
 
             <div className="prev-grid">
-              {visible.map(({ combo, index }) => (
+              {visible.map(({ combo, index, rank }) => (
                 <NFTCard
                   key={index}
                   index={index}
+                  rank={sortBy !== 'shuffle' ? rank : null}
                   combo={combo}
                   layers={layers}
                   bitmapCache={bitmapCache}
@@ -347,7 +384,6 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
                 />
               ))}
             </div>
-
           </>
         )}
       </div>
