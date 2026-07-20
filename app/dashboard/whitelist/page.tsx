@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useWhitelist } from "@/app/whitelist/hooks/useWhitelist";
-import { ToastContainer } from "@/app/whitelist/components/Toast";
-import { useToast } from "@/app/whitelist/hooks/useToast";
+import { useWhitelist } from "./hooks/useWhitelist";
+import { ToastContainer } from "./components/Toast";
+import { useToast } from "./hooks/useToast";
 
 type Tab = "addresses" | "add" | "bulk" | "merkle" | "test" | "export";
 

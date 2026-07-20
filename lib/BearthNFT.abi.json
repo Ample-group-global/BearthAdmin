@@ -7,27 +7,32 @@
       "inputs": [
         {
           "internalType": "string",
-          "name": "n",
+          "name": "name_",
           "type": "string"
         },
         {
           "internalType": "string",
-          "name": "s",
+          "name": "symbol_",
           "type": "string"
         },
         {
           "internalType": "string",
-          "name": "u",
+          "name": "blindBoxURI_",
           "type": "string"
         },
         {
           "internalType": "address",
-          "name": "m",
+          "name": "adminWallet",
           "type": "address"
         },
         {
           "internalType": "address",
-          "name": "fixedAddr",
+          "name": "operationsWallet",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "treasury_",
           "type": "address"
         }
       ],
@@ -53,6 +58,11 @@
         }
       ],
       "name": "AccessControlUnauthorizedAccount",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "AlreadyClaimed",
       "type": "error"
     },
     {
@@ -260,17 +270,7 @@
     },
     {
       "inputs": [],
-      "name": "InvalidBatchMintParams",
-      "type": "error"
-    },
-    {
-      "inputs": [],
       "name": "InvalidEmergencyTransfer",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "InvalidLimits",
       "type": "error"
     },
     {
@@ -280,7 +280,7 @@
     },
     {
       "inputs": [],
-      "name": "InvalidProof",
+      "name": "InvalidRarityTier",
       "type": "error"
     },
     {
@@ -295,17 +295,32 @@
     },
     {
       "inputs": [],
-      "name": "InvalidWLTimes",
+      "name": "InvalidWaveNum",
       "type": "error"
     },
     {
       "inputs": [],
-      "name": "LimitExceededOrWrongPayment",
+      "name": "MarketplaceNotAllowed",
       "type": "error"
     },
     {
       "inputs": [],
       "name": "NoBalance",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotAllWavesClosed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotDutchWave",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotWhitelisted",
       "type": "error"
     },
     {
@@ -332,12 +347,12 @@
     },
     {
       "inputs": [],
-      "name": "PaidMintUnavailable",
+      "name": "ProvenanceAlreadySet",
       "type": "error"
     },
     {
       "inputs": [],
-      "name": "PublicMintUnavailable",
+      "name": "PurchaseLimitExceeded",
       "type": "error"
     },
     {
@@ -347,12 +362,22 @@
     },
     {
       "inputs": [],
+      "name": "RefundFailed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "SBTCannotBeApproved",
       "type": "error"
     },
     {
       "inputs": [],
-      "name": "SupplyOrLimitExceeded",
+      "name": "SupplyExceeded",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "TokenRarityPriceLocked",
       "type": "error"
     },
     {
@@ -367,7 +392,37 @@
     },
     {
       "inputs": [],
-      "name": "WLNotActive",
+      "name": "WaveAlreadyClosed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "WaveNotActive",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "WavePriceLocked",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "WaveSoldOut",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "WaveStillActive",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "WrongPayment",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "WrongPhase",
       "type": "error"
     },
     {
@@ -382,7 +437,7 @@
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "t",
+          "name": "timestamp",
           "type": "uint256"
         }
       ],
@@ -401,7 +456,7 @@
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "t",
+          "name": "timestamp",
           "type": "uint256"
         }
       ],
@@ -476,11 +531,49 @@
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "t",
+          "name": "timestamp",
           "type": "uint256"
         }
       ],
       "name": "Burned",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "uri",
+          "type": "string"
+        }
+      ],
+      "name": "ContractURIUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "waveNum",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "startPrice",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "floorPrice",
+          "type": "uint256"
+        }
+      ],
+      "name": "DutchAuctionConfigured",
       "type": "event"
     },
     {
@@ -495,35 +588,54 @@
         {
           "indexed": true,
           "internalType": "address",
-          "name": "f",
+          "name": "from",
           "type": "address"
         },
         {
           "indexed": true,
           "internalType": "address",
-          "name": "t",
+          "name": "to",
           "type": "address"
         },
         {
           "indexed": false,
           "internalType": "address",
-          "name": "o",
+          "name": "operator",
           "type": "address"
         },
         {
           "indexed": false,
           "internalType": "string",
-          "name": "r",
+          "name": "reason",
           "type": "string"
         },
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "tm",
+          "name": "timestamp",
           "type": "uint256"
         }
       ],
       "name": "Emergency",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "marketplace",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "allowed",
+          "type": "bool"
+        }
+      ],
+      "name": "MarketplaceAllowlistChanged",
       "type": "event"
     },
     {
@@ -538,26 +650,20 @@
         {
           "indexed": true,
           "internalType": "uint256",
-          "name": "id",
+          "name": "tokenId",
           "type": "uint256"
         },
         {
-          "indexed": false,
-          "internalType": "enum BearthNFT.Phase",
-          "name": "p",
-          "type": "uint8"
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "waveNum",
+          "type": "uint256"
         },
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "t",
+          "name": "timestamp",
           "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "bool",
-          "name": "s",
-          "type": "bool"
         }
       ],
       "name": "Minted",
@@ -601,13 +707,19 @@
         {
           "indexed": false,
           "internalType": "enum BearthNFT.Phase",
-          "name": "p",
+          "name": "newPhase",
           "type": "uint8"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "caller",
+          "type": "address"
         },
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "t",
+          "name": "timestamp",
           "type": "uint256"
         }
       ],
@@ -619,14 +731,46 @@
       "inputs": [
         {
           "indexed": false,
+          "internalType": "bytes32",
+          "name": "hash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "ProvenanceSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "enabled",
+          "type": "bool"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "maxPerWallet",
+          "type": "uint256"
+        }
+      ],
+      "name": "PurchaseLimitChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
           "internalType": "string",
-          "name": "u",
+          "name": "uri",
           "type": "string"
         },
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "t",
+          "name": "timestamp",
           "type": "uint256"
         }
       ],
@@ -714,7 +858,39 @@
         {
           "indexed": false,
           "internalType": "bool",
-          "name": "e",
+          "name": "enforced",
+          "type": "bool"
+        }
+      ],
+      "name": "RoyaltyEnforcementChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "receiver",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint96",
+          "name": "feeBasisPoints",
+          "type": "uint96"
+        }
+      ],
+      "name": "RoyaltyUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "enabled",
           "type": "bool"
         }
       ],
@@ -750,6 +926,19 @@
       "anonymous": false,
       "inputs": [
         {
+          "indexed": true,
+          "internalType": "address",
+          "name": "wallet",
+          "type": "address"
+        }
+      ],
+      "name": "TreasuryWalletChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
           "indexed": false,
           "internalType": "address",
           "name": "account",
@@ -763,57 +952,132 @@
       "anonymous": false,
       "inputs": [
         {
+          "indexed": true,
+          "internalType": "address",
+          "name": "wallet",
+          "type": "address"
+        },
+        {
           "indexed": false,
-          "internalType": "bytes32",
-          "name": "r",
-          "type": "bytes32"
+          "internalType": "bool",
+          "name": "status",
+          "type": "bool"
         }
       ],
-      "name": "WLRootSet",
+      "name": "VIPStatusChanged",
       "type": "event"
     },
     {
       "anonymous": false,
       "inputs": [
         {
-          "indexed": false,
-          "internalType": "bytes32",
-          "name": "r",
-          "type": "bytes32"
-        },
-        {
-          "indexed": false,
+          "indexed": true,
           "internalType": "uint256",
-          "name": "s",
+          "name": "waveNum",
           "type": "uint256"
         },
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "e",
+          "name": "skippedQty",
           "type": "uint256"
         }
       ],
-      "name": "WLSet",
+      "name": "WaveClosedBurn",
       "type": "event"
     },
     {
       "anonymous": false,
       "inputs": [
         {
-          "indexed": false,
+          "indexed": true,
           "internalType": "uint256",
-          "name": "s",
+          "name": "waveNum",
           "type": "uint256"
         },
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "e",
+          "name": "qty",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "treasury",
+          "type": "address"
+        }
+      ],
+      "name": "WaveClosedTreasury",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "waveNum",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newPrice",
           "type": "uint256"
         }
       ],
-      "name": "WLTimesSet",
+      "name": "WavePriceUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "waveNum",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "startTime",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "endTime",
+          "type": "uint256"
+        }
+      ],
+      "name": "WaveScheduleUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "waveNum",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "buyer",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "qty",
+          "type": "uint256"
+        }
+      ],
+      "name": "WaveSold",
       "type": "event"
     },
     {
@@ -870,12 +1134,12 @@
     },
     {
       "inputs": [],
-      "name": "PAUSER_ROLE",
+      "name": "OPENSEA_SEAPORT",
       "outputs": [
         {
-          "internalType": "bytes32",
+          "internalType": "address",
           "name": "",
-          "type": "bytes32"
+          "type": "address"
         }
       ],
       "stateMutability": "view",
@@ -883,12 +1147,12 @@
     },
     {
       "inputs": [],
-      "name": "PRICE",
+      "name": "PAUSER_ROLE",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "bytes32",
           "name": "",
-          "type": "uint256"
+          "type": "bytes32"
         }
       ],
       "stateMutability": "view",
@@ -922,12 +1186,25 @@
     },
     {
       "inputs": [],
-      "name": "STAGE1_SUPPLY",
+      "name": "WAVE_COUNT",
       "outputs": [
         {
           "internalType": "uint256",
           "name": "",
           "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "WAVE_ROLE",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
         }
       ],
       "stateMutability": "view",
@@ -954,6 +1231,43 @@
           "internalType": "bytes32",
           "name": "",
           "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "qty",
+          "type": "uint256"
+        }
+      ],
+      "name": "adminMint",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "allowedMarketplaces",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -1012,24 +1326,6 @@
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "batchMint",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
           "internalType": "uint256",
           "name": "id",
           "type": "uint256"
@@ -1044,22 +1340,61 @@
       "inputs": [
         {
           "internalType": "uint256",
+          "name": "waveNum",
+          "type": "uint256"
+        }
+      ],
+      "name": "burnUnsold",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "contractURI",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "currentPhase",
+      "outputs": [
+        {
+          "internalType": "enum BearthNFT.Phase",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
           "name": "id",
           "type": "uint256"
         },
         {
           "internalType": "address",
-          "name": "f",
+          "name": "from",
           "type": "address"
         },
         {
           "internalType": "address",
-          "name": "t",
+          "name": "to",
           "type": "address"
         },
         {
           "internalType": "string",
-          "name": "r",
+          "name": "reason",
           "type": "string"
         }
       ],
@@ -1089,91 +1424,47 @@
     },
     {
       "inputs": [],
-      "name": "getData",
+      "name": "getCollectionInfo",
       "outputs": [
         {
           "internalType": "enum BearthNFT.Phase",
-          "name": "",
+          "name": "phase_",
           "type": "uint8"
         },
         {
           "internalType": "uint256",
-          "name": "",
+          "name": "totalCounter",
           "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "",
+          "name": "maxSupply_",
           "type": "uint256"
         },
         {
           "internalType": "bool",
-          "name": "",
+          "name": "sbt_",
           "type": "bool"
         },
         {
           "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "a",
-          "type": "address"
-        }
-      ],
-      "name": "getInfo",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "",
+          "name": "revealCount_",
           "type": "uint256"
         },
         {
           "internalType": "bool",
-          "name": "",
+          "name": "royaltyEnforced_",
           "type": "bool"
         },
         {
           "internalType": "bool",
-          "name": "",
+          "name": "purchaseLimitEnabled_",
           "type": "bool"
         },
         {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
+          "internalType": "uint256",
+          "name": "normalMaxPerWallet_",
+          "type": "uint256"
         }
       ],
       "stateMutability": "view",
@@ -1193,6 +1484,84 @@
           "internalType": "bytes32",
           "name": "",
           "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "wallet",
+          "type": "address"
+        }
+      ],
+      "name": "getWalletInfo",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "totalMinted_",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "isVIP_",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "wlClaimed_",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "waveNum",
+          "type": "uint256"
+        }
+      ],
+      "name": "getWaveInfo",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "qty",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "sold",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "startTime",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "endTime",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "closed",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "active",
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -1268,16 +1637,35 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "a",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "isVIP",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "addr",
           "type": "address"
         },
         {
           "internalType": "bytes32[]",
-          "name": "p",
+          "name": "proof",
           "type": "bytes32[]"
         }
       ],
-      "name": "isWL",
+      "name": "isWhitelisted",
       "outputs": [
         {
           "internalType": "bool",
@@ -1290,25 +1678,12 @@
     },
     {
       "inputs": [],
-      "name": "limit1",
+      "name": "merkleRoot",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "bytes32",
           "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "limit2",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
+          "type": "bytes32"
         }
       ],
       "stateMutability": "view",
@@ -1318,19 +1693,36 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "",
+          "name": "to",
           "type": "address"
-        }
-      ],
-      "name": "minted",
-      "outputs": [
+        },
         {
           "internalType": "uint256",
-          "name": "",
+          "name": "waveNum",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "qty",
           "type": "uint256"
         }
       ],
-      "stateMutability": "view",
+      "name": "mintAndTransfer",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "waveNum",
+          "type": "uint256"
+        }
+      ],
+      "name": "mintToTreasury",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -1341,6 +1733,19 @@
           "internalType": "string",
           "name": "",
           "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "normalMaxPerWallet",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
         }
       ],
       "stateMutability": "view",
@@ -1382,7 +1787,7 @@
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "q",
+          "name": "qty",
           "type": "uint256"
         }
       ],
@@ -1445,12 +1850,12 @@
     },
     {
       "inputs": [],
-      "name": "phase",
+      "name": "provenanceHash",
       "outputs": [
         {
-          "internalType": "enum BearthNFT.Phase",
+          "internalType": "bytes32",
           "name": "",
-          "type": "uint8"
+          "type": "bytes32"
         }
       ],
       "stateMutability": "view",
@@ -1458,9 +1863,15 @@
     },
     {
       "inputs": [],
-      "name": "publicMint",
-      "outputs": [],
-      "stateMutability": "nonpayable",
+      "name": "purchaseLimitEnabled",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -1492,7 +1903,7 @@
       "inputs": [
         {
           "internalType": "string",
-          "name": "u",
+          "name": "uri",
           "type": "string"
         }
       ],
@@ -1534,12 +1945,12 @@
     },
     {
       "inputs": [],
-      "name": "root",
+      "name": "royaltyEnforced",
       "outputs": [
         {
-          "internalType": "bytes32",
+          "internalType": "bool",
           "name": "",
-          "type": "bytes32"
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -1642,12 +2053,30 @@
       "inputs": [
         {
           "internalType": "address",
+          "name": "marketplace",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "allowed",
+          "type": "bool"
+        }
+      ],
+      "name": "setAllowedMarketplace",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
           "name": "op",
           "type": "address"
         },
         {
           "internalType": "bool",
-          "name": "a",
+          "name": "approved",
           "type": "bool"
         }
       ],
@@ -1659,17 +2088,25 @@
     {
       "inputs": [
         {
-          "internalType": "uint256",
-          "name": "l1",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "l2",
-          "type": "uint256"
+          "internalType": "string",
+          "name": "uri",
+          "type": "string"
         }
       ],
-      "name": "setLimits",
+      "name": "setContractURI",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "root",
+          "type": "bytes32"
+        }
+      ],
+      "name": "setMerkleRoot",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -1690,13 +2127,44 @@
     {
       "inputs": [
         {
+          "internalType": "bytes32",
+          "name": "hash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "setProvenanceHash",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bool",
+          "name": "enabled",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "maxPerWallet",
+          "type": "uint256"
+        }
+      ],
+      "name": "setPurchaseLimitConfig",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "address",
-          "name": "r",
+          "name": "receiver",
           "type": "address"
         },
         {
           "internalType": "uint96",
-          "name": "b",
+          "name": "bps",
           "type": "uint96"
         }
       ],
@@ -1709,7 +2177,20 @@
       "inputs": [
         {
           "internalType": "bool",
-          "name": "e",
+          "name": "enforced",
+          "type": "bool"
+        }
+      ],
+      "name": "setRoyaltyEnforced",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bool",
+          "name": "enabled",
           "type": "bool"
         }
       ],
@@ -1721,22 +2202,17 @@
     {
       "inputs": [
         {
-          "internalType": "bytes32",
-          "name": "r",
-          "type": "bytes32"
-        },
-        {
           "internalType": "uint256",
-          "name": "s",
+          "name": "tokenId",
           "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "e",
+          "name": "priceWei",
           "type": "uint256"
         }
       ],
-      "name": "setWL",
+      "name": "setTokenRarityPrice",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -1745,16 +2221,16 @@
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "s",
+          "name": "tokenId",
           "type": "uint256"
         },
         {
-          "internalType": "uint256",
-          "name": "e",
-          "type": "uint256"
+          "internalType": "uint8",
+          "name": "rarity",
+          "type": "uint8"
         }
       ],
-      "name": "setWLTimes",
+      "name": "setTokenRarity",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -1762,19 +2238,63 @@
     {
       "inputs": [
         {
-          "internalType": "bytes32",
-          "name": "r",
-          "type": "bytes32"
+          "internalType": "uint256[]",
+          "name": "tokenIds",
+          "type": "uint256[]"
+        },
+        {
+          "internalType": "uint8[]",
+          "name": "rarities",
+          "type": "uint8[]"
         }
       ],
-      "name": "setWhitelist",
+      "name": "setTokenRarityBatch",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     },
     {
-      "inputs": [],
-      "name": "stage1Minted",
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "waveNum",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "startPrice",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "floorPrice",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "decrementWei",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "intervalSecs",
+          "type": "uint256"
+        }
+      ],
+      "name": "setDutchAuction",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "waveNum",
+          "type": "uint256"
+        }
+      ],
+      "name": "getCurrentDutchPrice",
       "outputs": [
         {
           "internalType": "uint256",
@@ -1788,8 +2308,175 @@
     {
       "inputs": [
         {
+          "internalType": "uint256",
+          "name": "waveNum",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "qty",
+          "type": "uint256"
+        }
+      ],
+      "name": "dutchMint",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "tokenRarity",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "isDutchWave",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "dutchConfig",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "startPrice",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "floorPrice",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "decrementWei",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "intervalSecs",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "auctionStart",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "wallet",
+          "type": "address"
+        }
+      ],
+      "name": "setTreasuryWallet",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "wallet",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "status",
+          "type": "bool"
+        }
+      ],
+      "name": "setVIP",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "waveNum",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "priceWei",
+          "type": "uint256"
+        }
+      ],
+      "name": "setWavePrice",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "waveNum",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "startTime",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "endTime",
+          "type": "uint256"
+        }
+      ],
+      "name": "setWaveSchedule",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "bytes4",
-          "name": "i",
+          "name": "id",
           "type": "bytes4"
         }
       ],
@@ -1850,6 +2537,25 @@
         }
       ],
       "name": "tokenOfOwnerByIndex",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "tokenRarityPrice",
       "outputs": [
         {
           "internalType": "uint256",
@@ -1930,6 +2636,19 @@
     },
     {
       "inputs": [],
+      "name": "treasuryWallet",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "unpause",
       "outputs": [],
       "stateMutability": "nonpayable",
@@ -1951,19 +2670,12 @@
     {
       "inputs": [
         {
-          "internalType": "address payable",
-          "name": "t",
+          "internalType": "address",
+          "name": "",
           "type": "address"
         }
       ],
-      "name": "withdraw",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "wlEnd",
+      "name": "walletTotalMinted",
       "outputs": [
         {
           "internalType": "uint256",
@@ -1977,12 +2689,126 @@
     {
       "inputs": [
         {
-          "internalType": "bytes32[]",
-          "name": "p",
-          "type": "bytes32[]"
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
         }
       ],
-      "name": "wlMint",
+      "name": "waveClosed",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "waveEndTime",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "wavePrice",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "waveQty",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "waveSoldCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "waveStartTime",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address payable",
+          "name": "to",
+          "type": "address"
+        }
+      ],
+      "name": "withdraw",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -1995,28 +2821,28 @@
           "type": "address"
         }
       ],
-      "name": "wlMinted",
+      "name": "wlClaimed",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "bool",
           "name": "",
-          "type": "uint256"
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
       "type": "function"
     },
     {
-      "inputs": [],
-      "name": "wlStart",
-      "outputs": [
+      "inputs": [
         {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
+          "internalType": "bytes32[]",
+          "name": "proof",
+          "type": "bytes32[]"
         }
       ],
-      "stateMutability": "view",
+      "name": "wlMint",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     }
   ],

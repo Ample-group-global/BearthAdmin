@@ -18,8 +18,8 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "advanced",  label: "Advanced",           icon: "🔧" },
 ];
 
-const PHASE_NAMES = ["0 — None", "1 — Whitelist", "2 — Public Mint", "3 — Paid Mint"];
-const PHASE_COLOR = ["bg-slate-100 text-slate-600", "bg-blue-100 text-blue-700", "bg-emerald-100 text-emerald-700", "bg-amber-100 text-amber-700"];
+const PHASE_NAMES = ["0 — Whitelist Mint", "1 — Paid Mint", "2 — Revealed"];
+const PHASE_COLOR = ["bg-blue-100 text-blue-700", "bg-amber-100 text-amber-700", "bg-emerald-100 text-emerald-700"];
 
 interface TxState {
   pending: boolean;
@@ -105,10 +105,10 @@ export default function ContractPage() {
   const [liveRevealed, setLiveRevealed] = useState<boolean | null>(null);
   const [liveSupply, setLiveSupply] = useState<{ minted: number; max: number } | null>(null);
   const [liveRoot, setLiveRoot] = useState("");
-  const [liveWlStart, setLiveWlStart] = useState<number | null>(null);
-  const [liveWlEnd, setLiveWlEnd] = useState<number | null>(null);
+  const [liveWave1Start, setLiveWave1Start] = useState<number | null>(null);
+  const [liveWave1End, setLiveWave1End] = useState<number | null>(null);
   const [liveBalance, setLiveBalance] = useState("");
-  const [liveLimits, setLiveLimits] = useState<{ l1: number; l2: number } | null>(null);
+  const [livePurchaseLimit, setLivePurchaseLimit] = useState<{ enabled: boolean; maxPerWallet: number } | null>(null);
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveError, setLiveError] = useState("");
 
@@ -118,8 +118,8 @@ export default function ContractPage() {
   const [wlEndInput, setWlEndInput] = useState("");
   const [rootInput, setRootInput] = useState("");
   const [backendRoot, setBackendRoot] = useState("");
-  const [limit1, setLimit1] = useState("1");
-  const [limit2, setLimit2] = useState("3");
+  const [limitEnabled, setLimitEnabled] = useState(true);
+  const [limitMax, setLimitMax] = useState("5");
   const [sbtInput, setSbtInput] = useState(false);
   const [revealUri, setRevealUri] = useState("");
   const [checkTokenId, setCheckTokenId] = useState("");
@@ -193,26 +193,23 @@ export default function ContractPage() {
     setLiveLoading(true);
     setLiveError("");
     try {
-      const [phase, sbt, data, root, wlStart, wlEnd, balance] = await Promise.all([
-        readContract.phase(),
-        readContract.sbt(),
-        readContract.getData(),
-        readContract.root(),
-        readContract.wlStart(),
-        readContract.wlEnd(),
+      const [info, root, wave1Start, wave1End, balance] = await Promise.all([
+        readContract.getCollectionInfo(),
+        readContract.merkleRoot(),
+        readContract.waveStartTime(1),
+        readContract.waveEndTime(1),
         readProvider.getBalance(activeChain.contractAddress),
       ]);
-      setLivePhase(Number(phase));
-      setLiveSbt(Boolean(sbt));
-      setLiveSupply({ minted: Number(data[1]), max: Number(data[2]) });
-      setLiveRevealed(Boolean(data[5]));
-      setLiveLimits({ l1: Number(data[6]), l2: Number(data[7]) });
+      setLivePhase(Number(info.phase_));
+      setLiveSbt(Boolean(info.sbt_));
+      setLiveSupply({ minted: Number(info.totalCounter), max: Number(info.maxSupply_) });
+      setLiveRevealed(info.revealCount_ > 0n);
+      setLivePurchaseLimit({ enabled: Boolean(info.purchaseLimitEnabled_), maxPerWallet: Number(info.normalMaxPerWallet_) });
       setLiveRoot(root);
-      setLiveWlStart(Number(wlStart));
-      setLiveWlEnd(Number(wlEnd));
+      setLiveWave1Start(Number(wave1Start));
+      setLiveWave1End(Number(wave1End));
       setLiveBalance(parseFloat(ethers.formatEther(balance)).toFixed(4));
-      // Pre-fill sbt toggle from on-chain
-      setSbtInput(Boolean(sbt));
+      setSbtInput(Boolean(info.sbt_));
     } catch (e: any) {
       setLiveError("Could not read contract: " + (e?.shortMessage || e?.message || String(e)));
     } finally {
@@ -260,11 +257,9 @@ export default function ContractPage() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleSetPhase = () => contract && exec(setTxPhase, contract.setPhase(BigInt(phaseInput)), `Phase set to ${PHASE_NAMES[Number(phaseInput)]}`);
-  const handleSetTimes = () => contract && exec(setTxTimes, contract.setWLTimes(BigInt(wlStartInput), BigInt(wlEndInput)), "Whitelist window updated");
-  // setWL(root, start, end) — sets root + times in one tx
-  const handleSetWL = () => contract && exec(setTxRoot, contract.setWL(rootInput.trim(), BigInt(wlStartInput), BigInt(wlEndInput)), "Root + times set in one transaction");
-  const handlePushRoot = () => contract && exec(setTxRoot, contract.setWhitelist(rootInput.trim()), "Merkle root pushed on-chain");
-  const handleSetLimits = () => contract && exec(setTxLimits, contract.setLimits(BigInt(limit1), BigInt(limit2)), "Mint limits updated");
+  const handleSetTimes = () => contract && exec(setTxTimes, contract.setWaveSchedule(1n, BigInt(wlStartInput), BigInt(wlEndInput)), "Wave 1 schedule updated");
+  const handlePushRoot = () => contract && exec(setTxRoot, contract.setMerkleRoot(rootInput.trim()), "Merkle root pushed on-chain");
+  const handleSetLimits = () => contract && exec(setTxLimits, contract.setPurchaseLimitConfig(limitEnabled, BigInt(limitMax)), "Purchase limit updated");
   const handleSetSbt = () => contract && exec(setTxSbt, contract.setSBT(sbtInput), `SBT mode ${sbtInput ? "enabled" : "disabled"}`);
   const handleReveal = () => contract && exec(setTxReveal, contract.reveal(revealUri.trim()), "NFT artwork revealed");
   const handleWithdraw = () => contract && exec(setTxWithdraw, contract.withdraw(withdrawTo.trim()), "ETH withdrawn");
@@ -277,7 +272,7 @@ export default function ContractPage() {
     contract.emergencyTransfer(BigInt(emergencyTokenId), emergencyFrom.trim(), emergencyTo.trim(), emergencyReason.trim()),
     "Emergency transfer executed"
   );
-  const handleBatchMint = () => contract && exec(setTxBatch, contract.batchMint(batchMintTo.trim(), BigInt(batchMintAmt)), `Minted ${batchMintAmt} NFTs`);
+  const handleBatchMint = () => contract && exec(setTxBatch, contract.adminMint(batchMintTo.trim(), BigInt(batchMintAmt)), `Minted ${batchMintAmt} NFTs`);
 
   const handleCheckMetadata = async () => {
     if (!contract || !checkTokenId) return;
@@ -351,8 +346,8 @@ export default function ContractPage() {
           { label: "Minted", value: liveSupply ? `${liveSupply.minted} / ${liveSupply.max}` : "—" },
           { label: "SBT Mode", value: liveSbt !== null ? (liveSbt ? "Locked" : "Transferable") : "—" },
           { label: "Artwork", value: liveRevealed !== null ? (liveRevealed ? "Revealed" : "Blind Box") : "—" },
-          { label: "WL Opens", value: fmt(liveWlStart) },
-          { label: "WL Closes", value: fmt(liveWlEnd) },
+          { label: "Wave 1 Opens", value: fmt(liveWave1Start) },
+          { label: "Wave 1 Closes", value: fmt(liveWave1End) },
           { label: "Balance", value: liveBalance ? `${liveBalance} ETH` : "—" },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
@@ -390,29 +385,27 @@ export default function ContractPage() {
             <>
               {/* Phase stepper */}
               <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                {[0, 1, 2, 3].map((p) => (
+                {[0, 1, 2].map((p) => (
                   <div key={p} className={`flex-1 min-w-[90px] text-center py-3 px-2 rounded-xl border-2 text-xs font-bold transition-all ${
                     livePhase === p
                       ? "border-blue-500 bg-blue-50 text-blue-700"
                       : "border-slate-200 bg-slate-50 text-slate-400"
                   }`}>
                     {livePhase === p && <span className="block text-blue-400 text-[10px] mb-0.5">▶ Active</span>}
-                    {["None", "Whitelist Mint", "Public Mint", "Paid Mint"][p]}
+                    {["Whitelist Mint", "Paid Mint", "Revealed"][p]}
                   </div>
                 ))}
               </div>
 
-              <SectionCard title="Set Phase" note="Advancing the phase opens or closes minting for the corresponding group.">
+              <SectionCard title="Set Phase" note="Phase 0=WhitelistMint (Wave 1 free), Phase 1=PaidMint (Waves 2-7), Phase 2=Revealed (after reveal() call — auto-set by contract).">
                 <InputRow label="New Phase">
                   <select
                     value={phaseInput}
                     onChange={(e) => setPhaseInput(e.target.value)}
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="0">0 — None (paused)</option>
-                    <option value="1">1 — Whitelist Mint</option>
-                    <option value="2">2 — Public Mint (free)</option>
-                    <option value="3">3 — Paid Mint</option>
+                    <option value="0">0 — Whitelist Mint (Wave 1 free)</option>
+                    <option value="1">1 — Paid Mint (Waves 2-7)</option>
                   </select>
                 </InputRow>
                 <ActionBtn onClick={handleSetPhase} loading={txPhase.pending} disabled={!walletConnected}>
@@ -421,9 +414,9 @@ export default function ContractPage() {
                 <TxStatus tx={txPhase} onClear={() => setTxPhase(TX0)} />
               </SectionCard>
 
-              <SectionCard title="Whitelist Time Window" note="Unix timestamps. The WL phase is only active between these two times.">
+              <SectionCard title="Wave 1 Schedule" note="Unix timestamps for Wave 1 (Whitelist free mint, 303 NFTs). Use BearthAdmin → Waves for other waves.">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <InputRow label="WL Start (Unix timestamp)" note={wlStartInput ? `→ ${fmt(Number(wlStartInput))}` : undefined}>
+                  <InputRow label="Wave 1 Start (Unix timestamp)" note={wlStartInput ? `→ ${fmt(Number(wlStartInput))}` : undefined}>
                     <input
                       type="number"
                       value={wlStartInput}
@@ -432,7 +425,7 @@ export default function ContractPage() {
                       className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </InputRow>
-                  <InputRow label="WL End (Unix timestamp)" note={wlEndInput ? `→ ${fmt(Number(wlEndInput))}` : undefined}>
+                  <InputRow label="Wave 1 End (Unix timestamp)" note={wlEndInput ? `→ ${fmt(Number(wlEndInput))}` : undefined}>
                     <input
                       type="number"
                       value={wlEndInput}
@@ -443,7 +436,7 @@ export default function ContractPage() {
                   </InputRow>
                 </div>
                 <ActionBtn onClick={handleSetTimes} loading={txTimes.pending} disabled={!walletConnected}>
-                  Set Times Only
+                  Set Wave 1 Schedule
                 </ActionBtn>
                 <TxStatus tx={txTimes} onClear={() => setTxTimes(TX0)} />
               </SectionCard>
@@ -477,7 +470,7 @@ export default function ContractPage() {
                 </div>
               </div>
 
-              <SectionCard title="Root Input" note="After saving the whitelist, the backend computes this root. Copy it here to push on-chain.">
+              <SectionCard title="Push Merkle Root" note="After saving the whitelist in BearthAdmin, the backend computes this root. Copy it here to push on-chain via setMerkleRoot().">
                 <InputRow label="Merkle Root (bytes32)">
                   <div className="flex gap-2">
                     <input
@@ -496,22 +489,10 @@ export default function ContractPage() {
                     )}
                   </div>
                 </InputRow>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
-                    <p className="text-xs font-semibold text-slate-700">Option A — Root only</p>
-                    <p className="text-xs text-slate-400">Calls <code className="bg-slate-200 px-1 rounded">setWhitelist(root)</code> — push the root now, set times separately.</p>
-                    <ActionBtn onClick={handlePushRoot} loading={txRoot.pending} disabled={!walletConnected || !rootInput.trim()}>
-                      Push Root On-chain
-                    </ActionBtn>
-                  </div>
-                  <div className="bg-blue-50 rounded-xl border border-blue-200 p-4 space-y-3">
-                    <p className="text-xs font-semibold text-blue-700">Option B — Root + Times in one tx (recommended)</p>
-                    <p className="text-xs text-blue-500">Calls <code className="bg-blue-100 px-1 rounded">setWL(root, start, end)</code> — uses the times from the Phase & Timing tab.</p>
-                    <ActionBtn onClick={handleSetWL} loading={txRoot.pending} disabled={!walletConnected || !rootInput.trim() || !wlStartInput || !wlEndInput}>
-                      Set Root + Times Together
-                    </ActionBtn>
-                  </div>
-                </div>
+                <p className="text-xs text-slate-400">Calls <code className="bg-slate-100 px-1 rounded">setMerkleRoot(root)</code> — set Wave 1 schedule separately via the Phase &amp; Timing tab.</p>
+                <ActionBtn onClick={handlePushRoot} loading={txRoot.pending} disabled={!walletConnected || !rootInput.trim()}>
+                  Push Root On-chain
+                </ActionBtn>
                 <TxStatus tx={txRoot} onClear={() => setTxRoot(TX0)} />
               </SectionCard>
             </>
@@ -522,8 +503,12 @@ export default function ContractPage() {
             <>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                 {[
-                  { label: "WL Limit per wallet", value: liveLimits?.l1 ?? "—" },
-                  { label: "Paid Limit per wallet", value: liveLimits?.l2 ?? "—" },
+                  {
+                    label: "Purchase Limit",
+                    value: livePurchaseLimit
+                      ? (livePurchaseLimit.enabled ? `Max ${livePurchaseLimit.maxPerWallet}/wallet` : "Unlimited")
+                      : "—"
+                  },
                   { label: "SBT Mode", value: liveSbt !== null ? (liveSbt ? "Locked (non-transferable)" : "Unlocked (transferable)") : "—" },
                 ].map((s) => (
                   <div key={s.label} className="bg-slate-50 border border-slate-200 rounded-xl p-4">
@@ -533,18 +518,20 @@ export default function ContractPage() {
                 ))}
               </div>
 
-              <SectionCard title="Mint Limits" note="How many NFTs each wallet can mint per phase.">
-                <div className="grid grid-cols-2 gap-4">
-                  <InputRow label="WL / Public Free limit (per wallet)">
-                    <input type="number" min="1" value={limit1} onChange={(e) => setLimit1(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  </InputRow>
-                  <InputRow label="Paid mint limit (per wallet)">
-                    <input type="number" min="1" value={limit2} onChange={(e) => setLimit2(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  </InputRow>
+              <SectionCard title="Purchase Limit" note="Normal (non-VIP) wallets. VIP wallets always have unlimited mints. Wave 1 is always 1 per wallet regardless.">
+                <div className="flex items-center gap-4 mb-3">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input type="checkbox" checked={limitEnabled} onChange={(e) => setLimitEnabled(e.target.checked)}
+                      className="w-4 h-4 rounded" />
+                    Enable limit
+                  </label>
                 </div>
-                <ActionBtn onClick={handleSetLimits} loading={txLimits.pending} disabled={!walletConnected}>Set Limits</ActionBtn>
+                <InputRow label="Max per wallet (normal wallets)">
+                  <input type="number" min="1" value={limitMax} onChange={(e) => setLimitMax(e.target.value)}
+                    disabled={!limitEnabled}
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
+                </InputRow>
+                <ActionBtn onClick={handleSetLimits} loading={txLimits.pending} disabled={!walletConnected}>Set Purchase Limit</ActionBtn>
                 <TxStatus tx={txLimits} onClear={() => setTxLimits(TX0)} />
               </SectionCard>
 

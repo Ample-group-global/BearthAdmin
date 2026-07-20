@@ -24,8 +24,19 @@ export default function LoginPage() {
         body: JSON.stringify({ email: email.trim(), password }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "Login failed. Please try again."); return; }
-      router.push(data.role === "tech" ? "/dashboard" : "/presale");
+      if (!res.ok) {
+        if (res.status === 503 || data.cause === "db_connection_timeout") {
+          setError("Service temporarily unavailable — the database is unreachable. Please try again in a moment.");
+        } else if (res.status === 401) {
+          setError("Incorrect email or password. Please try again.");
+        } else if (res.status === 403) {
+          setError("Your account does not have admin access.");
+        } else {
+          setError(data.error || "Login failed. Please try again.");
+        }
+        return;
+      }
+      router.push(data.role === "tech" ? "/dashboard" : "/");
     } catch {
       setError("Network error. Please check your connection.");
     } finally {

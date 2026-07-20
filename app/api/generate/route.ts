@@ -3,12 +3,12 @@ import fs     from 'fs';
 import sharp  from 'sharp';
 import { NextResponse } from 'next/server';
 import { JOBS }        from '../../../lib/studio/jobs';
-import { scanLayers, getLayersDir, getName } from '../../../lib/studio/layers';
+import { scanLayers, getLayersDir, getName, getTraitNames, clearLayersCache } from '../../../lib/studio/layers';
 
 export const dynamic = 'force-dynamic';
 
-// Parallel NFTs composited at once — tune to CPU core count
-const CONCURRENCY = 12;
+// Parallel NFTs composited at once — set to 4× core count to keep libvips thread pool saturated
+const CONCURRENCY = 48;
 
 function applyNameFormat(fmt: string, idx: number): string {
   if (!fmt) return `#${idx}`;
@@ -190,7 +190,19 @@ async function runJob(jobId: string, config: any, total: number, outName: string
     }
 
     // ── Composite images and write metadata in parallel batches ───────────────
-    const layerLabelMap = Object.fromEntries(scanLayers().map(l => [l.folder, l.label]));
+    // Force fresh scan so trait names are always current regardless of module cache state
+    clearLayersCache();
+    const allLayers    = scanLayers();
+    const layerLabelMap = Object.fromEntries(allLayers.map(l => [l.folder, l.label]));
+    // Read trait names fresh from disk and overlay onto scanLayers-derived names
+    const freshTraitNames = getTraitNames();
+    const stemNames: Record<string, Record<string, string>> = {};
+    for (const l of allLayers) {
+      stemNames[l.folder] = {};
+      for (const a of l.assets) {
+        stemNames[l.folder][a.stem] = freshTraitNames[l.folder]?.[a.stem] ?? a.name;
+      }
+    }
     let doneCount = 0;
 
     async function processOne(i: number) {
@@ -213,7 +225,7 @@ async function runJob(jobId: string, config: any, total: number, outName: string
 
         const pipeline = needsResize ? base.resize(targetW, targetH, { fit: 'fill' }) : base;
         const writes: Promise<any>[] = [];
-        if (wantPng)  writes.push(pipeline.clone().png({ compressionLevel: 1 }).toFile(path.join(outDir, 'png',  `${i + 1}.png`)));
+        if (wantPng)  writes.push(pipeline.clone().png({ compressionLevel: 0 }).toFile(path.join(outDir, 'png',  `${i + 1}.png`)));
         if (wantWebp) writes.push(pipeline.clone().webp({ quality: 90 })        .toFile(path.join(outDir, 'webp', `${i + 1}.webp`)));
         await Promise.all(writes);
       }
@@ -221,7 +233,10 @@ async function runJob(jobId: string, config: any, total: number, outName: string
       // Exclude NONE placeholder picks from metadata attributes
       const attrs = layerOrder
         .filter(f => combo[f] && !noneStemsByFolder[f]?.has(combo[f]))
-        .map(f => ({ trait_type: layerLabelMap[f] ?? f, value: getName(f, combo[f]) }));
+        .map(f => ({
+          trait_type: layerLabelMap[f] ?? f,
+          value: stemNames[f]?.[combo[f]] ?? getName(f, combo[f]),
+        }));
 
       fs.writeFileSync(
         path.join(metaDir, `${i + 1}.json`),
@@ -237,12 +252,16 @@ async function runJob(jobId: string, config: any, total: number, outName: string
       job.done = ++doneCount;
     }
 
-    for (let i = 0; i < total; i += CONCURRENCY) {
-      if (job.cancelled) break;
-      const batch: Promise<void>[] = [];
-      for (let j = i; j < Math.min(i + CONCURRENCY, total); j++) batch.push(processOne(j));
-      await Promise.all(batch);
-    }
+    // Sliding window worker pool — always keeps CONCURRENCY tasks in flight
+    // so no CPU cycle is wasted waiting for a slow composite to unblock the next batch
+    let nextIdx = 0;
+    await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
+      while (!job.cancelled) {
+        const i = nextIdx++;
+        if (i >= total) break;
+        await processOne(i);
+      }
+    }));
 
     job.status = 'done';
     job.outDir = outDir;

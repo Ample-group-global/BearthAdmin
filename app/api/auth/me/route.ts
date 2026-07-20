@@ -11,12 +11,27 @@ export async function GET(req: NextRequest) {
   const local = verifyToken(token);
   if (!local) return NextResponse.json({ authenticated: false }, { status: 401 });
 
+  const LOCAL_FALLBACK = {
+    authenticated: true,
+    userId: local.userId,
+    role: local.role,
+    roleCode: local.role,
+    roleName: local.role,
+    permissions: [] as string[],
+    menus: [] as unknown[],
+  };
+
   // Proxy to BearthApi for DB-fresh context (permissions + menus)
   try {
     const apiRes = await fetch(`${API_BASE}/api/auth/admin/me`, {
       headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(4000),
     });
-    if (!apiRes.ok) return NextResponse.json({ authenticated: false }, { status: 401 });
+    // On any server-side error (5xx) fall back to local token — keeps admins logged in when DB is down
+    if (!apiRes.ok) {
+      if (apiRes.status >= 500) return NextResponse.json(LOCAL_FALLBACK);
+      return NextResponse.json({ authenticated: false }, { status: 401 });
+    }
     const data = await apiRes.json() as {
       authenticated: boolean;
       userId: string;
@@ -28,15 +43,6 @@ export async function GET(req: NextRequest) {
     // Expose `role` as alias for roleCode so existing layout code keeps working
     return NextResponse.json({ ...data, role: data.roleCode });
   } catch {
-    // BearthApi unreachable — fall back to local token data only
-    return NextResponse.json({
-      authenticated: true,
-      userId: local.userId,
-      role: local.role,
-      roleCode: local.role,
-      roleName: local.role,
-      permissions: [],
-      menus: [],
-    });
+    return NextResponse.json(LOCAL_FALLBACK);
   }
 }

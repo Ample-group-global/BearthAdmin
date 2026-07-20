@@ -24,13 +24,13 @@ function Badge({ label, style }: { label: string; style: React.CSSProperties }) 
 }
 
 const MINT_BADGE: Record<string, React.CSSProperties> = {
-  "Owner":        { background: "rgba(36,49,95,0.1)",   color: "#24315f" },
-  "WL Free":      { background: "rgba(65,175,235,0.1)", color: "#2e9fd8" },
-  "Public Free":  { background: "rgba(16,185,129,0.1)", color: "#059669" },
-  "Paid":         { background: "rgba(139,92,246,0.1)", color: "#7c3aed" },
+  "WL Free":       { background: "rgba(65,175,235,0.1)",  color: "#2e9fd8" },
+  "Fixed Price":   { background: "rgba(139,92,246,0.1)",  color: "#7c3aed" },
+  "Dutch Auction": { background: "rgba(217,119,6,0.1)",   color: "#d97706" },
+  "Admin":         { background: "rgba(36,49,95,0.1)",    color: "#24315f" },
 };
 
-type SortCol = "tokenId" | "owner" | "mintType" | "pricePaid" | "gasFee" | "date";
+type SortCol = "tokenId" | "owner" | "mintType" | "waveNum" | "gasFee" | "date";
 
 // ─── NFT Detail Modal ────────────────────────────────────────────────────────
 
@@ -175,7 +175,6 @@ function NFTModal({ ev, enrich, blockExplorer, onClose }: NFTModalProps) {
                 #{ev.tokenId}
               </span>
               <Badge label={ev.mintType} style={MINT_BADGE[ev.mintType] ?? {}} />
-              {ev.sbt && <Badge label="SBT" style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626" }} />}
               {ev.isRevealed
                 ? <Badge label="Revealed" style={{ background: "rgba(217,119,6,0.08)", color: "#d97706" }} />
                 : <Badge label="Blind Box" style={{ background: "rgba(107,114,128,0.08)", color: "#6b7280" }} />
@@ -260,10 +259,8 @@ function NFTModal({ ev, enrich, blockExplorer, onClose }: NFTModalProps) {
               )}
 
               <div className="flex justify-between">
-                <span className="text-gray-500">ETH Paid</span>
-                <span className="font-mono font-semibold text-xs" style={{ color: ev.mintType === "Paid" ? "#7c3aed" : "#6b7280" }}>
-                  {ev.pricePaid}
-                </span>
+                <span className="text-gray-500">Wave</span>
+                <span className="font-mono text-xs text-gray-700">{ev.waveLabel}</span>
               </div>
 
               {enrich && (
@@ -431,7 +428,7 @@ export default function NFTOverviewPage() {
 
   // ── export CSV ───────────────────────────────────────────────────────────
   const exportCSV = () => {
-    const headers = ["Token ID", "Minted By", "Current Holder", "Transferred", "Mint Type", "ETH Paid", "Gas Fee (ETH)", "SBT", "Status", "Date", "Tx Hash"];
+    const headers = ["Token ID", "Minted By", "Current Holder", "Transferred", "Wave", "Mint Type", "Gas Fee (ETH)", "Status", "Date", "Tx Hash"];
     const rows = events.map((ev) => {
       const enrich = enrichMap.get(ev.tokenId);
       return [
@@ -439,10 +436,9 @@ export default function NFTOverviewPage() {
         ev.owner,
         enrich?.currentHolder ?? ev.owner,
         enrich ? (enrich.transferred ? "Yes" : "No") : "—",
+        ev.waveNum,
         ev.mintType,
-        ev.pricePaid,
         enrich?.gasFeeEth ?? "—",
-        ev.sbt ? "Yes" : "No",
         ev.isRevealed ? "Revealed" : "Blind Box",
         ev.dateStr,
         ev.txHash,
@@ -460,19 +456,15 @@ export default function NFTOverviewPage() {
 
   // ── derived stats ─────────────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const paid = events.filter((e) => e.mintType === "Paid");
-    const totalRevWei = paid.reduce((s, e) => s + e.pricePaidWei, 0n);
     const totalGasWei = [...enrichMap.values()].reduce((s, e) => s + e.gasFeeWei, 0n);
     const transferred = [...enrichMap.values()].filter((e) => e.transferred).length;
     return {
       total: events.length,
-      owner: events.filter((e) => e.mintType === "Owner").length,
       wlFree: events.filter((e) => e.mintType === "WL Free").length,
-      publicFree: events.filter((e) => e.mintType === "Public Free").length,
-      paid: paid.length,
+      fixedPrice: events.filter((e) => e.mintType === "Fixed Price").length,
+      dutchAuction: events.filter((e) => e.mintType === "Dutch Auction").length,
+      admin: events.filter((e) => e.mintType === "Admin").length,
       revealed: events.filter((e) => e.isRevealed).length,
-      sbt: events.filter((e) => e.sbt).length,
-      totalRevEth: Number(totalRevWei) / 1e18,
       totalGasEth: enrichMap.size > 0 ? Number(totalGasWei) / 1e18 : null,
       transferred,
     };
@@ -501,7 +493,7 @@ export default function NFTOverviewPage() {
       if (sortCol === "tokenId")   cmp = a.tokenId - b.tokenId;
       else if (sortCol === "owner") cmp = a.owner.localeCompare(b.owner);
       else if (sortCol === "mintType") cmp = a.mintType.localeCompare(b.mintType);
-      else if (sortCol === "pricePaid") cmp = Number(a.pricePaidWei - b.pricePaidWei);
+      else if (sortCol === "waveNum") cmp = a.waveNum - b.waveNum;
       else if (sortCol === "gasFee") {
         const ga = enrichMap.get(a.tokenId)?.gasFeeWei ?? 0n;
         const gb = enrichMap.get(b.tokenId)?.gasFeeWei ?? 0n;
@@ -598,15 +590,14 @@ export default function NFTOverviewPage() {
       </div>
 
       {/* ── Summary Cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
         {[
-          { label: "Total Minted",   value: stats.total,      color: "#24315f" },
-          { label: "Owner Mints",    value: stats.owner,      color: "#6b7280" },
-          { label: "WL Free",        value: stats.wlFree,     color: "#2e9fd8" },
-          { label: "Public Free",    value: stats.publicFree, color: "#059669" },
-          { label: "Paid Mints",     value: stats.paid,       color: "#7c3aed" },
-          { label: "Revealed",       value: stats.revealed,   color: "#d97706" },
-          { label: "SBT (Locked)",   value: stats.sbt,        color: "#dc2626" },
+          { label: "Total Minted",   value: stats.total,        color: "#24315f" },
+          { label: "WL Free (Wave1)",value: stats.wlFree,       color: "#2e9fd8" },
+          { label: "Fixed Price",    value: stats.fixedPrice,   color: "#7c3aed" },
+          { label: "Dutch Auction",  value: stats.dutchAuction, color: "#d97706" },
+          { label: "Admin Mints",    value: stats.admin,        color: "#6b7280" },
+          { label: "Revealed",       value: stats.revealed,     color: "#059669" },
         ].map((c) => (
           <div key={c.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
             <p className="text-xs text-gray-400 mb-1 font-medium">{c.label}</p>
@@ -618,21 +609,19 @@ export default function NFTOverviewPage() {
       {/* ── Financial + Holder Summary ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: "#9bafc5" }}>Revenue</p>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: "#9bafc5" }}>Paid Mints</p>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Paid mints</span>
-              <span className="font-semibold text-gray-800">{stats.paid}</span>
+              <span className="text-gray-500">Fixed Price (Wave 2)</span>
+              <span className="font-semibold text-gray-800">{stats.fixedPrice}</span>
             </div>
-            {contractState && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Price per mint</span>
-                <span className="font-semibold text-gray-800">{contractState.mintPriceEth}</span>
-              </div>
-            )}
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Dutch Auction</span>
+              <span className="font-semibold text-gray-800">{stats.dutchAuction}</span>
+            </div>
             <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-              <span className="font-semibold text-gray-700">Total Revenue</span>
-              <span className="font-bold" style={{ color: "#7c3aed" }}>{stats.totalRevEth.toFixed(4)} ETH</span>
+              <span className="font-semibold text-gray-700">Total Paid</span>
+              <span className="font-bold" style={{ color: "#7c3aed" }}>{stats.fixedPrice + stats.dutchAuction}</span>
             </div>
           </div>
         </div>
@@ -719,10 +708,11 @@ export default function NFTOverviewPage() {
           className="px-3 py-2 rounded-lg text-sm outline-none"
           style={{ border: "1px solid #e5e7eb", color: "#374151" }}>
           <option value="all">All Mint Types</option>
-          <option value="Owner">Owner</option>
-          <option value="WL Free">WL Free</option>
-          <option value="Public Free">Public Free</option>
-          <option value="Paid">Paid</option>
+          <option value="WL Free">WL Free (Genesis)</option>
+          <option value="Fixed Price">Fixed Price</option>
+          <option value="Dutch Auction">Dutch Auction</option>
+          <option value="English Auction">English Auction</option>
+          <option value="Admin">Admin Mint</option>
         </select>
         {enrichMap.size > 0 && (
           <select value={holderFilter} onChange={(e) => { setHolderFilter(e.target.value); setPage(1); }}
@@ -761,15 +751,14 @@ export default function NFTOverviewPage() {
                   {/* Thumbnail */}
                   <th className="px-3 py-3 w-14" />
                   {[
-                    { label: "Token ID",       col: "tokenId"   as SortCol },
-                    { label: "Minted By",      col: "owner"     as SortCol },
+                    { label: "Token ID",       col: "tokenId"  as SortCol },
+                    { label: "Minted By",      col: "owner"    as SortCol },
                     { label: "Current Holder", col: null },
-                    { label: "Mint Type",      col: "mintType"  as SortCol },
-                    { label: "ETH Paid",       col: "pricePaid" as SortCol },
-                    { label: "Gas Fee",        col: "gasFee"    as SortCol },
-                    { label: "SBT",            col: null },
+                    { label: "Mint Type",      col: "mintType" as SortCol },
+                    { label: "Wave",           col: "waveNum"  as SortCol },
+                    { label: "Gas Fee",        col: "gasFee"   as SortCol },
                     { label: "Status",         col: null },
-                    { label: "Date",           col: "date"      as SortCol },
+                    { label: "Date",           col: "date"     as SortCol },
                     { label: "Tx",             col: null },
                   ].map(({ label, col }) => (
                     <th key={label}
@@ -855,13 +844,9 @@ export default function NFTOverviewPage() {
                         <Badge label={ev.mintType} style={MINT_BADGE[ev.mintType] ?? {}} />
                       </td>
 
-                      {/* ETH Paid */}
-                      <td className="px-4 py-3 font-mono text-xs">
-                        {ev.mintType === "Paid" ? (
-                          <span className="font-semibold" style={{ color: "#7c3aed" }}>{ev.pricePaid}</span>
-                        ) : (
-                          <span className="text-gray-400">0 ETH</span>
-                        )}
+                      {/* Wave */}
+                      <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                        W{ev.waveNum}
                       </td>
 
                       {/* Gas Fee */}
@@ -873,13 +858,6 @@ export default function NFTOverviewPage() {
                         ) : (
                           <span className="text-gray-300">—</span>
                         )}
-                      </td>
-
-                      {/* SBT */}
-                      <td className="px-4 py-3">
-                        {ev.sbt
-                          ? <Badge label="SBT" style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626" }} />
-                          : <Badge label="Free" style={{ background: "rgba(16,185,129,0.08)", color: "#059669" }} />}
                       </td>
 
                       {/* Status */}

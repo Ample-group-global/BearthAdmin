@@ -29,14 +29,14 @@ export default function MenusPage() {
   }, {});
 
   const MODULE_LABEL: Record<string, string> = {
-    presale: "Presale Management",
+    sales: "Sales & Orders",
     dashboard: "Technical Dashboard",
     admin: "Admin / RBAC",
     other: "Other",
   };
 
   const MODULE_COLOR: Record<string, string> = {
-    presale: "#41afeb",
+    sales: "#41afeb",
     dashboard: "#24315f",
     admin: "#f59e0b",
     other: "#9bafc5",

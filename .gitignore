@@ -51,6 +51,25 @@ yarn-error.log*
 
 # Test artifacts
 /test-results/
+/test-screenshots/
+/tests/results/
+/tests/screenshots/
+/tests/.auth/
+/playwright-report/
+/blob-report/
+/opensea-screenshots/
+
+# Test scripts with credentials / throwaway utilities
+panel-test.js
+screenshot.cjs
+screenshot2.cjs
+test-team-page.cjs
+
+# Logs
+*.log
+
+# Local config artifacts
+.layers-config.json
 
 # Backup folders
 _backup_*/

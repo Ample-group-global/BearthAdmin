@@ -2,23 +2,19 @@ import { ethers } from "ethers";
 import BearthNFTArtifact from "./BearthNFT.abi.json";
 import { getChainConfigOrDefault } from "./chains";
 
-export type MintPhase = 0 | 1 | 2 | 3;
+export type MintPhase = 0 | 1 | 2;
 
 export interface MintedEvent {
   tokenId: number;
-  owner: string;         // original minter
-  phase: MintPhase;
-  phaseLabel: string;
-  mintType: "Owner" | "WL Free" | "Public Free" | "Paid";
-  pricePaid: string;     // formatted ETH string e.g. "0 ETH" or "0.0303 ETH"
-  pricePaidWei: bigint;  // actual price in wei (0 for free mints)
+  owner: string;
+  waveNum: number;
+  waveLabel: string;
+  mintType: "WL Free" | "Fixed Price" | "Dutch Auction" | "English Auction" | "Admin";
   timestamp: number;
   dateStr: string;
-  sbt: boolean;
   isRevealed: boolean;
   txHash: string;
   blockNumber: number;
-  // Enriched fields — populated separately after initial load
   currentHolder?: string;
   transferred?: boolean;
   gasFeeWei?: bigint;
@@ -29,27 +25,19 @@ export interface ContractState {
   phase: number;
   totalMinted: number;
   maxSupply: number;
-  stage1Minted: number;
   sbt: boolean;
-  isRevealed: boolean;
   revealCount: number;
-  mintPriceWei: bigint;
-  mintPriceEth: string;
+  royaltyEnforced: boolean;
+  purchaseLimitEnabled: boolean;
+  normalMaxPerWallet: number;
 }
 
-const PHASE_LABEL: Record<number, string> = {
-  0: "Owner",
-  1: "WL Free",
-  2: "Public Free",
-  3: "Paid",
-};
+function waveLabel(waveNum: number): string {
+  if (waveNum === 0) return "Admin Mint";
+  if (waveNum === 1) return "Wave 1 — Genesis";
+  return `Wave ${waveNum}`;
+}
 
-const MINT_TYPE: Record<number, MintedEvent["mintType"]> = {
-  0: "Owner",
-  1: "WL Free",
-  2: "Public Free",
-  3: "Paid",
-};
 
 export async function fetchMintedEvents(chainId: number): Promise<{
   events: MintedEvent[];
@@ -59,32 +47,27 @@ export async function fetchMintedEvents(chainId: number): Promise<{
   const provider = new ethers.JsonRpcProvider(config.rpcUrl);
   const contract = new ethers.Contract(config.contractAddress, BearthNFTArtifact.abi, provider);
 
-  // Read contract state first
   let contractState: ContractState = {
-    phase: 0, totalMinted: 0, maxSupply: 0, stage1Minted: 0,
-    sbt: false, isRevealed: false, revealCount: 0,
-    mintPriceWei: 0n, mintPriceEth: "0 ETH",
+    phase: 0, totalMinted: 0, maxSupply: 0,
+    sbt: false, revealCount: 0,
+    royaltyEnforced: true, purchaseLimitEnabled: false, normalMaxPerWallet: 5,
   };
   try {
-    const data = await contract.getData();
-    // getData() → [phase, counter, MAX_SUPPLY, stage1Minted, sbt, revealCount, limit1, limit2, PRICE]
-    const priceWei = BigInt(data[8]);
+    const info = await contract.getCollectionInfo();
     contractState = {
-      phase: Number(data[0]),
-      totalMinted: Number(data[1]),
-      maxSupply: Number(data[2]),
-      stage1Minted: Number(data[3]),
-      sbt: Boolean(data[4]),
-      revealCount: Number(data[5]),
-      isRevealed: Number(data[5]) > 0,
-      mintPriceWei: priceWei,
-      mintPriceEth: `${Number(ethers.formatEther(priceWei)).toFixed(4)} ETH`,
+      phase: Number(info.phase_),
+      totalMinted: Number(info.totalMinted_),
+      maxSupply: Number(info.maxSupply_),
+      sbt: Boolean(info.sbt_),
+      revealCount: Number(info.revealCount_),
+      royaltyEnforced: Boolean(info.royaltyEnforced_),
+      purchaseLimitEnabled: Boolean(info.purchaseLimitEnabled_),
+      normalMaxPerWallet: Number(info.normalMaxPerWallet_),
     };
   } catch {
     // continue without contract state
   }
 
-  // Fetch Minted events starting from deployment block to avoid full chain scan
   const fromBlock = config.deploymentBlock ?? 0;
   let rawEvents: ethers.EventLog[] = [];
   let fetchError: string | null = null;
@@ -100,7 +83,6 @@ export async function fetchMintedEvents(chainId: number): Promise<{
         const chunk = (await contract.queryFilter(filter, start, end)) as ethers.EventLog[];
         rawEvents.push(...chunk);
       } catch (chunkErr: unknown) {
-        // Surface rate-limit / access errors but keep events found so far
         const msg = chunkErr instanceof Error ? chunkErr.message : String(chunkErr);
         fetchError = `Partial load — stopped at block ${start.toLocaleString()}: ${msg}`;
         break;
@@ -116,26 +98,42 @@ export async function fetchMintedEvents(chainId: number): Promise<{
     throw new Error(fetchError);
   }
 
-  const { mintPriceWei, mintPriceEth, isRevealed } = contractState;
+  const isRevealed = contractState.revealCount > 0;
 
+  // Determine which wave numbers appeared, then query isDutchWave for each unique paid wave.
+  const uniqueWaves = [...new Set(rawEvents.map((ev) => Number((ev.args as unknown as [string, bigint, bigint, bigint])[2])))];
+  const dutchWaves = new Set<number>();
+  await Promise.allSettled(
+    uniqueWaves.filter(w => w >= 2).map(async (w) => {
+      try {
+        const isDutch = await contract.isDutchWave(w);
+        if (isDutch) dutchWaves.add(w);
+      } catch { /* wave not configured — ignore */ }
+    })
+  );
+
+  function resolvedMintType(waveNum: number): MintedEvent["mintType"] {
+    if (waveNum === 0) return "Admin";
+    if (waveNum === 1) return "WL Free";
+    if (dutchWaves.has(waveNum)) return "Dutch Auction";
+    return "Fixed Price";
+  }
+
+  // Minted event: (address indexed to, uint256 indexed tokenId, uint256 indexed waveNum, uint256 timestamp)
   const events: MintedEvent[] = rawEvents.map((ev) => {
-    const args = ev.args as unknown as [string, bigint, bigint, bigint, boolean];
-    const phase = Number(args[2]) as MintPhase;
-    const isPaid = phase === 3;
+    const args = ev.args as unknown as [string, bigint, bigint, bigint];
+    const waveNum = Number(args[2]);
     const ts = Number(args[3]);
     return {
       tokenId: Number(args[1]),
       owner: args[0],
-      phase,
-      phaseLabel: PHASE_LABEL[phase] ?? `Phase ${phase}`,
-      mintType: MINT_TYPE[phase] ?? "WL Free",
-      pricePaid: isPaid ? mintPriceEth : "0 ETH",
-      pricePaidWei: isPaid ? mintPriceWei : 0n,
+      waveNum,
+      waveLabel: waveLabel(waveNum),
+      mintType: resolvedMintType(waveNum),
       timestamp: ts,
       dateStr: ts > 0
         ? new Date(ts * 1000).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
         : "—",
-      sbt: args[4],
       isRevealed,
       txHash: ev.transactionHash,
       blockNumber: ev.blockNumber,
@@ -146,7 +144,6 @@ export async function fetchMintedEvents(chainId: number): Promise<{
   return { events, contractState };
 }
 
-/** Enriches a batch of events with gas fee and current holder data. */
 export async function enrichEvents(
   events: MintedEvent[],
   chainId: number,

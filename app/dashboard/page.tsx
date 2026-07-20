@@ -7,27 +7,25 @@ import Link from "next/link";
 import { useChain } from "@/lib/ChainContext";
 import BearthNFTArtifact from "@/lib/BearthNFT.abi.json";
 
-const PHASE_LABELS = ["Not Started", "Whitelist Mint", "Public Mint", "Paid Mint"];
+const PHASE_LABELS = ["Whitelist Mint", "Paid Mint", "Revealed"];
 const PHASE_COLORS = [
-  "bg-slate-100 text-slate-600",
   "bg-blue-100 text-blue-700",
-  "bg-emerald-100 text-emerald-700",
   "bg-amber-100 text-amber-700",
+  "bg-emerald-100 text-emerald-700",
 ];
 
 interface ContractStats {
   phase: number;
   totalMinted: number;
   maxSupply: number;
-  stage1Minted: number;
   sbt: boolean;
   revealCount: number;
-  limit1: number;
-  limit2: number;
-  price: string;
+  royaltyEnforced: boolean;
+  purchaseLimitEnabled: boolean;
+  normalMaxPerWallet: number;
   root: string;
-  wlStart: number;
-  wlEnd: number;
+  wave1Start: number;
+  wave1End: number;
   ethBalance: string;
 }
 
@@ -75,29 +73,26 @@ export default function TechDashboardPage() {
       const provider = new ethers.JsonRpcProvider(activeChain.rpcUrl);
       const contract = new ethers.Contract(activeChain.contractAddress, BearthNFTArtifact.abi, provider);
 
-      const [phase, sbt, data, root, wlStart, wlEnd, balance] = await Promise.all([
-        contract.phase(),
-        contract.sbt(),
-        contract.getData(),
-        contract.root(),
-        contract.wlStart(),
-        contract.wlEnd(),
+      const [info, root, wave1Start, wave1End, balance] = await Promise.all([
+        contract.getCollectionInfo(),
+        contract.merkleRoot(),
+        contract.waveStartTime(1),
+        contract.waveEndTime(1),
         provider.getBalance(activeChain.contractAddress),
       ]);
 
       setStats({
-        phase: Number(phase),
-        totalMinted: Number(data[1]),
-        maxSupply: Number(data[2]),
-        stage1Minted: Number(data[3]),
-        sbt: Boolean(data[4]),
-        revealCount: Number(data[5]),
-        limit1: Number(data[6]),
-        limit2: Number(data[7]),
-        price: ethers.formatEther(data[8]),
+        phase: Number(info.phase_),
+        totalMinted: Number(info.totalCounter),
+        maxSupply: Number(info.maxSupply_),
+        sbt: Boolean(info.sbt_),
+        revealCount: Number(info.revealCount_),
+        royaltyEnforced: Boolean(info.royaltyEnforced_),
+        purchaseLimitEnabled: Boolean(info.purchaseLimitEnabled_),
+        normalMaxPerWallet: Number(info.normalMaxPerWallet_),
         root: String(root),
-        wlStart: Number(wlStart),
-        wlEnd: Number(wlEnd),
+        wave1Start: Number(wave1Start),
+        wave1End: Number(wave1End),
         ethBalance: parseFloat(ethers.formatEther(balance)).toFixed(4),
       });
     } catch (e: any) {
@@ -120,7 +115,7 @@ export default function TechDashboardPage() {
 
   const now = Math.floor(Date.now() / 1000);
   const wlActive = stats
-    ? stats.phase === 1 && now >= stats.wlStart && now <= stats.wlEnd
+    ? stats.phase === 0 && now >= stats.wave1Start && now <= stats.wave1End
     : false;
 
   return (
@@ -183,11 +178,6 @@ export default function TechDashboardPage() {
               accent="text-slate-900"
             />
             <StatCard
-              label="Stage 1 Minted"
-              value={`${stats.stage1Minted} / 303`}
-              sub="WL + Public phase"
-            />
-            <StatCard
               label="Contract Balance"
               value={`${stats.ethBalance} ETH`}
               accent="text-emerald-700"
@@ -195,7 +185,7 @@ export default function TechDashboardPage() {
             <StatCard
               label="Whitelist Size"
               value={wlCount !== null ? wlCount.toLocaleString() : "—"}
-              sub="Addresses in DB"
+              sub="Addresses in DB (Wave 1)"
             />
             <StatCard
               label="Merkle Root"
@@ -216,20 +206,30 @@ export default function TechDashboardPage() {
               accent={stats.sbt ? "text-amber-700" : "text-slate-500"}
               sub={stats.sbt ? "Transfers locked" : "Transfers allowed"}
             />
+            <StatCard
+              label="Purchase Limit"
+              value={stats.purchaseLimitEnabled ? `Max ${stats.normalMaxPerWallet}/wallet` : "Unlimited"}
+              accent={stats.purchaseLimitEnabled ? "text-slate-900" : "text-slate-500"}
+              sub={stats.royaltyEnforced ? "Royalty enforced" : "Royalty not enforced"}
+            />
           </div>
 
-          {/* WL Window */}
-          {stats.phase === 1 && (
+          {/* Wave 1 WL Window */}
+          {stats.phase === 0 && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-blue-900 mb-3">Whitelist Mint Window</h3>
+              <h3 className="text-sm font-semibold text-blue-900 mb-3">Wave 1 — Whitelist Mint Window</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-blue-700 font-medium">Opens: </span>
-                  <span className="text-blue-800">{new Date(stats.wlStart * 1000).toLocaleString()}</span>
+                  <span className="text-blue-800">
+                    {stats.wave1Start > 0 ? new Date(stats.wave1Start * 1000).toLocaleString() : "Not set"}
+                  </span>
                 </div>
                 <div>
                   <span className="text-blue-700 font-medium">Closes: </span>
-                  <span className="text-blue-800">{new Date(stats.wlEnd * 1000).toLocaleString()}</span>
+                  <span className="text-blue-800">
+                    {stats.wave1End > 0 ? new Date(stats.wave1End * 1000).toLocaleString() : "Not set"}
+                  </span>
                 </div>
               </div>
             </div>

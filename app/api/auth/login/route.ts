@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE = process.env.BEARTH_API_URL!;
+const API_BASE = process.env.BEARTH_API_URL ?? "http://localhost:8000";
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,7 +28,9 @@ export async function POST(req: NextRequest) {
       path: "/",
     });
     return res;
-  } catch {
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[login] error:", msg);
+    return NextResponse.json({ error: "Server error", detail: msg }, { status: 500 });
   }
 }
