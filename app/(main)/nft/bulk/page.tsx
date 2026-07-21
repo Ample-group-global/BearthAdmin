@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ErrBanner } from "@/components/nft/ErrBanner";
+import { OkBanner } from "@/components/nft/OkBanner";
+import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
 
 interface BulkOrder {
   id: string;
@@ -20,21 +23,6 @@ interface BulkOrder {
   notes: string | null;
   created_at: string;
 }
-
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "8px 12px", borderRadius: "8px",
-  border: "1px solid #e5e7eb", fontSize: "13px", color: "#111827", outline: "none",
-};
-const labelStyle: React.CSSProperties = {
-  display: "block", fontSize: "11px", fontWeight: 700,
-  color: "#9bafc5", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.05em",
-};
-const thStyle: React.CSSProperties = {
-  fontSize: "11px", fontWeight: 700, color: "#9bafc5",
-  textTransform: "uppercase", letterSpacing: "0.06em",
-  padding: "10px 14px", borderBottom: "1px solid #e5e7eb",
-  background: "#f9fafb", whiteSpace: "nowrap",
-};
 
 function StatusBadge({ status }: { status: string }) {
   const cfg: Record<string, { bg: string; color: string }> = {
@@ -211,8 +199,8 @@ export default function BulkPage() {
         </button>
       </div>
 
-      {ok  && <div className="px-3 py-2 rounded-lg text-xs text-green-700" style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.3)" }}>{ok}</div>}
-      {err && <div className="px-3 py-2 rounded-lg text-xs text-red-600"   style={{ background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.3)" }}>{err}</div>}
+      {ok  && <OkBanner  msg={ok}  onDismiss={() => setOk(null)} />}
+      {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
@@ -396,7 +384,7 @@ export default function BulkPage() {
                 placeholder="e.g. Corporate package, invoice #B-001" />
             </div>
           </div>
-          {err && <div className="mt-3 text-xs text-red-600">{err}</div>}
+          {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
           <div className="flex gap-3 mt-5">
             <button onClick={() => setShowCreate(false)}
               className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">

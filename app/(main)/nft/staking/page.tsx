@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { TxBanner } from "@/components/nft/TxBanner";
+import { ErrBanner } from "@/components/nft/ErrBanner";
+import { Toggle } from "@/components/nft/Toggle";
+import { SectionCard } from "@/components/nft/SectionCard";
+import { labelStyle, inputStyle } from "@/components/nft/styles";
+import { RARITY_TIERS } from "@/lib/nft-constants";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,74 +30,6 @@ interface HolderInfo {
   available: string;
   pendingPoints: string;
 }
-
-// ─── Shared styles ────────────────────────────────────────────────────────────
-
-const labelStyle: React.CSSProperties = {
-  display: "block", fontSize: "11px", fontWeight: 700,
-  color: "#9bafc5", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.05em",
-};
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "8px 12px", borderRadius: "8px",
-  border: "1px solid #e5e7eb", fontSize: "13px", color: "#111827", outline: "none",
-};
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function TxBanner({ txHash }: { txHash: string }) {
-  return (
-    <div className="px-4 py-3 rounded-xl text-xs flex items-center gap-2"
-      style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.25)", color: "#16a34a" }}>
-      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-      </svg>
-      <span>Transaction submitted: <span className="font-mono">{txHash.slice(0, 22)}…</span></span>
-    </div>
-  );
-}
-
-function ErrBanner({ msg }: { msg: string }) {
-  return (
-    <div className="px-4 py-3 rounded-xl text-sm" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>
-      {msg}
-    </div>
-  );
-}
-
-function Toggle({ value, onChange, disabled }: { value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={() => !disabled && onChange(!value)}
-      disabled={disabled}
-      className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200"
-      style={{ background: value ? "#16a34a" : "#d1d5db", opacity: disabled ? 0.6 : 1 }}>
-      <span className="inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 mt-0.5"
-        style={{ marginLeft: value ? "22px" : "2px" }} />
-    </button>
-  );
-}
-
-function SectionCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-white rounded-2xl shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
-      <div className="px-6 py-4" style={{ borderBottom: "1px solid #f3f4f6" }}>
-        <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>{title}</h2>
-        {subtitle && <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>{subtitle}</p>}
-      </div>
-      <div className="px-6 py-5">{children}</div>
-    </div>
-  );
-}
-
-// ─── Rarity labels ────────────────────────────────────────────────────────────
-
-const RARITY_TIERS = [
-  { id: 1, label: "Common",    color: "#6b7280", defaultBps: 10000 },
-  { id: 2, label: "Rare",      color: "#3b82f6", defaultBps: 20000 },
-  { id: 3, label: "Epic",      color: "#7c3aed", defaultBps: 30000 },
-  { id: 4, label: "Legendary", color: "#d97706", defaultBps: 40000 },
-];
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 

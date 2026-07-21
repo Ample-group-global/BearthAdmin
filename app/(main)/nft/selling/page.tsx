@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { TxBanner } from "@/components/nft/TxBanner";
+import { ErrBanner } from "@/components/nft/ErrBanner";
+import { OkBanner } from "@/components/nft/OkBanner";
+import { Toggle } from "@/components/nft/Toggle";
+import { SectionCard } from "@/components/nft/SectionCard";
+import { labelStyle, inputStyle } from "@/components/nft/styles";
+import { PHASE_NAMES, PHASE_COLORS, ETH_ADDRESS_RE, MERKLE_ROOT_RE } from "@/lib/nft-constants";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -53,73 +60,10 @@ interface AdminSale {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PHASE_NAMES = ["Whitelist", "PaidMint", "Revealed"];
-const PHASE_COLORS: Record<string, { bg: string; color: string }> = {
-  Whitelist: { bg: "rgba(124,58,237,0.1)",  color: "#7c3aed" },
-  PaidMint:  { bg: "rgba(65,175,235,0.12)", color: "#41afeb" },
-  Revealed:  { bg: "rgba(22,163,74,0.1)",   color: "#16a34a" },
-};
 const TABS = ["Mint Operations", "Admin Sales", "Collection & Controls"] as const;
 type Tab = typeof TABS[number];
 
-// ─── Shared styles ────────────────────────────────────────────────────────────
-
-const labelStyle: React.CSSProperties = {
-  display: "block", fontSize: "11px", fontWeight: 700,
-  color: "#9bafc5", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.05em",
-};
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "8px 12px", borderRadius: "8px",
-  border: "1px solid #e5e7eb", fontSize: "13px", color: "#111827", outline: "none",
-};
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function TxBanner({ txHash, onDismiss }: { txHash: string; onDismiss?: () => void }) {
-  return (
-    <div className="px-4 py-3 rounded-xl text-xs flex items-center gap-2"
-      style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.25)", color: "#16a34a" }}>
-      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-      </svg>
-      <span className="flex-1">Tx: <span className="font-mono">{txHash.slice(0, 22)}…</span></span>
-      {onDismiss && <button onClick={onDismiss} style={{ color: "#16a34a", fontSize: 16 }}>✕</button>}
-    </div>
-  );
-}
-
-function ErrBanner({ msg, onDismiss }: { msg: string; onDismiss?: () => void }) {
-  return (
-    <div className="px-4 py-3 rounded-xl text-sm flex items-center gap-2"
-      style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>
-      <span className="flex-1">{msg}</span>
-      {onDismiss && <button onClick={onDismiss} style={{ fontSize: 16 }}>✕</button>}
-    </div>
-  );
-}
-
-function OkBanner({ msg }: { msg: string }) {
-  return (
-    <div className="px-4 py-3 rounded-xl text-xs flex items-center gap-2"
-      style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.25)", color: "#16a34a" }}>
-      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-      </svg>
-      {msg}
-    </div>
-  );
-}
-
-function Toggle({ value, onChange, disabled }: { value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
-  return (
-    <button type="button" onClick={() => !disabled && onChange(!value)} disabled={disabled}
-      className="relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors"
-      style={{ background: value ? "#41afeb" : "#d1d5db", opacity: disabled ? 0.5 : 1 }}>
-      <span className="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform mt-1"
-        style={{ transform: value ? "translateX(24px)" : "translateX(4px)" }} />
-    </button>
-  );
-}
+// ─── Page-specific sub-components ─────────────────────────────────────────────
 
 function PhaseBadge({ phase }: { phase: string }) {
   const c = PHASE_COLORS[phase] ?? PHASE_COLORS.Whitelist;
@@ -143,21 +87,6 @@ function SaleStatusBadge({ status }: { status: string }) {
   return (
     <span className="px-2 py-0.5 rounded-full text-xs font-semibold capitalize"
       style={{ background: c.bg, color: c.color }}>{status}</span>
-  );
-}
-
-function SectionCard({ title, subtitle, accent, children }: {
-  title: string; subtitle?: string; accent?: string; children: React.ReactNode;
-}) {
-  return (
-    <div className="bg-white rounded-2xl shadow-sm"
-      style={{ border: `1px solid ${accent ?? "#e5e7eb"}`, background: accent ? `${accent}04` : "white" }}>
-      <div className="px-6 py-4" style={{ borderBottom: "1px solid #f3f4f6" }}>
-        <h2 className="text-sm font-bold" style={{ color: accent ?? "#24315f" }}>{title}</h2>
-        {subtitle && <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>{subtitle}</p>}
-      </div>
-      <div className="px-6 py-5">{children}</div>
-    </div>
   );
 }
 
@@ -328,7 +257,7 @@ export default function SellingPage() {
   };
 
   const handleSetMerkleRoot = () => {
-    if (!merkleRoot) { setOpError("Merkle root required."); return; }
+    if (!MERKLE_ROOT_RE.test(merkleRoot)) { setOpError("Merkle root must be 0x followed by 64 hex characters."); return; }
     doOp("merkle", () => fetch("/api/nft-sell/collection/merkle-root", {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -357,7 +286,7 @@ export default function SellingPage() {
   };
 
   const handleSetTreasury = () => {
-    if (!treasury) { setOpError("Wallet address required."); return; }
+    if (!ETH_ADDRESS_RE.test(treasury)) { setOpError("Treasury must be a valid Ethereum address (0x + 40 hex characters)."); return; }
     doOp("treasury", () => fetch("/api/nft-sell/collection/treasury", {
       method: "PUT", credentials: "include",
       headers: { "Content-Type": "application/json" },

@@ -36,7 +36,7 @@ export default function TechWhitelistPage() {
   const [bulkText, setBulkText] = useState("");
   const [merkleInput, setMerkleInput] = useState("");
   const [testAddr, setTestAddr] = useState("");
-  const [testResult, setTestResult] = useState<any>(null);
+  const [testResult, setTestResult] = useState<{ isWhitelisted: boolean; proof?: string[] } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const PER_PAGE = 20;
@@ -303,10 +303,10 @@ export default function TechWhitelistPage() {
                       {testResult.isWhitelisted ? "✓ Whitelisted" : "✗ Not Whitelisted"}
                     </span>
                   </div>
-                  {testResult.isWhitelisted && testResult.proof?.length > 0 && (
+                  {testResult.isWhitelisted && (testResult.proof?.length ?? 0) > 0 && (
                     <div className="space-y-1">
-                      <p className="text-xs font-medium text-slate-600 mb-2">Merkle Proof ({testResult.proof.length} elements):</p>
-                      {testResult.proof.map((p: string, i: number) => (
+                      <p className="text-xs font-medium text-slate-600 mb-2">Merkle Proof ({testResult.proof!.length} elements):</p>
+                      {testResult.proof!.map((p: string, i: number) => (
                         <p key={i} className="font-mono text-xs text-slate-700 break-all bg-white px-2 py-1 rounded border">{p}</p>
                       ))}
                     </div>

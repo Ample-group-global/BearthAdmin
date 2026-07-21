@@ -9,6 +9,16 @@ import { ipfsToGateway } from "@/lib/ipfs";
 
 type Tab = "phase" | "whitelist" | "mint" | "reveal" | "financial" | "advanced";
 
+interface TokenMetadata {
+  name?: string;
+  description?: string;
+  image?: string;
+  attributes?: { trait_type: string; value: string | number }[];
+}
+
+const ETH_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
+const BYTES32_HEX_RE = /^0x[0-9a-fA-F]{64}$/;
+
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "phase",     label: "Phase & Timing",    icon: "🔄" },
   { id: "whitelist", label: "Whitelist Root",     icon: "🌳" },
@@ -123,7 +133,7 @@ export default function ContractPage() {
   const [sbtInput, setSbtInput] = useState(false);
   const [revealUri, setRevealUri] = useState("");
   const [checkTokenId, setCheckTokenId] = useState("");
-  const [checkMeta, setCheckMeta] = useState<any>(null);
+  const [checkMeta, setCheckMeta] = useState<TokenMetadata | null>(null);
   const [checkLoading, setCheckLoading] = useState(false);
   const [checkError, setCheckError] = useState("");
   const [withdrawTo, setWithdrawTo] = useState("");
@@ -256,23 +266,68 @@ export default function ContractPage() {
   };
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const handleSetPhase = () => contract && exec(setTxPhase, contract.setPhase(BigInt(phaseInput)), `Phase set to ${PHASE_NAMES[Number(phaseInput)]}`);
-  const handleSetTimes = () => contract && exec(setTxTimes, contract.setWaveSchedule(1n, BigInt(wlStartInput), BigInt(wlEndInput)), "Wave 1 schedule updated");
-  const handlePushRoot = () => contract && exec(setTxRoot, contract.setMerkleRoot(rootInput.trim()), "Merkle root pushed on-chain");
-  const handleSetLimits = () => contract && exec(setTxLimits, contract.setPurchaseLimitConfig(limitEnabled, BigInt(limitMax)), "Purchase limit updated");
+  const handleSetPhase = () => {
+    const p = Number(phaseInput);
+    if (![0, 1, 2].includes(p)) { setTxPhase({ ...TX0, error: "Phase must be 0, 1, or 2." }); return; }
+    contract && exec(setTxPhase, contract.setPhase(BigInt(p)), `Phase set to ${PHASE_NAMES[p]}`);
+  };
+  const handleSetTimes = () => {
+    const start = Number(wlStartInput), end = Number(wlEndInput);
+    if (!start || start < Math.floor(Date.now() / 1000) - 300) { setTxTimes({ ...TX0, error: "Start timestamp must be a valid future Unix timestamp." }); return; }
+    if (!end || end <= start) { setTxTimes({ ...TX0, error: "End timestamp must be after start timestamp." }); return; }
+    contract && exec(setTxTimes, contract.setWaveSchedule(1n, BigInt(start), BigInt(end)), "Wave 1 schedule updated");
+  };
+  const handlePushRoot = () => {
+    if (!BYTES32_HEX_RE.test(rootInput.trim())) { setTxRoot({ ...TX0, error: "Merkle root must be 0x followed by 64 hex characters." }); return; }
+    contract && exec(setTxRoot, contract.setMerkleRoot(rootInput.trim()), "Merkle root pushed on-chain");
+  };
+  const handleSetLimits = () => {
+    const max = Number(limitMax);
+    if (!Number.isInteger(max) || max < 1) { setTxLimits({ ...TX0, error: "Max per wallet must be a positive integer." }); return; }
+    contract && exec(setTxLimits, contract.setPurchaseLimitConfig(limitEnabled, BigInt(max)), "Purchase limit updated");
+  };
   const handleSetSbt = () => contract && exec(setTxSbt, contract.setSBT(sbtInput), `SBT mode ${sbtInput ? "enabled" : "disabled"}`);
-  const handleReveal = () => contract && exec(setTxReveal, contract.reveal(revealUri.trim()), "NFT artwork revealed");
-  const handleWithdraw = () => contract && exec(setTxWithdraw, contract.withdraw(withdrawTo.trim()), "ETH withdrawn");
-  const handleSetRoyalty = () => contract && exec(setTxRoyalty, contract.setRoyalty(royaltyReceiver.trim(), BigInt(royaltyBps)), "Royalty updated");
+  const handleReveal = () => {
+    if (!revealUri.trim().startsWith("ipfs://")) { setTxReveal({ ...TX0, error: "Reveal URI must start with ipfs://" }); return; }
+    contract && exec(setTxReveal, contract.reveal(revealUri.trim()), "NFT artwork revealed");
+  };
+  const handleWithdraw = () => {
+    if (!ETH_ADDR_RE.test(withdrawTo.trim())) { setTxWithdraw({ ...TX0, error: "Enter a valid Ethereum address (0x + 40 hex)." }); return; }
+    contract && exec(setTxWithdraw, contract.withdraw(withdrawTo.trim()), "ETH withdrawn");
+  };
+  const handleSetRoyalty = () => {
+    if (!ETH_ADDR_RE.test(royaltyReceiver.trim())) { setTxRoyalty({ ...TX0, error: "Enter a valid receiver address (0x + 40 hex)." }); return; }
+    const bps = Number(royaltyBps);
+    if (isNaN(bps) || bps < 0 || bps > 1000) { setTxRoyalty({ ...TX0, error: "Royalty BPS must be 0–1000 (0–10%)." }); return; }
+    contract && exec(setTxRoyalty, contract.setRoyalty(royaltyReceiver.trim(), BigInt(bps)), "Royalty updated");
+  };
   const handlePause = () => contract && exec(setTxPause, contract.pause(), "Contract paused");
   const handleUnpause = () => contract && exec(setTxPause, contract.unpause(), "Contract unpaused");
-  const handlePauseAccount = () => contract && exec(setTxPauseAcc, contract.pauseAccount(pauseAccountAddr.trim()), "Account paused");
-  const handleUnpauseAccount = () => contract && exec(setTxPauseAcc, contract.unpauseAccount(unpauseAccountAddr.trim()), "Account unpaused");
-  const handleEmergencyTransfer = () => contract && exec(setTxEmergency,
-    contract.emergencyTransfer(BigInt(emergencyTokenId), emergencyFrom.trim(), emergencyTo.trim(), emergencyReason.trim()),
-    "Emergency transfer executed"
-  );
-  const handleBatchMint = () => contract && exec(setTxBatch, contract.adminMint(batchMintTo.trim(), BigInt(batchMintAmt)), `Minted ${batchMintAmt} NFTs`);
+  const handlePauseAccount = () => {
+    if (!ETH_ADDR_RE.test(pauseAccountAddr.trim())) { setTxPauseAcc({ ...TX0, error: "Enter a valid Ethereum address." }); return; }
+    contract && exec(setTxPauseAcc, contract.pauseAccount(pauseAccountAddr.trim()), "Account paused");
+  };
+  const handleUnpauseAccount = () => {
+    if (!ETH_ADDR_RE.test(unpauseAccountAddr.trim())) { setTxPauseAcc({ ...TX0, error: "Enter a valid Ethereum address." }); return; }
+    contract && exec(setTxPauseAcc, contract.unpauseAccount(unpauseAccountAddr.trim()), "Account unpaused");
+  };
+  const handleEmergencyTransfer = () => {
+    const tid = Number(emergencyTokenId);
+    if (!tid || tid < 1) { setTxEmergency({ ...TX0, error: "Valid token ID required." }); return; }
+    if (!ETH_ADDR_RE.test(emergencyFrom.trim())) { setTxEmergency({ ...TX0, error: "Valid 'from' address required." }); return; }
+    if (!ETH_ADDR_RE.test(emergencyTo.trim())) { setTxEmergency({ ...TX0, error: "Valid 'to' address required." }); return; }
+    if (!emergencyReason.trim()) { setTxEmergency({ ...TX0, error: "Reason is required." }); return; }
+    contract && exec(setTxEmergency,
+      contract.emergencyTransfer(BigInt(tid), emergencyFrom.trim(), emergencyTo.trim(), emergencyReason.trim()),
+      "Emergency transfer executed"
+    );
+  };
+  const handleBatchMint = () => {
+    if (!ETH_ADDR_RE.test(batchMintTo.trim())) { setTxBatch({ ...TX0, error: "Enter a valid recipient address." }); return; }
+    const amt = Number(batchMintAmt);
+    if (!amt || amt < 1) { setTxBatch({ ...TX0, error: "Quantity must be >= 1." }); return; }
+    contract && exec(setTxBatch, contract.adminMint(batchMintTo.trim(), BigInt(amt)), `Minted ${amt} NFTs`);
+  };
 
   const handleCheckMetadata = async () => {
     if (!contract || !checkTokenId) return;

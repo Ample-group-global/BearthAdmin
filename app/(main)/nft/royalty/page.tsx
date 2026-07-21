@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { TxBanner } from "@/components/nft/TxBanner";
+import { ErrBanner } from "@/components/nft/ErrBanner";
+import { Toggle } from "@/components/nft/Toggle";
+import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,54 +22,6 @@ interface Marketplace {
   name: string | null;
   enabled: boolean;
   synced_at: string | null;
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-const labelStyle: React.CSSProperties = {
-  display: "block", fontSize: "11px", fontWeight: 700,
-  color: "#9bafc5", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.05em",
-};
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "8px 12px", borderRadius: "8px",
-  border: "1px solid #e5e7eb", fontSize: "13px", color: "#111827", outline: "none",
-};
-const thStyle: React.CSSProperties = {
-  fontSize: "11px", fontWeight: 700, color: "#9bafc5",
-  textTransform: "uppercase", letterSpacing: "0.06em",
-  padding: "10px 14px", borderBottom: "1px solid #e5e7eb",
-  background: "#f9fafb", whiteSpace: "nowrap",
-};
-
-function TxBanner({ txHash }: { txHash: string }) {
-  return (
-    <div className="px-4 py-3 rounded-xl text-xs flex items-center gap-2"
-      style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.25)", color: "#16a34a" }}>
-      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-      </svg>
-      <span>Transaction submitted: <span className="font-mono">{txHash.slice(0, 20)}…</span></span>
-    </div>
-  );
-}
-
-function ErrBanner({ msg }: { msg: string }) {
-  return (
-    <div className="px-4 py-3 rounded-xl text-sm" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>
-      {msg}
-    </div>
-  );
-}
-
-function Toggle({ value, onChange, disabled }: { value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
-  return (
-    <button type="button" onClick={() => !disabled && onChange(!value)} disabled={disabled}
-      className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none"
-      style={{ background: value ? "#41afeb" : "#d1d5db", opacity: disabled ? 0.5 : 1 }}>
-      <span className="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
-        style={{ transform: value ? "translateX(24px)" : "translateX(4px)" }} />
-    </button>
-  );
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -177,9 +133,10 @@ export default function RoyaltyPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: mkt.address, name: mkt.name, allowed: !mkt.enabled }),
       });
-      if (!res.ok) return;
+      const d = await res.json();
+      if (!res.ok) { setRoyaltyError(d.error ?? "Failed to toggle marketplace."); return; }
       load();
-    } catch { /* silent */ }
+    } catch { setRoyaltyError("Network error."); }
   };
 
   if (loading) return (

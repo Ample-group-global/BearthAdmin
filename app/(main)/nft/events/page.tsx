@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ErrBanner } from "@/components/nft/ErrBanner";
+import { OkBanner } from "@/components/nft/OkBanner";
+import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
 
 interface NftEvent {
   id: string;
@@ -22,21 +25,6 @@ interface Checkin {
   checked_in_at: string;
   notes: string | null;
 }
-
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "8px 12px", borderRadius: "8px",
-  border: "1px solid #e5e7eb", fontSize: "13px", color: "#111827", outline: "none",
-};
-const labelStyle: React.CSSProperties = {
-  display: "block", fontSize: "11px", fontWeight: 700,
-  color: "#9bafc5", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.05em",
-};
-const thStyle: React.CSSProperties = {
-  fontSize: "11px", fontWeight: 700, color: "#9bafc5",
-  textTransform: "uppercase", letterSpacing: "0.06em",
-  padding: "10px 14px", borderBottom: "1px solid #e5e7eb",
-  background: "#f9fafb", whiteSpace: "nowrap",
-};
 
 export default function EventsPage() {
   const [events, setEvents]       = useState<NftEvent[]>([]);
@@ -149,7 +137,8 @@ export default function EventsPage() {
         </button>
       </div>
 
-      {ok && <div className="px-3 py-2 rounded-lg text-xs text-green-700" style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.3)" }}>{ok}</div>}
+      {ok  && <OkBanner  msg={ok}  onDismiss={() => setOk(null)} />}
+      {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Events List */}
@@ -271,7 +260,7 @@ export default function EventsPage() {
               <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} style={{ ...inputStyle, resize: "vertical" }} />
             </div>
           </div>
-          {err && <div className="mt-3 text-xs text-red-600">{err}</div>}
+          {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
           <div className="flex gap-3 mt-5">
             <button onClick={() => setShowCreate(false)} className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">Cancel</button>
             <button onClick={createEvent} disabled={saving} className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"
@@ -300,7 +289,7 @@ export default function EventsPage() {
                 style={inputStyle} />
             </div>
           </div>
-          {err && <div className="mt-3 text-xs text-red-600">{err}</div>}
+          {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
           <div className="flex gap-3 mt-5">
             <button onClick={() => setShowCheckin(false)} className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">Cancel</button>
             <button onClick={addCheckin} disabled={saving} className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"

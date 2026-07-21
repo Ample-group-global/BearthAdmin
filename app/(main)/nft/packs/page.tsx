@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ErrBanner } from "@/components/nft/ErrBanner";
+import { OkBanner } from "@/components/nft/OkBanner";
+import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
 
 interface PackDef {
   id: string;
@@ -25,21 +28,6 @@ interface PackOrder {
   revealed: boolean;
   created_at: string;
 }
-
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "8px 12px", borderRadius: "8px",
-  border: "1px solid #e5e7eb", fontSize: "13px", color: "#111827", outline: "none",
-};
-const labelStyle: React.CSSProperties = {
-  display: "block", fontSize: "11px", fontWeight: 700,
-  color: "#9bafc5", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.05em",
-};
-const thStyle: React.CSSProperties = {
-  fontSize: "11px", fontWeight: 700, color: "#9bafc5",
-  textTransform: "uppercase", letterSpacing: "0.06em",
-  padding: "10px 14px", borderBottom: "1px solid #e5e7eb",
-  background: "#f9fafb", whiteSpace: "nowrap",
-};
 
 const RARITIES = ["legendary", "epic", "rare", "common"];
 
@@ -176,7 +164,8 @@ export default function PacksPage() {
         </button>
       </div>
 
-      {ok && <div className="px-3 py-2 rounded-lg text-xs text-green-700" style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.3)" }}>{ok}</div>}
+      {ok  && <OkBanner  msg={ok}  onDismiss={() => setOk(null)} />}
+      {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Pack definitions */}
@@ -312,7 +301,7 @@ export default function PacksPage() {
               </div>
             </div>
           </div>
-          {err && <div className="mt-3 text-xs text-red-600">{err}</div>}
+          {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
           <div className="flex gap-3 mt-5">
             <button onClick={() => setShowCreate(false)} className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">Cancel</button>
             <button onClick={createPack} disabled={saving} className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"
@@ -334,7 +323,7 @@ export default function PacksPage() {
               placeholder="any secret string" style={inputStyle} />
             <p className="text-xs text-gray-400 mt-1">Keep this secret until all orders are placed. Never share before reveal.</p>
           </div>
-          {err && <div className="mt-3 text-xs text-red-600">{err}</div>}
+          {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
           <div className="flex gap-3 mt-5">
             <button onClick={() => setShowCommit(null)} className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">Cancel</button>
             <button onClick={commitSeedFn} disabled={saving || !commitSeed} className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"
@@ -355,7 +344,7 @@ export default function PacksPage() {
             <input type="text" value={revealSeed} onChange={e => setRevealSeed(e.target.value)}
               placeholder="the original secret seed" style={inputStyle} />
           </div>
-          {err && <div className="mt-3 text-xs text-red-600">{err}</div>}
+          {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
           <div className="flex gap-3 mt-5">
             <button onClick={() => setShowReveal(null)} className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">Cancel</button>
             <button onClick={revealPack} disabled={saving || !revealSeed} className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"
@@ -374,7 +363,7 @@ export default function PacksPage() {
             <label style={labelStyle}>Buyer Wallet</label>
             <input type="text" value={orderWallet} onChange={e => setOrderWallet(e.target.value)} placeholder="0x..." style={inputStyle} />
           </div>
-          {err && <div className="mt-3 text-xs text-red-600">{err}</div>}
+          {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
           <div className="flex gap-3 mt-5">
             <button onClick={() => setShowNewOrder(false)} className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">Cancel</button>
             <button onClick={createOrder} disabled={saving || !orderWallet} className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"

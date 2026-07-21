@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ErrBanner } from "@/components/nft/ErrBanner";
+import { OkBanner } from "@/components/nft/OkBanner";
+import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
 
 interface Collaboration {
   id: string;
@@ -14,21 +17,6 @@ interface Collaboration {
   created_at: string;
   wallet_count?: number;
 }
-
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "8px 12px", borderRadius: "8px",
-  border: "1px solid #e5e7eb", fontSize: "13px", color: "#111827", outline: "none",
-};
-const labelStyle: React.CSSProperties = {
-  display: "block", fontSize: "11px", fontWeight: 700,
-  color: "#9bafc5", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.05em",
-};
-const thStyle: React.CSSProperties = {
-  fontSize: "11px", fontWeight: 700, color: "#9bafc5",
-  textTransform: "uppercase", letterSpacing: "0.06em",
-  padding: "10px 14px", borderBottom: "1px solid #e5e7eb",
-  background: "#f9fafb", whiteSpace: "nowrap",
-};
 
 const STATUS_COLOR: Record<string, { bg: string; color: string }> = {
   upcoming: { bg: "rgba(156,163,175,0.12)", color: "#9ca3af" },
@@ -159,8 +147,8 @@ export default function CollaborationsPage() {
         </button>
       </div>
 
-      {ok && <div className="px-3 py-2 rounded-lg text-xs text-green-700" style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.3)" }}>{ok}</div>}
-      {err && <div className="px-3 py-2 rounded-lg text-xs text-red-600" style={{ background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.3)" }}>{err}</div>}
+      {ok  && <OkBanner  msg={ok}  onDismiss={() => setOk(null)} />}
+      {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
@@ -327,7 +315,7 @@ export default function CollaborationsPage() {
               </div>
             </div>
           </div>
-          {err && <div className="mt-3 text-xs text-red-600">{err}</div>}
+          {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
           <div className="flex gap-3 mt-5">
             <button onClick={() => setShowCreate(false)} className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">Cancel</button>
             <button onClick={createCollab} disabled={saving} className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"
@@ -352,7 +340,7 @@ export default function CollaborationsPage() {
               Preview: {importText.split(/[,\n\s]+/).filter(s => s.startsWith("0x")).length} valid addresses
             </p>
           </div>
-          {err && <div className="mt-3 text-xs text-red-600">{err}</div>}
+          {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
           <div className="flex gap-3 mt-5">
             <button onClick={() => setShowImport(false)} className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">Cancel</button>
             <button onClick={importWallets} disabled={saving} className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"
@@ -383,7 +371,7 @@ export default function CollaborationsPage() {
               <span className="text-sm text-gray-600">Also include current NFT holders (holder priority merge)</span>
             </label>
           </div>
-          {err && <div className="mt-3 text-xs text-red-600">{err}</div>}
+          {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
           <div className="flex gap-3 mt-5">
             <button onClick={() => setShowMerkle(false)} className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">Cancel</button>
             <button onClick={generateMerkle} disabled={saving || !merkleForm.wave_number} className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"

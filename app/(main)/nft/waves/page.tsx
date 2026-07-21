@@ -2,6 +2,10 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
+import { ErrBanner } from "@/components/nft/ErrBanner";
+import { OkBanner } from "@/components/nft/OkBanner";
+import { TxBanner as SharedTxBanner } from "@/components/nft/TxBanner";
+import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,23 +49,6 @@ interface SaleMethod { code: string; label: string; is_active: boolean; sort_ord
 
 const STATUS_OPTS = ["upcoming", "active", "completed", "paused"];
 
-// ─── Shared styles ────────────────────────────────────────────────────────────
-
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "8px 12px", borderRadius: "8px",
-  border: "1px solid #e5e7eb", fontSize: "13px", color: "#111827", outline: "none",
-};
-const labelStyle: React.CSSProperties = {
-  display: "block", fontSize: "11px", fontWeight: 700,
-  color: "#9bafc5", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.05em",
-};
-const thStyle: React.CSSProperties = {
-  fontSize: "11px", fontWeight: 700, color: "#9bafc5",
-  textTransform: "uppercase", letterSpacing: "0.06em",
-  padding: "10px 14px", borderBottom: "1px solid #e5e7eb",
-  background: "#f9fafb", whiteSpace: "nowrap",
-};
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
@@ -90,18 +77,6 @@ function SaleMethodBadge({ method, saleMethods }: { method: string; saleMethods:
       style={{ background: "rgba(65,175,235,0.12)", color: "#41afeb" }}>
       {sm?.label ?? method}
     </span>
-  );
-}
-
-function TxBanner({ txHash }: { txHash: string }) {
-  return (
-    <div className="px-3 py-2 rounded-lg text-xs flex items-center gap-2"
-      style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.3)", color: "#16a34a" }}>
-      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-      </svg>
-      Tx: <span className="font-mono">{txHash.slice(0, 18)}…</span>
-    </div>
   );
 }
 
@@ -415,7 +390,7 @@ export default function WavesPage() {
             </span>
             <span className="ml-2" style={{ color: "#6b7280" }}>
               — Configure waves with{" "}
-              <strong>{saleMethods.find(s => s.code === strategyHighlight)?.name ?? strategyHighlight}</strong>{" "}
+              <strong>{saleMethods.find(s => s.code === strategyHighlight)?.label ?? strategyHighlight}</strong>{" "}
               as the sale method. Edit each wave below and set Sale Method accordingly.
             </span>
           </div>
@@ -437,11 +412,7 @@ export default function WavesPage() {
         ))}
       </div>
 
-      {error && (
-        <div className="px-4 py-3 rounded-xl text-sm" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>
-          {error}
-        </div>
-      )}
+      {error && <ErrBanner msg={error} onDismiss={() => setError(null)} />}
 
       {/* ── Waves Table ── */}
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
@@ -684,8 +655,8 @@ export default function WavesPage() {
               <div className="pt-2" style={{ borderTop: "1px solid #e5e7eb" }}>
                 <p className="text-xs font-bold mb-3" style={{ color: "#9bafc5", textTransform: "uppercase", letterSpacing: "0.06em" }}>Strategy Config</p>
 
-                {stratOk && <div className="mb-2 px-3 py-1.5 rounded-lg text-xs text-green-700" style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.3)" }}>{stratOk}</div>}
-                {stratErr && <div className="mb-2 px-3 py-1.5 rounded-lg text-xs text-red-600" style={{ background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.3)" }}>{stratErr}</div>}
+                {stratOk  && <OkBanner  msg={stratOk}  onDismiss={() => setStratOk(null)}  />}
+                {stratErr && <ErrBanner msg={stratErr} onDismiss={() => setStratErr(null)} />}
 
                 {/* Flash Sale */}
                 <div className="p-3 rounded-xl mb-3" style={{ background: "#fafafa", border: "1px solid #e5e7eb" }}>
@@ -860,8 +831,8 @@ export default function WavesPage() {
                 </div>
               )}
 
-              {chainTx   && <TxBanner txHash={chainTx} />}
-              {chainError && <div className="px-4 py-3 rounded-xl text-sm" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>{chainError}</div>}
+              {chainTx    && <SharedTxBanner txHash={chainTx} />}
+              {chainError && <ErrBanner msg={chainError} onDismiss={() => setChainError(null)} />}
 
               {/* 1 — Set Schedule */}
               <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>

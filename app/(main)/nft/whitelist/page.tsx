@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { labelStyle as label, inputStyle as input, thStyle as thS, tdStyle as tdS } from "@/components/nft/styles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,28 +25,11 @@ const card: React.CSSProperties = {
   background: "#fff", borderRadius: "12px",
   border: "1px solid #e5e7eb", padding: "20px 24px",
 };
-const label: React.CSSProperties = {
-  display: "block", fontSize: "11px", fontWeight: 700,
-  color: "#9bafc5", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.05em",
-};
-const input: React.CSSProperties = {
-  width: "100%", padding: "8px 12px", borderRadius: "8px",
-  border: "1px solid #e5e7eb", fontSize: "13px", color: "#111827", outline: "none",
-};
 const btn = (color: string): React.CSSProperties => ({
   padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
   background: color, color: "#fff", border: "none", cursor: "pointer",
   display: "inline-flex", alignItems: "center", gap: "6px",
 });
-const thS: React.CSSProperties = {
-  fontSize: "11px", fontWeight: 700, color: "#9bafc5", textTransform: "uppercase",
-  letterSpacing: "0.06em", padding: "10px 14px", borderBottom: "1px solid #e5e7eb",
-  background: "#f9fafb", whiteSpace: "nowrap",
-};
-const tdS: React.CSSProperties = {
-  fontSize: "13px", color: "#374151", padding: "10px 14px",
-  borderBottom: "1px solid #f3f4f6",
-};
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
