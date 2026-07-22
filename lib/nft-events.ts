@@ -74,8 +74,8 @@ export async function fetchMintedEvents(chainId: number): Promise<{
   try {
     const filter = contract.filters.Minted();
     const latest = await provider.getBlockNumber();
-    const CHUNK = 500;
-    const DELAY_MS = 200;
+    const CHUNK = 2000;
+    const DELAY_MS = 500;
 
     for (let start = fromBlock; start <= latest; start += CHUNK) {
       const end = Math.min(start + CHUNK - 1, latest);

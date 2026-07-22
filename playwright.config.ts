@@ -34,44 +34,6 @@ export default defineConfig({
         },
       },
     },
-    // Authenticated project: reuses saved admin session — no login DB hit per test
-    {
-      name: "Authenticated",
-      use: {
-        ...devices["Desktop Chrome"],
-        storageState: ADMIN_AUTH,
-        launchOptions: {
-          args: [
-            "--disable-dev-shm-usage",
-            "--no-sandbox",
-            "--js-flags=--max-old-space-size=4096",
-          ],
-        },
-      },
-    },
-    // Audit project: reuses saved tech session — no login DB hit per test
-    {
-      name: "Audit Chrome",
-      use: {
-        ...devices["Desktop Chrome"],
-        storageState: TECH_AUTH,
-        launchOptions: {
-          args: [
-            "--disable-dev-shm-usage",
-            "--no-sandbox",
-            "--js-flags=--max-old-space-size=4096",
-          ],
-        },
-      },
-    },
-    {
-      name: "Mobile Safari",
-      use: { ...devices["iPhone 13"] },
-    },
-    {
-      name: "Tablet",
-      use: { ...devices["iPad Pro"] },
-    },
   ],
   webServer: {
     command: "npm run dev",

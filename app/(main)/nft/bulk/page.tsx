@@ -237,7 +237,7 @@ export default function BulkPage() {
                   <td className="px-3 py-3 text-sm font-semibold" style={{ color: "#24315f" }}>{order.company_name}</td>
                   <td className="px-3 py-3 text-sm text-gray-600">{order.contact_name ?? <span className="text-gray-300">—</span>}</td>
                   <td className="px-3 py-3 text-sm font-mono text-gray-500">
-                    {order.buyer_wallet.slice(0, 6)}…{order.buyer_wallet.slice(-4)}
+                    {order.buyer_wallet ? `${order.buyer_wallet.slice(0, 6)}…${order.buyer_wallet.slice(-4)}` : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-3 py-3 text-sm font-bold" style={{ color: "#41afeb" }}>{order.quantity}</td>
                   <td className="px-3 py-3"><RarityBadge rarity={order.rarity_tier} /></td>

@@ -737,7 +737,7 @@ export default function NFTOverviewPage() {
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
             <p className="text-sm text-gray-500">Scanning blockchain events from block {activeChain.deploymentBlock?.toLocaleString() ?? "0"}…</p>
-            <p className="text-xs text-gray-400 mt-1">Fetching in 500-block chunks — takes ~30–60 seconds</p>
+            <p className="text-xs text-gray-400 mt-1">Fetching in 2,000-block chunks — takes ~15–30 seconds</p>
           </div>
         ) : paginated.length === 0 ? (
           <div className="p-12 text-center text-gray-400 text-sm">

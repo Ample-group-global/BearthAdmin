@@ -273,7 +273,7 @@ export default function GiftsPage() {
               ) : filteredGifts.map(gift => (
                 <tr key={gift.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                   <td className="px-3 py-3 text-sm font-mono text-gray-700">
-                    {gift.recipient_wallet.slice(0, 6)}…{gift.recipient_wallet.slice(-4)}
+                    {gift.recipient_wallet ? `${gift.recipient_wallet.slice(0, 6)}…${gift.recipient_wallet.slice(-4)}` : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-3 py-3 text-sm text-gray-600">{gift.recipient_name ?? <span className="text-gray-300">—</span>}</td>
                   <td className="px-3 py-3 text-sm text-gray-500 capitalize">{gift.rarity_tier ?? "any"}</td>

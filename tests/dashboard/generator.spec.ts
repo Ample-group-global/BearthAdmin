@@ -6,6 +6,7 @@ test.use({ storageState: path.join(process.cwd(), "tests", ".auth", "tech.json")
 
 // Helper: wait for AppShell auth to complete (Sign Out button visible = sidebar rendered)
 async function waitForAppShell(page: any) {
+  await page.locator('text=Verifying access').waitFor({ state: 'detached', timeout: 60000 }).catch(() => {});
   await page.locator('button').filter({ hasText: /Sign Out/i }).waitFor({ state: 'visible', timeout: 60000 }).catch(() => {});
 }
 

@@ -37,6 +37,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     blockExplorer: "https://sepolia.etherscan.io",
     nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
     color: "purple",
+    deploymentBlock: 8300000,
   },
 ];
 

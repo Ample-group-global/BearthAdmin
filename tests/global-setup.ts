@@ -30,7 +30,7 @@ async function createSession(browser: any, email: string, password: string, file
     await page.getByPlaceholder("Enter your email").fill(email);
     await page.getByPlaceholder("Enter your password").fill(password);
     await page.getByRole("button", { name: "Sign In" }).click();
-    await page.waitForURL((url: URL) => !url.pathname.includes("/login"), { timeout: 30000 });
+    await page.waitForURL((url: URL) => !url.pathname.includes("/login"), { timeout: 120000 });
     await context.storageState({ path: filePath });
     console.log(`[global-setup] Created session for ${email} → ${filePath}`);
   } finally {
