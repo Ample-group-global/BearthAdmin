@@ -15,9 +15,9 @@ interface Wave {
   name: string;
   stageId: string | null;
   stageName: string | null;
-  quantity: number;
-  cumulativeStart: number;
-  cumulativeEnd: number;
+  quantity: number | null;
+  cumulativeStart: number | null;
+  cumulativeEnd: number | null;
   defaultPriceEth: number | null;
   saleMethod: string;
   scheduledStart: string | null;
@@ -351,7 +351,7 @@ export default function WavesPage() {
     });
   };
 
-  const totalNfts     = waves.reduce((s, w) => s + w.quantity, 0);
+  const totalNfts     = waves.reduce((s, w) => s + (w.quantity ?? 0), 0);
   const activeWave    = waves.find(w => w.status === "active");
   const completedCount = waves.filter(w => w.status === "completed" || w.status === "closed" || w.status === "sold_out").length;
   const totalSold     = waves.reduce((s, w) => s + (w.soldCount ?? 0), 0);
@@ -457,7 +457,7 @@ export default function WavesPage() {
                       </td>
 
                       <td style={{ padding: "10px 14px", textAlign: "center" }}>
-                        <span className="text-xs font-semibold" style={{ color: "#374151" }}>{w.quantity.toLocaleString()}</span>
+                        <span className="text-xs font-semibold" style={{ color: "#374151" }}>{(w.quantity ?? 0).toLocaleString()}</span>
                       </td>
 
                       <td style={{ padding: "10px 14px" }}>
@@ -479,12 +479,12 @@ export default function WavesPage() {
                       <td style={{ padding: "10px 14px", textAlign: "center" }}>
                         <div className="text-xs">
                           <span className="font-bold" style={{ color: "#41afeb" }}>{(w.soldCount ?? 0).toLocaleString()}</span>
-                          <span style={{ color: "#9bafc5" }}> / {w.quantity.toLocaleString()}</span>
+                          <span style={{ color: "#9bafc5" }}> / {(w.quantity ?? 0).toLocaleString()}</span>
                         </div>
                         {(w.soldCount ?? 0) > 0 && (
                           <div className="h-1 rounded-full mt-1" style={{ background: "#e5e7eb", width: 60, margin: "4px auto 0" }}>
                             <div className="h-1 rounded-full" style={{
-                              width: `${Math.min(100, Math.round((w.soldCount ?? 0) / w.quantity * 100))}%`,
+                              width: `${Math.min(100, Math.round((w.soldCount ?? 0) / (w.quantity || 1) * 100))}%`,
                               background: "#41afeb",
                             }} />
                           </div>
