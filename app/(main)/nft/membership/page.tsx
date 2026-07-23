@@ -182,6 +182,7 @@ export default function MembershipPage() {
         {loading ? (
           <div className="p-8 text-center text-sm text-gray-400">Loading…</div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
@@ -228,6 +229,7 @@ export default function MembershipPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import DataTable, { type ColumnDef } from "@/components/DataTable";
+import { ErrBanner } from "@/components/nft/ErrBanner";
+import { inputStyle, labelStyle } from "@/components/nft/styles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,7 +138,6 @@ export default function NftPage() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [master, setMaster]     = useState<Master | null>(null);
-  const [myRole, setMyRole]     = useState<string | null>(null);
   const [sortKey, setSortKey]   = useState<string | undefined>(undefined);
   const [sortDir, setSortDir]   = useState<"asc" | "desc">("asc");
 
@@ -158,15 +159,6 @@ export default function NftPage() {
   const [form, setForm] = useState({
     serialNumber: "", stageId: "", nftTypeId: "", deliveryStatusId: "", notes: "",
   });
-
-  const inputStyle: React.CSSProperties = {
-    width: "100%", padding: "8px 12px", borderRadius: "8px",
-    border: "1px solid #e5e7eb", fontSize: "13px", color: "#111827", outline: "none",
-  };
-  const labelStyle: React.CSSProperties = {
-    display: "block", fontSize: "11px", fontWeight: 700,
-    color: "#9bafc5", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.05em",
-  };
 
   // ── Data loading ───────────────────────────────────────────────────────────
   const loadRecords = useCallback((
@@ -196,8 +188,6 @@ export default function NftPage() {
   useEffect(() => {
     fetch("/api/master", { credentials: "include" })
       .then(r => r.json()).then(d => setMaster(d)).catch(() => {});
-    fetch("/api/me", { credentials: "include" })
-      .then(r => r.json()).then(d => setMyRole(d.role ?? null)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -649,7 +639,7 @@ export default function NftPage() {
                   </div>
                 </div>
               )}
-              {myRole === "tech" && (
+              {(
                 <>
                   {!viewRecord.isRevealed && (
                     <div className="p-3 rounded-xl flex items-center gap-3"
@@ -776,10 +766,3 @@ function ModalWrap({ children, onClose, title, small, wide }:
   );
 }
 
-function ErrBanner({ msg }: { msg: string }) {
-  return (
-    <div className="p-3 rounded-lg text-sm" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>
-      {msg}
-    </div>
-  );
-}

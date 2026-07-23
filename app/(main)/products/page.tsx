@@ -897,7 +897,7 @@ export default function ProductsPage() {
             </div>
 
             {/* Stock / Sort / Status */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label style={labelStyle}>Stock Qty</label>
                 <input type="number" min="0" value={form.stockQty}

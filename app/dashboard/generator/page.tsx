@@ -12,6 +12,11 @@ import RarityTab           from './components/RarityTab';
 import ConflictsPanel      from './components/ConflictsPanel';
 import { LayerFilesProvider } from './LayerFilesContext';
 
+interface LayerAsset { stem: string; defaultWeight?: number; rel?: string; }
+interface Layer { folder: string; count: number; assets: LayerAsset[]; optional?: boolean; }
+type Weights = Record<string, Record<string, number>>;
+type ConflictRule = Record<string, unknown>;
+
 const DEFAULT_COLLECTION = {
   name:        '',
   symbol:      '',
@@ -30,11 +35,11 @@ export default function Page() {
   const [collectionId,   setCollectionId]  = useState<string | null>(null);
   const [syncing,        setSyncing]       = useState(false);
   const [syncError,      setSyncError]     = useState('');
-  const [layers,         setLayers]        = useState<any[]>([]);
-  const [weights,        setWeights]       = useState<Record<string, any>>({});
+  const [layers,         setLayers]        = useState<Layer[]>([]);
+  const [weights,        setWeights]       = useState<Weights>({});
   const [activeFolder,   setActiveFolder]  = useState<string | null>(null);
   const [gearFolder,     setGearFolder]    = useState<string | null>(null);
-  const [conflicts,      setConflicts]     = useState<any[]>([]);
+  const [conflicts,      setConflicts]     = useState<ConflictRule[]>([]);
   const [showConflicts,  setShowConflicts] = useState(false);
 
   function goToStep(newStep: string) {
@@ -45,15 +50,15 @@ export default function Page() {
     setStep(newStep);
   }
 
-  const loadLayers = useCallback((localLayers?: any[]) => {
-    const applyLayers = (data: any[]) => {
+  const loadLayers = useCallback((localLayers?: Layer[]) => {
+    const applyLayers = (data: Layer[]) => {
       setLayers(data);
       setWeights(prev => {
         const updated = { ...prev };
         data.forEach(l => {
           if (!updated[l.folder]) {
             updated[l.folder] = Object.fromEntries(
-              l.assets.map((a: any) => [a.stem, a.defaultWeight ?? 1])
+              l.assets.map((a: LayerAsset) => [a.stem, a.defaultWeight ?? 1])
             );
           }
         });
@@ -72,16 +77,16 @@ export default function Page() {
 
     fetch('/api/layers')
       .then(r => r.json())
-      .then((data: any[]) => { if (data.length) applyLayers(data); })
-      .catch(() => {});
+      .then((data: Layer[]) => { if (data.length) applyLayers(data); })
+      .catch(() => { /* layers load silently — page shows empty state */ });
   }, [activeFolder]);
 
   useEffect(() => {
     loadLayers();
     fetch('/api/conflicts')
       .then(r => r.json())
-      .then(setConflicts)
-      .catch(() => {});
+      .then((data: ConflictRule[]) => setConflicts(data))
+      .catch(() => { /* conflicts load silently — modal shows empty state */ });
 
     // Check if there's already a collection saved in session storage
     const savedId = sessionStorage.getItem('nft_collection_id');
@@ -92,14 +97,14 @@ export default function Page() {
     }
   }, []);
 
-  const handleWeightChange = useCallback((folder: string, stem: string, value: any) => {
+  const handleWeightChange = useCallback((folder: string, stem: string, value: number) => {
     setWeights(prev => ({
       ...prev,
       [folder]: { ...prev[folder], [stem]: value },
     }));
   }, []);
 
-  async function saveConflicts(rules: any[]) {
+  async function saveConflicts(rules: ConflictRule[]) {
     await fetch('/api/conflicts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -164,8 +169,8 @@ export default function Page() {
       }
 
       goToStep('organize');
-    } catch (err: any) {
-      setSyncError(err.message ?? 'Failed to create collection');
+    } catch (err: unknown) {
+      setSyncError(err instanceof Error ? err.message : 'Failed to create collection');
     } finally {
       setSyncing(false);
     }
@@ -286,10 +291,10 @@ export default function Page() {
       {step === 'export' && (
         <ExportPanel
           weights={weights}
-          layers={layers as any}
+          layers={layers as never[]}
           collection={collection}
           conflicts={conflicts}
-          collectionId={collectionId as any}
+          collectionId={collectionId as never}
         />
       )}
 
@@ -312,10 +317,10 @@ export default function Page() {
             layer={gearLayer}
             weights={weights[gearFolder] ?? {}}
             supply={collection.supply}
-            onSave={(newWs: any) => {
+            onSave={(newWs: Record<string, number>) => {
               Object.entries(newWs).forEach(([stem, val]) => handleWeightChange(gearFolder, stem, val));
             }}
-            onDelete={async (asset: any) => {
+            onDelete={async (asset: { rel?: string }) => {
               if (!asset.rel) return;
               await fetch('/api/asset/delete', {
                 method: 'DELETE',

@@ -151,7 +151,7 @@ export default function CollaborationsPage() {
       {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: "Total", value: stats.total, color: "#41afeb" },
           { label: "Active", value: stats.active, color: "#16a34a" },

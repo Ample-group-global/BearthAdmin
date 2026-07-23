@@ -133,6 +133,7 @@ export default function BrandsPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr>
@@ -165,6 +166,7 @@ export default function BrandsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

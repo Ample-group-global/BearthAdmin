@@ -162,7 +162,7 @@ export default function OtcPage() {
       {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: "Total Deals",  value: stats.total,       color: "#41afeb" },
           { label: "Pending",      value: stats.pending,     color: "#d97706" },
@@ -180,6 +180,7 @@ export default function OtcPage() {
         {loading ? (
           <div className="p-8 text-center text-sm text-gray-400">Loading…</div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
@@ -195,7 +196,7 @@ export default function OtcPage() {
                 <tr key={deal.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                   <td className="px-3 py-3 text-sm text-gray-700">{deal.buyer_name ?? <span className="text-gray-300">—</span>}</td>
                   <td className="px-3 py-3 text-sm font-mono text-gray-500">
-                    {deal.buyer_wallet.slice(0, 6)}…{deal.buyer_wallet.slice(-4)}
+                    {deal.buyer_wallet ? `${deal.buyer_wallet.slice(0, 6)}…${deal.buyer_wallet.slice(-4)}` : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-3 py-3 text-sm font-semibold" style={{ color: "#41afeb" }}>
                     {deal.nft_record_ids?.length ?? 0}
@@ -234,6 +235,7 @@ export default function OtcPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

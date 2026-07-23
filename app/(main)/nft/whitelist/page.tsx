@@ -237,7 +237,7 @@ export default function WhitelistPage() {
       </div>
 
       {/* Stats bar */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginBottom: 24 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div style={{ ...card, textAlign: "center" }}>
           <div style={{ fontSize: 32, fontWeight: 800, color: "#41afeb" }}>{total.toLocaleString()}</div>
           <div style={{ fontSize: 12, color: "#9bafc5", fontWeight: 600, textTransform: "uppercase" }}>Whitelisted Wallets</div>

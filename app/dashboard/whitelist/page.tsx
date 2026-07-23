@@ -47,7 +47,7 @@ export default function TechWhitelistPage() {
 
   const wrap = async (fn: () => Promise<unknown>, ok: string) => {
     try { await fn(); showToast(ok, "success"); }
-    catch (e: any) { showToast(e?.message || "Error", "error"); }
+    catch (e: unknown) { showToast(e instanceof Error ? e.message : "Error", "error"); }
   };
 
   const handleAdd = () =>
@@ -72,7 +72,7 @@ export default function TechWhitelistPage() {
       const r = await testAddress(testAddr.trim());
       setTestResult(r);
       showToast(r.isWhitelisted ? "Address is whitelisted ✓" : "Address is NOT whitelisted", r.isWhitelisted ? "success" : "warning");
-    } catch (e: any) { showToast(e?.message || "Error", "error"); }
+    } catch (e: unknown) { showToast(e instanceof Error ? e.message : "Error", "error"); }
   };
 
   const handleExport = async (fmt: "csv" | "json" | "txt") => {

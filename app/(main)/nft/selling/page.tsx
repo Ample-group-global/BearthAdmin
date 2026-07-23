@@ -454,7 +454,7 @@ export default function SellingPage() {
           {/* Phase Control */}
           <SectionCard title="Phase Control" subtitle="Advance the mint phase on-chain. Order: Whitelist → PaidMint → Revealed (one-way, irreversible).">
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {PHASE_NAMES.map((name, idx) => {
                   const current = onChain ? onChain.currentPhase : -1;
                   const isPast    = idx < current;

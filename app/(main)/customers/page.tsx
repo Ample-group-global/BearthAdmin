@@ -665,7 +665,7 @@ export default function CustomersPage() {
                     <span className="text-xs" style={{ color: "#dc2626" }}>Fill in at least one</span>
                   )}
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs mb-1" style={{ color: "#9bafc5" }}>Phone</label>
                     <input

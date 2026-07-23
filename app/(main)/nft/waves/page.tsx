@@ -291,18 +291,18 @@ export default function WavesPage() {
   };
 
   const handleCloseTreasury = () =>
-    chainOp("treasury", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/close-treasury`, {
+    chainOp("treasury", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/rollover`, {
       method: "POST", credentials: "include",
     }));
 
   const handleCloseBurn = () =>
-    chainOp("burn", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/close-burn`, {
+    chainOp("burn", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/forfeit`, {
       method: "POST", credentials: "include",
     }));
 
   const handleMintTransfer = () => {
     if (!auctionTo) { setChainError("Recipient address required."); return; }
-    chainOp("mint-transfer", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/mint-transfer`, {
+    chainOp("mint-transfer", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/auction-mint`, {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ to: auctionTo, qty: parseInt(auctionQty, 10) }),
@@ -329,7 +329,7 @@ export default function WavesPage() {
         startPriceEth:  dutchStartPrice,
         floorPriceEth:  dutchFloorPrice,
         decrementEth:   dutchDecrement,
-        intervalSeconds: parseInt(dutchInterval, 10),
+        intervalSecs: parseInt(dutchInterval, 10),
       }),
     }));
   };
@@ -817,7 +817,7 @@ export default function WavesPage() {
 
               {/* On-chain status */}
               {chainOnChain && (
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {[
                     { label: "Sold",     value: `${chainOnChain.soldCount} / ${chainOnChain.qty}` },
                     { label: "Price",    value: `${chainOnChain.price} ETH` },
@@ -908,7 +908,7 @@ export default function WavesPage() {
                 <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
                   <p className="text-xs font-bold" style={{ color: "#24315f" }}>4. Mint & Transfer to Auction Winner</p>
                   <p className="text-xs" style={{ color: "#9bafc5" }}>After OpenSea auction settles — mints the NFT directly to the winner.</p>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="col-span-2">
                       <label style={labelStyle}>Winner Address</label>
                       <input type="text" value={auctionTo} onChange={e => setAuctionTo(e.target.value)}

@@ -169,7 +169,7 @@ export default function BulkPage() {
 
   const stats = {
     total:     orders.length,
-    totalNfts: orders.reduce((sum, o) => sum + o.quantity, 0),
+    totalNfts: orders.reduce((sum, o) => sum + (o.quantity ?? 0), 0),
     completed: orders.filter(o => o.status === "completed").length,
   };
 
@@ -203,7 +203,7 @@ export default function BulkPage() {
       {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: "Total Orders",       value: stats.total,     color: "#41afeb" },
           { label: "Total NFTs Ordered", value: stats.totalNfts, color: "#7c3aed" },
@@ -221,6 +221,7 @@ export default function BulkPage() {
         {loading ? (
           <div className="p-8 text-center text-sm text-gray-400">Loading…</div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
@@ -273,6 +274,7 @@ export default function BulkPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

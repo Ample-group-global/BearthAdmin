@@ -226,7 +226,7 @@ export default function GiftsPage() {
       {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: "Total Gifts",  value: stats.totalGifts,  color: "#7c3aed" },
           { label: "Airdrops",     value: stats.airdrops,    color: "#d97706" },
@@ -257,6 +257,7 @@ export default function GiftsPage() {
         {loading ? (
           <div className="p-8 text-center text-sm text-gray-400">Loading…</div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
@@ -317,6 +318,7 @@ export default function GiftsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

@@ -423,7 +423,7 @@ export default function StakingPage() {
           </div>
 
           {/* Default reference row */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {RARITY_TIERS.map(t => (
               <div key={t.id} className="p-2 rounded-xl text-center" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
                 <span className="block text-[10px] font-bold" style={{ color: t.color }}>{t.label}</span>

@@ -8,6 +8,7 @@ import { Toggle } from "@/components/nft/Toggle";
 import { labelStyle, inputStyle } from "@/components/nft/styles";
 
 interface SchedulerStatus {
+  configured:            boolean;
   autoPhaseEnabled:      boolean;
   autoRevealEnabled:     boolean;
   autoWaveRevealEnabled: boolean;
@@ -75,6 +76,7 @@ export default function SchedulerPage() {
       const r = await fetch("/api/nft-sell/scheduler/status", { credentials: "include" });
       if (!r.ok) { const d = await r.json(); setErr(d.error ?? "Failed to load scheduler status."); return; }
       const d = await r.json();
+      if (d.configured === false) { setLoading(false); return; }
       setStatus(d);
     } catch { setErr("Network error loading scheduler."); }
     finally { setLoading(false); }
@@ -389,7 +391,7 @@ export default function SchedulerPage() {
                 {waveStatusLoading ? "Loading…" : "Refresh"}
               </button>
             </div>
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2">
               {waveStatusLoading ? (
                 Array.from({ length: 7 }).map((_, i) => (
                   <div key={i} className="rounded-xl bg-gray-100 animate-pulse h-20" />

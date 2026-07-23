@@ -541,6 +541,7 @@ export default function InventoryPage() {
             <EmptyState message="No purchase orders found" />
           ) : (
             <div className="bg-white rounded-xl overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr>
@@ -591,6 +592,7 @@ export default function InventoryPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>
@@ -612,6 +614,7 @@ export default function InventoryPage() {
           ) : (
             <>
               <div className="bg-white rounded-xl overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr>
@@ -650,6 +653,7 @@ export default function InventoryPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
               {movTotal > 50 && (
                 <div className="flex items-center justify-between">
@@ -708,6 +712,7 @@ export default function InventoryPage() {
             <EmptyState message="No returns found" />
           ) : (
             <div className="bg-white rounded-xl overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr>
@@ -748,6 +753,7 @@ export default function InventoryPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>

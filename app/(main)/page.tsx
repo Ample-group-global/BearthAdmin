@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 interface ReportData {
-  orders: {
+  orders?: {
     total: number;
     nftOrderCount: number;
     productOrderCount: number;
@@ -15,14 +15,14 @@ interface ReportData {
     byNftStatus: Array<{ statusName: string; statusCode: string; count: number }>;
     byMerchStatus?: Array<{ statusName: string; statusCode: string; count: number }>;
   };
-  customers: { total: number; withOrders: number };
-  nft: {
+  customers?: { total: number; withOrders: number };
+  nft?: {
     total: number;
     orderedCount: number;
     byDeliveryStatus: Array<{ statusName: string; statusCode: string; count: number }>;
   };
-  products: { total: number; active: number; orderedCount: number };
-  reconciliation: {
+  products?: { total: number; active: number; orderedCount: number };
+  reconciliation?: {
     byStatus: Array<{ status: string; count: number; totalTwd: number; totalEth: number }>;
   };
 }
@@ -81,7 +81,7 @@ function PurchasePanel({
         <span style={{ color }}>{icon}</span>
         <h3 className="text-sm font-extrabold" style={{ color: "#24315f" }}>{type}</h3>
       </div>
-      <div className="grid grid-cols-3 divide-x" style={{ borderBottom: "1px solid #f3f4f6" }}>
+      <div className="grid grid-cols-1 sm:grid-cols-3 divide-x" style={{ borderBottom: "1px solid #f3f4f6" }}>
         {[
           { label: "Orders",        value: orderCount,                           href: ordersLink },
           { label: "Items Sold",    value: itemCount,                            href: itemsLink },
@@ -158,7 +158,11 @@ export default function OverviewPage() {
 
   if (!data) return null;
 
-  const { orders, customers, nft, products, reconciliation } = data;
+  const orders         = data.orders         ?? { total: 0, nftOrderCount: 0, productOrderCount: 0, bothOrderCount: 0, totalNftTwd: 0, totalNftEth: 0, totalMerchTwd: 0, byNftStatus: [], byMerchStatus: [] };
+  const customers      = data.customers      ?? { total: 0, withOrders: 0 };
+  const nft            = data.nft            ?? { total: 0, orderedCount: 0, byDeliveryStatus: [] };
+  const products       = data.products       ?? { total: 0, active: 0, orderedCount: 0 };
+  const reconciliation = data.reconciliation ?? { byStatus: [] };
   const nftOrdered  = nft.orderedCount  ?? 0;
   const prodOrdered = products.orderedCount ?? 0;
 

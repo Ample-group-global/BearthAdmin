@@ -95,8 +95,8 @@ export default function TechDashboardPage() {
         wave1End: Number(wave1End),
         ethBalance: parseFloat(ethers.formatEther(balance)).toFixed(4),
       });
-    } catch (e: any) {
-      setError(e?.shortMessage || e?.message || "Failed to read contract");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to read contract");
     } finally {
       setLoading(false);
     }
@@ -108,7 +108,7 @@ export default function TechDashboardPage() {
         const d = await res.json();
         setWlCount(d.addresses?.length ?? null);
       }
-    } catch {}
+    } catch { /* whitelist count is non-critical; UI shows — */ }
   }, [activeChain]);
 
   useEffect(() => { fetchData(); }, [fetchData]);

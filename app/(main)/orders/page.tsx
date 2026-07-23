@@ -916,6 +916,7 @@ function OrdersPageInner() {
                           </button>
                         </div>
                       ) : (
+                        <div className="overflow-x-auto">
                         <>
                           <div className="flex items-center gap-3 px-4 py-2 text-[10px] font-bold uppercase tracking-wider"
                             style={{ color: "#9bafc5", background: "#fafafa", borderBottom: "1px solid #f3f4f6" }}>
@@ -993,6 +994,7 @@ function OrdersPageInner() {
                             </button>
                           </div>
                         </>
+                        </div>
                       )}
                     </div>
                   )}

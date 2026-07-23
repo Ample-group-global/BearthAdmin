@@ -170,7 +170,7 @@ export default function AuctionsPage() {
       {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: "Total", value: stats.total, color: "#41afeb" },
           { label: "Active", value: stats.active, color: "#d97706" },
@@ -188,6 +188,7 @@ export default function AuctionsPage() {
         {loading ? (
           <div className="p-8 text-center text-sm text-gray-400">Loading…</div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
@@ -248,6 +249,7 @@ export default function AuctionsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

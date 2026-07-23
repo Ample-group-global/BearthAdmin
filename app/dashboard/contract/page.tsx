@@ -220,8 +220,8 @@ export default function ContractPage() {
       setLiveWave1End(Number(wave1End));
       setLiveBalance(parseFloat(ethers.formatEther(balance)).toFixed(4));
       setSbtInput(Boolean(info.sbt_));
-    } catch (e: any) {
-      setLiveError("Could not read contract: " + (e?.shortMessage || e?.message || String(e)));
+    } catch (e: unknown) {
+      setLiveError("Could not read contract: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setLiveLoading(false);
     }
@@ -260,8 +260,8 @@ export default function ContractPage() {
       await tx.wait();
       set({ pending: false, hash: tx.hash, error: "", success: successMsg });
       fetchLive();
-    } catch (e: any) {
-      set({ pending: false, hash: "", error: e?.reason || e?.shortMessage || e?.message || String(e), success: "" });
+    } catch (e: unknown) {
+      set({ pending: false, hash: "", error: e instanceof Error ? e.message : String(e), success: "" });
     }
   };
 
@@ -338,7 +338,7 @@ export default function ContractPage() {
       const res = await fetch(httpUri);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setCheckMeta(await res.json());
-    } catch (e: any) { setCheckError(e?.message || String(e)); }
+    } catch (e: unknown) { setCheckError(e instanceof Error ? e.message : String(e)); }
     finally { setCheckLoading(false); }
   };
 

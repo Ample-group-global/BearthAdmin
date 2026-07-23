@@ -67,6 +67,7 @@ const ICONS: Record<string, React.ReactNode> = {
   "trending-down": <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>,
   lock: <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
   gift: <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h3.5M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg>,
+  clock: <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 7v5l3 3" /></svg>,
 };
 
 const DEFAULT_ICON = <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M5 12h14" /></svg>;
@@ -80,20 +81,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [ctx, setCtx] = useState<UserCtx | null>(null);
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
       .then(r => r.json())
       .then(data => {
         if (!data.authenticated) { router.push("/login"); return; }
-        setCtx({
-          role: data.role,
-          roleName: data.roleName,
-          menus: (data.menus ?? []).sort((a: MenuItem, b: MenuItem) => a.sortOrder - b.sortOrder),
-        });
+        const menus = (data.menus ?? []).sort((a: MenuItem, b: MenuItem) => a.sortOrder - b.sortOrder);
+        setCtx({ role: data.role, roleName: data.roleName, menus });
+        setOpenSections(new Set(menus.map((m: MenuItem) => m.module ?? "").filter(Boolean)));
       })
       .catch(() => router.push("/login"));
   }, [router]);
+
+  const toggleSection = (mod: string) => {
+    setOpenSections(prev => {
+      const next = new Set(prev);
+      if (next.has(mod)) next.delete(mod); else next.add(mod);
+      return next;
+    });
+  };
 
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -189,12 +197,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <div className="mx-1.5 my-2" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }} />
                 )}
                 {!collapsed && (
-                  <p className={`px-3 ${idx > 0 ? "pt-3" : "pt-1"} pb-1.5 text-[9px] font-bold uppercase tracking-widest`}
-                    style={{ color: "rgba(255,255,255,0.2)" }}>
-                    {sectionLabel}
-                  </p>
+                  <button
+                    onClick={() => toggleSection(mod)}
+                    className={`w-full flex items-center justify-between px-2.5 mx-1 rounded-md ${idx > 0 ? "mt-3" : "mt-1"} mb-1 py-1 transition-colors duration-150`}
+                    style={{ color: "rgba(255,255,255,0.72)" }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "#fff"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.72)"; }}
+                  >
+                    <span className="text-[11px] font-semibold uppercase tracking-wide">{sectionLabel}</span>
+                    <svg
+                      className="w-3 h-3 flex-shrink-0 transition-transform duration-200"
+                      style={{ transform: openSections.has(mod) ? "rotate(0deg)" : "rotate(-90deg)" }}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
                 )}
-                {items.map(item => {
+                {(collapsed || openSections.has(mod)) && items.map(item => {
                   const active = isActive(item.href);
                   return (
                     <div key={item.href} className="relative group px-1.5 mb-0.5">
@@ -205,14 +225,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           padding: collapsed ? "7px 0" : "6px 8px",
                           justifyContent: collapsed ? "center" : undefined,
                           background: active ? "rgba(65,175,235,0.15)" : "transparent",
-                          color: active ? "#fff" : "rgba(255,255,255,0.52)",
+                          color: active ? "#fff" : "rgba(255,255,255,0.68)",
                           borderLeft: active && !collapsed ? "2px solid #41afeb" : "2px solid transparent",
                         }}
-                        onMouseEnter={e => { if (!active) { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "rgba(255,255,255,0.85)"; } }}
-                        onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.52)"; } }}
+                        onMouseEnter={e => { if (!active) { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "#fff"; } }}
+                        onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.68)"; } }}
                         title={collapsed ? item.label : undefined}
                       >
-                        <span style={{ color: active ? "#41afeb" : "rgba(255,255,255,0.35)", flexShrink: 0 }}>
+                        <span style={{ color: active ? "#41afeb" : "rgba(255,255,255,0.5)", flexShrink: 0 }}>
                           <NavIcon name={item.icon} />
                         </span>
                         {!collapsed && <span className="truncate">{item.label}</span>}
@@ -231,6 +251,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             );
           })}
+
         </nav>
 
         {/* Sign out */}

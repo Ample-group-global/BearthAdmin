@@ -6,22 +6,26 @@ import { OkBanner } from "@/components/nft/OkBanner";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
 
 interface DutchWave {
-  wave_num: number;
-  start_price_eth: string;
-  floor_price_eth: string;
-  decrement_eth: string;
-  interval_secs: number;
-  status: string;
+  wave_num:        number;
+  name:            string;
+  start_price_eth: string | null;
+  floor_price_eth: string | null;
+  decrement_eth:   string | null;
+  interval_secs:   number | null;
+  status:          string;
+  quantity:        number | null;
+  sold_count:      number | null;
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status }: { status: string | null | undefined }) {
   const cfg: Record<string, { bg: string; color: string }> = {
     active:        { bg: "rgba(65,175,235,0.12)",  color: "#41afeb" },
     floor_reached: { bg: "rgba(22,163,74,0.1)",    color: "#16a34a" },
     disabled:      { bg: "rgba(156,163,175,0.12)", color: "#9ca3af" },
   };
-  const c = cfg[status] ?? cfg.disabled;
-  const label = status === "floor_reached" ? "Floor Reached" : status.charAt(0).toUpperCase() + status.slice(1);
+  const s = status ?? "disabled";
+  const c = cfg[s] ?? cfg.disabled;
+  const label = s === "floor_reached" ? "Floor Reached" : s.charAt(0).toUpperCase() + s.slice(1);
   return (
     <span className="px-2 py-0.5 rounded-full text-xs font-semibold"
       style={{ background: c.bg, color: c.color }}>
@@ -115,13 +119,21 @@ export default function DutchAuctionPage() {
     load();
   }
 
-  const activeCount  = waves.filter(w => w.status === "active").length;
-  const lowestPrice  = waves.length > 0
-    ? Math.min(...waves.map(w => parseFloat(currentPrices[w.wave_num] ?? w.floor_price_eth))).toFixed(4)
-    : "—";
-  const highestStart = waves.length > 0
-    ? Math.max(...waves.map(w => parseFloat(w.start_price_eth))).toFixed(4)
-    : "—";
+  const activeCount = waves.filter(w => w.status === "active").length;
+
+  const lowestPrice = (() => {
+    const vals = waves
+      .map(w => parseFloat(currentPrices[w.wave_num] ?? w.floor_price_eth ?? ""))
+      .filter(v => !isNaN(v));
+    return vals.length > 0 ? Math.min(...vals).toFixed(4) : "—";
+  })();
+
+  const highestStart = (() => {
+    const vals = waves
+      .map(w => parseFloat(w.start_price_eth ?? ""))
+      .filter(v => !isNaN(v));
+    return vals.length > 0 ? Math.max(...vals).toFixed(4) : "—";
+  })();
 
   const Overlay = ({ children }: { children: React.ReactNode }) => (
     <div className="fixed inset-0 z-50 flex items-center justify-center"
@@ -154,11 +166,11 @@ export default function DutchAuctionPage() {
       {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: "Active Dutch Waves",    value: activeCount,  color: "#41afeb" },
-          { label: "Lowest Current Price",  value: waves.length > 0 ? `${lowestPrice} ETH` : "—", color: "#16a34a" },
-          { label: "Highest Start Price",   value: waves.length > 0 ? `${highestStart} ETH` : "—", color: "#d97706" },
+          { label: "Active Dutch Waves",   value: activeCount,                                                          color: "#41afeb" },
+          { label: "Lowest Current Price", value: lowestPrice !== "—" ? `${lowestPrice} ETH` : "—",  color: "#16a34a" },
+          { label: "Highest Start Price",  value: highestStart !== "—" ? `${highestStart} ETH` : "—", color: "#d97706" },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-2xl shadow-sm p-4" style={{ border: "1px solid #e5e7eb" }}>
             <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{s.label}</div>
@@ -172,6 +184,7 @@ export default function DutchAuctionPage() {
         {loading ? (
           <div className="p-8 text-center text-sm text-gray-400">Loading…</div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
@@ -185,11 +198,13 @@ export default function DutchAuctionPage() {
                 <tr><td colSpan={8} className="text-center py-8 text-sm text-gray-400">No Dutch auction waves configured yet</td></tr>
               ) : waves.map(w => (
                 <tr key={w.wave_num} className="border-b border-gray-50 hover:bg-gray-50/50">
-                  <td className="px-3 py-3 text-sm font-bold" style={{ color: "#24315f" }}>Wave {w.wave_num}</td>
-                  <td className="px-3 py-3 text-sm text-gray-700">{w.start_price_eth} ETH</td>
-                  <td className="px-3 py-3 text-sm text-gray-700">{w.floor_price_eth} ETH</td>
-                  <td className="px-3 py-3 text-sm text-gray-700">{w.decrement_eth} ETH</td>
-                  <td className="px-3 py-3 text-sm text-gray-500">{w.interval_secs}s</td>
+                  <td className="px-3 py-3 text-sm font-bold" style={{ color: "#24315f" }}>
+                    Wave {w.wave_num}{w.name ? ` — ${w.name}` : ""}
+                  </td>
+                  <td className="px-3 py-3 text-sm text-gray-700">{w.start_price_eth != null ? `${w.start_price_eth} ETH` : "—"}</td>
+                  <td className="px-3 py-3 text-sm text-gray-700">{w.floor_price_eth != null ? `${w.floor_price_eth} ETH` : "—"}</td>
+                  <td className="px-3 py-3 text-sm text-gray-700">{w.decrement_eth != null ? `${w.decrement_eth} ETH` : "—"}</td>
+                  <td className="px-3 py-3 text-sm text-gray-500">{w.interval_secs != null ? `${w.interval_secs}s` : "—"}</td>
                   <td className="px-3 py-3 text-sm font-semibold" style={{ color: "#41afeb" }}>
                     {currentPrices[w.wave_num] != null ? `${currentPrices[w.wave_num]} ETH` : "—"}
                   </td>
@@ -207,6 +222,7 @@ export default function DutchAuctionPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
