@@ -100,7 +100,7 @@ export default function StakingPage() {
       setCfgForm({
         stakingContractAddress: cfg.stakingContractAddress ?? "",
         rewardTokenAddress:     cfg.rewardTokenAddress     ?? "",
-        pointsPerDayCommon:     String(cfg.pointsPerDayCommon),
+        pointsPerDayCommon:     String(cfg.pointsPerDayCommon ?? 100),
         stakingEnabled:         cfg.stakingEnabled,
       });
       setGenesisBps(String(cfg.genesisBonusBps));
@@ -334,7 +334,7 @@ export default function StakingPage() {
                 placeholder="100"
               />
               <p className="text-[10px] mt-1" style={{ color: "#9bafc5" }}>
-                Rare = 2×, Epic = 3×, Legendary = 4× this value. Genesis Wave 1 gets +{config ? Math.round(config.genesisBonusBps / 100) : 50}% bonus.
+                Rare = 2×, Epic = 3×, Legendary = 4× this value. Genesis Wave 1 gets +{config ? Math.round((config.genesisBonusBps ?? 0) / 100) : 50}% bonus.
               </p>
             </div>
             <div className="flex flex-col justify-between">
@@ -708,8 +708,8 @@ export default function StakingPage() {
           <div className="flex flex-wrap gap-x-6 gap-y-1" style={{ color: "#6b7280" }}>
             <span>Last updated: <strong style={{ color: "#374151" }}>{new Date(config.updatedAt).toLocaleString()}</strong></span>
             {config.syncedAt && <span>Last on-chain sync: <strong style={{ color: "#374151" }}>{new Date(config.syncedAt).toLocaleString()}</strong></span>}
-            <span>Points/day (common): <strong style={{ color: "#374151" }}>{config.pointsPerDayCommon}</strong></span>
-            <span>Genesis bonus: <strong style={{ color: "#374151" }}>{config.genesisBonusBps / 100}%</strong></span>
+            <span>Points/day (common): <strong style={{ color: "#374151" }}>{config.pointsPerDayCommon ?? 100}</strong></span>
+            <span>Genesis bonus: <strong style={{ color: "#374151" }}>{(config.genesisBonusBps ?? 0) / 100}%</strong></span>
             <span>Reward rate: <strong style={{ color: "#374151" }}>{config.rewardTokenRate} pts / BRT</strong></span>
           </div>
         </div>
