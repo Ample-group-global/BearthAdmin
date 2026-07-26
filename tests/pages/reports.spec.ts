@@ -62,6 +62,8 @@ test.describe("Admin Overview — Live DB Summary (from /)", () => {
     await page.goto("/", { timeout: 90000 });
     await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
     await waitForAppShell(page);
+    // Wait for the overview data spinner to clear before asserting stat cards
+    await page.locator('text=Loading overview').waitFor({ state: 'detached', timeout: 45000 }).catch(() => {});
     // Overview shows stat cards with DB data: Total Orders, Total Customers, NFT Items in Stock, Products
     await expect(
       page.locator('text=/Total Orders|TOTAL ORDERS/i').first()

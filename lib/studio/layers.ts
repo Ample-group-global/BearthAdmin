@@ -174,6 +174,22 @@ export function saveTraitName(folder: string, stem: string, name: string | null)
   clearLayersCache();
 }
 
+// ── Weights ──────────────────────────────────────────────────────────────────
+
+export function getWeights(): Record<string, Record<string, number>> {
+  const file = path.join(getLayersDir(), '.weights.json');
+  try {
+    if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {}
+  return {};
+}
+
+export function saveWeights(weights: Record<string, Record<string, number>>) {
+  const dir = getLayersDir();
+  if (!fs.existsSync(dir)) return;
+  fs.writeFileSync(path.join(dir, '.weights.json'), JSON.stringify(weights), 'utf8');
+}
+
 // ── Conflict / force rules ───────────────────────────────────────────────────
 
 export function getConflicts() {

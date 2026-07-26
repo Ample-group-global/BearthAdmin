@@ -51,13 +51,13 @@ function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onC
           <input
             className="range-slider"
             type="range"
-            min="0" max="20" step="0.05"
-            value={Math.min(weight, 20)}
+            min="0" max="100" step="0.5"
+            value={Math.min(weight, 100)}
             onChange={e => onChange(asset.stem, parseFloat(e.target.value))}
             style={{ width: '100%', marginBottom: 4 }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--xdim)' }}>
-            <span>0 (disabled)</span><span>10</span><span>20 (max)</span>
+            <span>0 (disabled)</span><span>50</span><span>100 (max)</span>
           </div>
 
           {asset.rel && (
@@ -128,8 +128,8 @@ export default function AssetCard({ asset, weight, totalWeight, supply, onChange
           <input
             className="range-slider"
             type="range"
-            min="0" max="20" step="0.05"
-            value={Math.min(weight, 20)}
+            min="0" max="100" step="0.5"
+            value={Math.min(weight, 100)}
             onChange={e => onChange(asset.stem, parseFloat(e.target.value))}
           />
         </div>

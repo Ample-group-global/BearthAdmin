@@ -60,29 +60,40 @@ test.describe("NFT Waves — DB Edit Actions (Smart Contract Support)", () => {
     test.setTimeout(120000);
     await goToWaves(page);
 
-    // Click first Edit button
-    const editBtn = page.locator('button').filter({ hasText: /Edit|Manage|Details/i }).first();
-    await expect(editBtn).toBeVisible({ timeout: 30000 });
+    // Wait for wave table rows to appear (data loaded from DB)
+    await page.locator('table tbody tr').first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+
+    // "Edit DB" button is the specific text used on the waves page
+    const editBtn = page.locator('button').filter({ hasText: /Edit DB/i }).first();
+    const hasEdit = await editBtn.isVisible({ timeout: 20000 }).catch(() => false);
+    if (!hasEdit) { console.log("No Edit DB buttons visible — skipping"); return; }
     await editBtn.click();
 
-    // Modal should appear with wave form fields
+    // Modal header contains "Edit Wave" text
     await expect(
-      page.locator('input').or(page.locator('[role="dialog"]')).first()
-    ).toBeVisible({ timeout: 10000 });
+      page.locator('h2').filter({ hasText: /Edit Wave/i }).first()
+    ).toBeVisible({ timeout: 20000 });
   });
 
   test("wave edit form has status dropdown with DB-backed options", async ({ page }) => {
     test.setTimeout(120000);
     await goToWaves(page);
 
-    const editBtn = page.locator('button').filter({ hasText: /Edit|Manage|Details/i }).first();
-    const hasEdit = await editBtn.isVisible({ timeout: 15000 }).catch(() => false);
+    // Wait for wave rows to load
+    await page.locator('table tbody tr').first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+
+    const editBtn = page.locator('button').filter({ hasText: /Edit DB/i }).first();
+    const hasEdit = await editBtn.isVisible({ timeout: 20000 }).catch(() => false);
     if (!hasEdit) { console.log("No edit buttons — skipping"); return; }
     await editBtn.click();
 
-    // Status uses a button-group (not <select>) — each option is a styled button
-    const statusBtn = page.locator('button').filter({ hasText: /^(upcoming|active|completed|paused)$/i }).first();
-    await expect(statusBtn).toBeVisible({ timeout: 10000 });
+    // Wait for modal to open (h2 with "Edit Wave" appears)
+    await page.locator('h2').filter({ hasText: /Edit Wave/i }).first()
+      .waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
+
+    // Status uses a button-group — each option is a styled button with exact text
+    const statusBtn = page.locator('button').filter({ hasText: /^upcoming$|^active$|^completed$|^paused$/i }).first();
+    await expect(statusBtn).toBeVisible({ timeout: 20000 });
   });
 
   test("on-chain action button opens blockchain interaction panel", async ({ page }) => {

@@ -191,7 +191,7 @@ export default function SeasonsPage() {
                     </span>
                   </div>
                   <div className="text-xs text-gray-400 mt-0.5">
-                    Waves {s.wave_numbers.join(", ")} · {s.price_eth} ETH
+                    Waves {(s.wave_numbers ?? []).join(", ")} · {s.price_eth} ETH
                     {s.price_twd ? ` / NT$${s.price_twd}` : ""}
                     {s.discount_pct ? ` · ${s.discount_pct}% off` : ""}
                   </div>

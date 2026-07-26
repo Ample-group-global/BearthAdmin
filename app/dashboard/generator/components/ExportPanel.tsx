@@ -20,12 +20,17 @@ function canvasToBlob(canvas: any, type: string): Promise<Blob> {
   return new Promise(res => canvas.toBlob(res, type));
 }
 
+// ── Tier colours ──────────────────────────────────────────────────────────────
+const TIER_COLOR: Record<string, string> = {
+  Legendary: '#F59E0B',
+  Epic:      '#A855F7',
+  Rare:      '#3B82F6',
+  Common:    '#6B7280',
+};
+
 // ── Rarity card ───────────────────────────────────────────────────────────────
 function RarityCard({ item, jobBitmaps, layers, canvasW, canvasH, onClick }) {
-  const tierColor =
-    item.rank <= Math.ceil(item.total * 0.01) ? '#F59E0B' :
-    item.rank <= Math.ceil(item.total * 0.05) ? '#A855F7' :
-    item.rank <= Math.ceil(item.total * 0.15) ? '#3B82F6' : '#6B7280';
+  const tierColor = TIER_COLOR[item.tier] ?? '#6B7280';
 
   const canvasRef = useRef(null);
   const cardRef   = useRef(null);
@@ -78,7 +83,10 @@ function RarityCard({ item, jobBitmaps, layers, canvasW, canvasH, onClick }) {
       </div>
       <div className="exp-nft-info">
         <div className="exp-nft-name">#{item.index}</div>
-        <div className="exp-nft-score" style={{ color: tierColor }}>Score: {item.score}</div>
+        <div style={{ display:'flex', gap:4, alignItems:'center', flexWrap:'wrap' }}>
+          <span className="exp-nft-score" style={{ color: tierColor }}>Score: {item.score}</span>
+          <span style={{ fontSize:10, fontWeight:700, color: tierColor, background:`${tierColor}22`, padding:'1px 5px', borderRadius:4 }}>{item.tier}</span>
+        </div>
       </div>
     </div>
   );
@@ -87,10 +95,7 @@ function RarityCard({ item, jobBitmaps, layers, canvasW, canvasH, onClick }) {
 // ── Popup ─────────────────────────────────────────────────────────────────────
 function NftPopup({ item, onClose }) {
   if (!item) return null;
-  const tierColor =
-    item.rank <= Math.ceil(item.total * 0.01) ? '#F59E0B' :
-    item.rank <= Math.ceil(item.total * 0.05) ? '#A855F7' :
-    item.rank <= Math.ceil(item.total * 0.15) ? '#3B82F6' : '#6B7280';
+  const tierColor = TIER_COLOR[item.tier] ?? '#6B7280';
   return (
     <div className="nft-popup-overlay" onClick={onClose}>
       <div className="nft-popup" onClick={e => e.stopPropagation()}>
@@ -100,8 +105,9 @@ function NftPopup({ item, onClose }) {
         </div>
         <div className="nft-popup-right">
           <div className="nft-popup-num">#{item.index}</div>
-          <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+          <div style={{ display:'flex', gap:8, marginBottom:10, alignItems:'center', flexWrap:'wrap' }}>
             <span style={{ fontSize:12, color: tierColor, fontWeight:700 }}>Rank #{item.rank}</span>
+            <span style={{ fontSize:11, fontWeight:700, color: tierColor, background:`${tierColor}22`, padding:'2px 7px', borderRadius:5 }}>{item.tier}</span>
             <span style={{ fontSize:12, color:'var(--dim)' }}>Score: {item.score}</span>
           </div>
           <div className="nft-popup-attrs-title">Attributes</div>
@@ -146,6 +152,19 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const [popup,     setPopup]     = useState(null);
   const [dlLoading, setDlLoading] = useState(false);
   const [error,     setError]     = useState('');
+
+  // ── Filebase IPFS push state ──────────────────────────────────────────────
+  const [fbBucket,  setFbBucket]  = useState('');
+  const [fbStatus,  setFbStatus]  = useState('idle'); // idle|checking|exists|not_found|creating|created|error
+  const [imgPhase,  setImgPhase]  = useState('idle'); // idle|preloading|uploading|done
+  const [imgDone,   setImgDone]   = useState(0);
+  const [imgCids,   setImgCids]   = useState({});
+  const [metaPhase, setMetaPhase] = useState('idle'); // idle|uploading|done
+  const [metaDone,  setMetaDone]  = useState(0);
+  const [metaCids,  setMetaCids]  = useState({});
+  const [showCids,  setShowCids]  = useState(false);
+  const [fbError,   setFbError]   = useState('');
+  const imgCidsRef = useRef({});
 
   const { getBlobUrl } = useLayerFiles();
 
@@ -228,7 +247,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     setRarityItems(scored);
     setPhase('done');
 
-    // Register in DB if collection exists (non-fatal)
+    // Persist generated items + rarity to DB (non-fatal)
     if (collectionId) {
       try {
         const jr = await fetch(`/api/nft-gen/collections/${collectionId}/jobs`, {
@@ -240,6 +259,27 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         const dbJobId = jdata?.job?.id ?? jdata?.id ?? null;
         if (dbJobId) {
           await fetch(`/api/nft-gen/jobs/${dbJobId}/start`, { method: 'POST' });
+
+          const ITEM_BATCH = 100;
+          for (let i = 0; i < scored.length; i += ITEM_BATCH) {
+            const chunk = scored.slice(i, i + ITEM_BATCH).map((item: any) => ({
+              editionNumber: item.index,
+              dnaHash: (item.attrs as any[]).map((a: any) => `${a.trait_type}:${a.value}`).join('|'),
+              score: item.score,
+              rank: item.rank,
+              tier: item.tier,
+              traits: (item.attrs as any[]).map((a: any) => ({
+                traitType: a.trait_type,
+                traitValue: a.value,
+              })),
+            }));
+            await fetch(`/api/nft-gen/jobs/${dbJobId}/items/batch`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ items: chunk }),
+            });
+          }
+
           await fetch(`/api/nft-gen/jobs/${dbJobId}/complete`, { method: 'POST' });
         }
       } catch {}
@@ -442,6 +482,173 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     cancelledRef.current = true;
   }
 
+  // ── Filebase helpers ──────────────────────────────────────────────────────
+
+  async function checkBucket() {
+    const name = fbBucket.trim();
+    if (!name) return;
+    setFbStatus('checking');
+    setFbError('');
+    try {
+      const r = await fetch(`/api/filebase/buckets/${encodeURIComponent(name)}`);
+      const d = await r.json();
+      setFbStatus(d.exists ? 'exists' : 'not_found');
+    } catch {
+      setFbStatus('error');
+      setFbError('Failed to reach Bearth-Filebase. Is it running on port 8002?');
+    }
+  }
+
+  async function createBucket() {
+    setFbStatus('creating');
+    setFbError('');
+    try {
+      const r = await fetch('/api/filebase/buckets', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ name: fbBucket.trim() }),
+      });
+      if (!r.ok) { const t = await r.text(); throw new Error(t); }
+      setFbStatus('created');
+    } catch (e: any) {
+      setFbStatus('error');
+      setFbError(e.message ?? 'Create bucket failed');
+    }
+  }
+
+  async function uploadImages() {
+    const bucket = fbBucket.trim();
+    if (!bucket || !allCombos.length) return;
+
+    setImgPhase('preloading');
+    setFbError('');
+    setImgDone(0);
+    setImgCids({});
+    imgCidsRef.current = {};
+
+    // Pre-load all unique layer images as ArrayBuffers once
+    const rels = [...new Set(
+      layers.flatMap(l => l.assets.filter(a => a.rel).map(a => a.rel))
+    )];
+    const imageBuffers = {};
+    await Promise.all(rels.map(async (rel) => {
+      try {
+        const src = getBlobUrl(rel) ?? `/api/layer-raw/${rel}`;
+        const res = await fetch(src);
+        if (res.ok) imageBuffers[rel] = await res.arrayBuffer();
+      } catch {}
+    }));
+
+    // Decode bitmaps
+    const bitmaps = {};
+    await Promise.all(Object.keys(imageBuffers).map(async (rel) => {
+      try { bitmaps[rel] = await createImageBitmap(new Blob([imageBuffers[rel]])); } catch {}
+    }));
+
+    setImgPhase('uploading');
+
+    // Concurrency-3 composite+upload pool
+    const CONCURRENCY = 3;
+    let cursor = 0;
+
+    async function runOne() {
+      while (cursor < allCombos.length) {
+        const idx   = cursor++;
+        const num   = idx + 1;
+        const combo = allCombos[idx];
+
+        const canvas = makeCanvas(targetW, targetH);
+        const ctx    = canvas.getContext('2d');
+        ctx.clearRect(0, 0, targetW, targetH);
+        for (const layer of layers) {
+          const pick = combo[layer.folder];
+          if (!pick?.rel) continue;
+          const bm = bitmaps[pick.rel];
+          if (bm) ctx.drawImage(bm, 0, 0, targetW, targetH);
+        }
+        const blob = await canvasToBlob(canvas, imgMime);
+
+        const fd = new FormData();
+        fd.append('file',   blob, `${num}.${imgExt}`);
+        fd.append('bucket', bucket);
+        fd.append('key',    `images/${num}.${imgExt}`);
+
+        try {
+          const r = await fetch('/api/filebase/image', { method: 'POST', body: fd });
+          if (r.ok) {
+            const d = await r.json();
+            imgCidsRef.current[num] = d.cid || '';
+            setImgCids(prev => ({ ...prev, [num]: d.cid || '' }));
+          }
+        } catch {}
+
+        setImgDone(prev => prev + 1);
+      }
+    }
+
+    await Promise.all(Array.from({ length: CONCURRENCY }, runOne));
+    setImgPhase('done');
+  }
+
+  async function uploadMetadata() {
+    const bucket = fbBucket.trim();
+    if (!bucket || !allCombos.length) return;
+
+    setMetaPhase('uploading');
+    setFbError('');
+    setMetaDone(0);
+    setMetaCids({});
+
+    const BATCH_SIZE     = 50;
+    const resolvedNameFmt = nameFormat || (collName ? `${collName} #{{id}}` : '#{{id}}');
+
+    for (let i = 0; i < supply; i += BATCH_SIZE) {
+      const end   = Math.min(i + BATCH_SIZE, supply);
+      const items = [];
+
+      for (let idx = i; idx < end; idx++) {
+        const num   = idx + 1;
+        const combo = allCombos[idx];
+        const attrs = layers
+          .filter(l => combo[l.folder] && combo[l.folder].rel !== null)
+          .map(l => ({ trait_type: l.label, value: combo[l.folder].name }));
+        const imgCid = imgCidsRef.current[num];
+
+        items.push({
+          key:     `metadata/${num}.json`,
+          content: JSON.stringify({
+            name:       applyNameFormat(resolvedNameFmt, num),
+            description,
+            image:      imgCid ? `ipfs://${imgCid}` : `ipfs://PLACEHOLDER_CID/${num}.${imgExt}`,
+            edition:    num,
+            attributes: attrs,
+          }, null, 2),
+        });
+      }
+
+      try {
+        const r = await fetch('/api/filebase/metadata', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ bucket, items }),
+        });
+        if (r.ok) {
+          const results = await r.json();
+          const update  = {};
+          results.forEach(({ key, cid }) => {
+            const n = parseInt(key.split('/').pop().replace('.json', ''), 10);
+            if (!isNaN(n)) update[n] = cid || '';
+          });
+          setMetaCids(prev => ({ ...prev, ...update }));
+        }
+      } catch {}
+
+      setMetaDone(prev => prev + items.length);
+    }
+
+    setMetaPhase('done');
+  }
+
   const pct = supply > 0 ? Math.min((progress / supply) * 100, 100) : 0;
 
   // ── Idle / settings ─────────────────────────────────────────────────────────
@@ -588,14 +795,15 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         {/* ── Tier legend ── */}
         <div style={{display:'flex', gap:16, padding:'8px 0', fontSize:11, color:'var(--dim)'}}>
           {[
-            {label:'Top 1%',  color:'#F59E0B'},
-            {label:'Top 5%',  color:'#A855F7'},
-            {label:'Top 15%', color:'#3B82F6'},
-            {label:'Common',  color:'#6B7280'},
+            {label:'Legendary', sub:'top 1%',  color:'#F59E0B'},
+            {label:'Epic',      sub:'top 5%',  color:'#A855F7'},
+            {label:'Rare',      sub:'top 15%', color:'#3B82F6'},
+            {label:'Common',    sub:'rest',     color:'#6B7280'},
           ].map(t => (
             <span key={t.label} style={{display:'flex', alignItems:'center', gap:4}}>
               <span style={{width:8, height:8, borderRadius:'50%', background:t.color, display:'inline-block'}} />
-              <span style={{color:t.color}}>{t.label}</span>
+              <span style={{color:t.color, fontWeight:600}}>{t.label}</span>
+              <span style={{color:'var(--dim)'}}>({t.sub})</span>
             </span>
           ))}
         </div>
@@ -614,6 +822,161 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
             />
           ))}
         </div>
+      </div>
+
+      {/* ── Push to Filebase IPFS ──────────────────────────────────────────── */}
+      <div className="export-card export-card-wide" style={{marginTop:16}}>
+        <div className="export-title" style={{fontSize:18}}>Push to Filebase IPFS</div>
+
+        {/* Bucket input + check/create */}
+        <div style={{display:'flex', gap:8, alignItems:'center', marginBottom:12, flexWrap:'wrap'}}>
+          <input
+            style={{background:'var(--bg0)', border:'1px solid var(--border)', color:'var(--text)', padding:'7px 12px', borderRadius:7, fontSize:13, minWidth:220}}
+            placeholder="Filebase bucket name"
+            value={fbBucket}
+            onChange={e => { setFbBucket(e.target.value); setFbStatus('idle'); }}
+          />
+          <button className="btn btn-ghost" onClick={checkBucket}
+            disabled={!fbBucket.trim() || fbStatus === 'checking'}>
+            {fbStatus === 'checking' ? 'Checking…' : 'Check Bucket'}
+          </button>
+          {fbStatus === 'not_found' && (
+            <button className="btn btn-primary" onClick={createBucket} disabled={fbStatus === 'creating'}>
+              + Create Bucket
+            </button>
+          )}
+          {fbStatus === 'creating' && <span style={{fontSize:12, color:'var(--dim)'}}>Creating…</span>}
+          {(fbStatus === 'exists' || fbStatus === 'created') && (
+            <span style={{fontSize:12, color:'#16a34a', fontWeight:600}}>✓ Bucket ready</span>
+          )}
+          {fbStatus === 'not_found' && (
+            <span style={{fontSize:12, color:'#d97706'}}>Bucket not found — create it first</span>
+          )}
+        </div>
+
+        {fbError && <div className="export-error" style={{marginBottom:12}}>❌ {fbError}</div>}
+
+        {/* Step 1 — Upload Images */}
+        <div style={{padding:12, background:'var(--bg0)', borderRadius:8, border:'1px solid var(--border)', marginBottom:10}}>
+          <div style={{fontWeight:600, fontSize:13, marginBottom:8}}>Step 1 — Upload Images</div>
+          <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
+            <button
+              className="btn btn-primary"
+              onClick={uploadImages}
+              disabled={!['exists','created'].includes(fbStatus) || imgPhase === 'preloading' || imgPhase === 'uploading'}
+            >
+              {imgPhase === 'preloading' ? 'Preloading images…'
+               : imgPhase === 'uploading' ? `Uploading… ${imgDone.toLocaleString()} / ${supply.toLocaleString()}`
+               : imgPhase === 'done'      ? '✓ Images Uploaded'
+               : '⬆ Upload Images'}
+            </button>
+            {(imgPhase === 'uploading' || imgPhase === 'done') && (
+              <span style={{fontSize:12, color:'var(--dim)'}}>
+                {imgDone.toLocaleString()} / {supply.toLocaleString()}
+              </span>
+            )}
+          </div>
+          {imgPhase !== 'idle' && (
+            <div className="prog-bg" style={{marginTop:8}}>
+              <div className="prog-fill" style={{width:`${supply > 0 ? Math.min((imgDone/supply)*100,100).toFixed(0) : 0}%`}} />
+            </div>
+          )}
+        </div>
+
+        {/* Step 2 — Upload Metadata */}
+        <div style={{padding:12, background:'var(--bg0)', borderRadius:8, border:'1px solid var(--border)', marginBottom:10}}>
+          <div style={{fontWeight:600, fontSize:13, marginBottom:8}}>Step 2 — Upload Metadata</div>
+          <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
+            <button
+              className="btn btn-primary"
+              onClick={uploadMetadata}
+              disabled={imgPhase !== 'done' || metaPhase === 'uploading'}
+            >
+              {metaPhase === 'uploading' ? `Uploading… ${metaDone.toLocaleString()} / ${supply.toLocaleString()}`
+               : metaPhase === 'done'    ? '✓ Metadata Uploaded'
+               : '⬆ Upload Metadata'}
+            </button>
+            {imgPhase !== 'done' && metaPhase === 'idle' && (
+              <span style={{fontSize:12, color:'var(--dim)'}}>Complete Step 1 first</span>
+            )}
+            {(metaPhase === 'uploading' || metaPhase === 'done') && (
+              <span style={{fontSize:12, color:'var(--dim)'}}>
+                {metaDone.toLocaleString()} / {supply.toLocaleString()}
+              </span>
+            )}
+          </div>
+          {metaPhase !== 'idle' && (
+            <div className="prog-bg" style={{marginTop:8}}>
+              <div className="prog-fill" style={{width:`${supply > 0 ? Math.min((metaDone/supply)*100,100).toFixed(0) : 0}%`}} />
+            </div>
+          )}
+        </div>
+
+        {/* CID Summary — only visible after metadata done */}
+        {metaPhase === 'done' && (
+          <div>
+            <div style={{display:'flex', gap:8, alignItems:'center', marginBottom:10, flexWrap:'wrap'}}>
+              <span style={{fontWeight:600, fontSize:14}}>CID Summary</span>
+              <button className="btn btn-ghost" style={{fontSize:11, padding:'3px 10px'}}
+                onClick={() => setShowCids(v => !v)}>
+                {showCids ? '▲ Hide Table' : '▼ Show CID Table'}
+              </button>
+              <button className="btn btn-ghost" style={{fontSize:11, padding:'3px 10px'}}
+                onClick={() => {
+                  const keys = Object.keys(imgCids).sort((a,b) => Number(a)-Number(b));
+                  const lines = keys.map(n => `${n}\t${imgCids[n]}\t${metaCids[n] || ''}`).join('\n');
+                  navigator.clipboard?.writeText(`#\tImage CID\tMetadata CID\n${lines}`);
+                }}>
+                📋 Copy All CIDs
+              </button>
+            </div>
+
+            <div style={{display:'flex', gap:12, marginBottom:12, flexWrap:'wrap'}}>
+              {[
+                { label:'Images Uploaded',   val: Object.keys(imgCids).length  },
+                { label:'Metadata Uploaded',  val: Object.keys(metaCids).length },
+              ].map(s => (
+                <div key={s.label} style={{padding:'8px 14px', background:'var(--bg0)', borderRadius:7, border:'1px solid var(--border)'}}>
+                  <div style={{fontSize:11, color:'var(--dim)'}}>{s.label}</div>
+                  <div style={{fontSize:22, fontWeight:700, color:'#41afeb'}}>{s.val.toLocaleString()}</div>
+                </div>
+              ))}
+              <div style={{padding:'8px 14px', background:'var(--bg0)', borderRadius:7, border:'1px solid var(--border)'}}>
+                <div style={{fontSize:11, color:'var(--dim)'}}>Bucket</div>
+                <div style={{fontSize:14, fontWeight:700, color:'var(--text)'}}>{fbBucket}</div>
+              </div>
+            </div>
+
+            {showCids && (
+              <div style={{overflowX:'auto', maxHeight:400, overflowY:'auto', border:'1px solid var(--border)', borderRadius:7}}>
+                <table style={{width:'100%', borderCollapse:'collapse', fontSize:11}}>
+                  <thead style={{position:'sticky', top:0, background:'var(--bg1)'}}>
+                    <tr>
+                      {['#','Image CID','Metadata CID'].map(h => (
+                        <th key={h} style={{padding:'6px 10px', textAlign:'left', color:'var(--dim)', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap'}}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.keys(imgCids).sort((a,b)=>Number(a)-Number(b)).map(n => (
+                      <tr key={n} style={{borderBottom:'1px solid var(--border)'}}>
+                        <td style={{padding:'4px 10px', color:'var(--dim)'}}>{n}</td>
+                        <td style={{padding:'4px 10px', fontFamily:'monospace', maxWidth:280, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                          {imgCids[n] || '—'}
+                        </td>
+                        <td style={{padding:'4px 10px', fontFamily:'monospace', maxWidth:280, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                          {metaCids[n] || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {popup && <NftPopup item={{...popup, total: supply}} onClose={() => setPopup(null)} />}

@@ -41,7 +41,15 @@ export default function BurnPage() {
 
   const [burnIds, setBurnIds]         = useState("");
   const [recipientWallet, setRecipientWallet] = useState("");
+  const [outputRarity, setOutputRarity] = useState<number>(2); // 1=Common,2=Rare,3=Epic,4=Legendary
   const [burnPreview, setBurnPreview] = useState<string | null>(null);
+
+  const OUTPUT_RARITY_OPTS = [
+    { value: 1, label: "Common" },
+    { value: 2, label: "Rare" },
+    { value: 3, label: "Epic" },
+    { value: 4, label: "Legendary" },
+  ];
 
   async function loadAll() {
     setLoading(true);
@@ -94,7 +102,7 @@ export default function BurnPage() {
       const r = await fetch("/api/nft-sell/burn/execute", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ burn_nft_record_ids: ids, recipient_wallet: recipientWallet }),
+        body: JSON.stringify({ burn_nft_record_ids: ids, recipient_wallet: recipientWallet, outputRarity }),
       });
       const d = await r.json();
       if (!r.ok) return setErr(d.error ?? "Burn failed");
@@ -194,6 +202,14 @@ export default function BurnPage() {
               <input type="text" value={recipientWallet}
                 onChange={e => { setRecipientWallet(e.target.value); setBurnPreview(null); }}
                 placeholder="0x..." style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Output Rarity (upgraded NFT tier)</label>
+              <select value={outputRarity} onChange={e => setOutputRarity(Number(e.target.value))} style={inputStyle}>
+                {OUTPUT_RARITY_OPTS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
             </div>
             <button onClick={previewBurn} className="w-full py-2 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700">
               Preview

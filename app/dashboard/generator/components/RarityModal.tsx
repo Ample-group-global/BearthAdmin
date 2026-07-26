@@ -1,7 +1,14 @@
 // @ts-nocheck
 'use client';
 import { useState, useMemo, useCallback } from 'react';
-import { getTier } from '../../../../lib/studio/tiers';
+import { getTier, TIER_PRESET_WEIGHTS } from '../../../../lib/studio/tiers';
+
+const TIER_LABELS = [
+  { label: 'Legendary', color: '#F59E0B' },
+  { label: 'Epic',      color: '#A855F7' },
+  { label: 'Rare',      color: '#3B82F6' },
+  { label: 'Common',    color: '#6B7280' },
+];
 
 export default function RarityModal({ layer, weights, supply, onSave, onDelete, onClose }) {
   // Local state for weights - starts from parent weights
@@ -20,10 +27,23 @@ export default function RarityModal({ layer, weights, supply, onSave, onDelete, 
   }
 
   function equalizeAll() {
-    const count = layer.assets.filter(a => (localWs[a.stem] ?? 1) > 0).length;
-    if (!count) return;
     const eq = {};
     layer.assets.forEach(a => { eq[a.stem] = (localWs[a.stem] ?? 1) > 0 ? 1 : 0; });
+    setLocalWs(eq);
+  }
+
+  function distributeByTier() {
+    // Sort assets by current weight ascending — rarest first
+    const sorted = [...layer.assets].sort((a, b) => (localWs[a.stem] ?? 1) - (localWs[b.stem] ?? 1));
+    const n = sorted.length;
+    const eq = { ...localWs };
+    sorted.forEach((a, i) => {
+      const pct = i / Math.max(n - 1, 1);
+      if (pct < 0.10)      eq[a.stem] = TIER_PRESET_WEIGHTS.Legendary;
+      else if (pct < 0.25) eq[a.stem] = TIER_PRESET_WEIGHTS.Epic;
+      else if (pct < 0.50) eq[a.stem] = TIER_PRESET_WEIGHTS.Rare;
+      else                 eq[a.stem] = TIER_PRESET_WEIGHTS.Common;
+    });
     setLocalWs(eq);
   }
 
@@ -48,6 +68,7 @@ export default function RarityModal({ layer, weights, supply, onSave, onDelete, 
         <div className="rm-toolbar">
           <span className="rm-trait-count">{layer.count} traits</span>
           <span className="rm-totalw">Total weight: {totalW.toFixed(1)}</span>
+          <button className="rm-tbtn" onClick={distributeByTier} title="Auto-assign weights: top 10% = Legendary (1), next 15% = Epic (3), next 25% = Rare (10), rest = Common (30)">✦ Distribute</button>
           <button className="rm-tbtn" onClick={equalizeAll}>Equalize</button>
           <button className="rm-tbtn" onClick={resetAll}>Reset</button>
         </div>
@@ -95,9 +116,9 @@ export default function RarityModal({ layer, weights, supply, onSave, onDelete, 
                       className="rm-slider"
                       type="range"
                       min="0"
-                      max="20"
-                      step="0.05"
-                      value={Math.min(w, 20)}
+                      max="100"
+                      step="0.5"
+                      value={Math.min(w, 100)}
                       onChange={e => setW(asset.stem, parseFloat(e.target.value))}
                     />
                     <input
@@ -109,14 +130,21 @@ export default function RarityModal({ layer, weights, supply, onSave, onDelete, 
                       onChange={e => setW(asset.stem, Math.max(0, parseFloat(e.target.value) || 0))}
                     />
                   </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'0 2px', marginTop:2 }}>
-                    {[
-                      { label:'Legendary', color:'#F59E0B' },
-                      { label:'Epic',      color:'#A855F7' },
-                      { label:'Rare',      color:'#3B82F6' },
-                      { label:'Common',    color:'#6B7280' },
-                    ].map(t => (
-                      <span key={t.label} style={{ fontSize:9, color: t.color, fontWeight:600, letterSpacing:'0.02em' }}>{t.label}</span>
+                  <div style={{ display:'flex', justifyContent:'space-between', padding:'0 2px', marginTop:4, gap:2 }}>
+                    {TIER_LABELS.map(t => (
+                      <button
+                        key={t.label}
+                        title={`Set to ${t.label} (weight ${TIER_PRESET_WEIGHTS[t.label]})`}
+                        onClick={() => setW(asset.stem, TIER_PRESET_WEIGHTS[t.label])}
+                        style={{
+                          fontSize:9, color: t.color, fontWeight:700, letterSpacing:'0.02em',
+                          background:'transparent', border:`1px solid ${t.color}44`,
+                          borderRadius:3, padding:'1px 4px', cursor:'pointer',
+                          opacity: tier.label === t.label ? 1 : 0.45,
+                        }}
+                      >
+                        {t.label}
+                      </button>
                     ))}
                   </div>
                 </div>

@@ -360,9 +360,10 @@ export default function NftPage() {
   };
 
   const handleConfirmDelivery = async (id: string) => {
-    const res = await fetch(`/api/nft/${id}/delivery`, {
+    const res = await fetch(`/api/nft/${id}`, {
       method: "PUT", credentials: "include",
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify({}),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "confirm_delivery" }),
     }).catch(() => null);
     if (!res || !res.ok) {
       const msg = res ? (await res.json().catch(() => ({}))).error : "Network error";

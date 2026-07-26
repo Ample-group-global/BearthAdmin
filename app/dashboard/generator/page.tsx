@@ -82,11 +82,17 @@ export default function Page() {
   }, [activeFolder]);
 
   useEffect(() => {
+    // Load layers, conflicts, and persisted weights in parallel
+    Promise.all([
+      fetch('/api/conflicts').then(r => r.json()).catch(() => []),
+      fetch('/api/weights').then(r => r.json()).catch(() => ({})),
+    ]).then(([conflictData, weightData]) => {
+      if (Array.isArray(conflictData)) setConflicts(conflictData);
+      if (weightData && typeof weightData === 'object' && !Array.isArray(weightData)) {
+        setWeights(prev => ({ ...prev, ...weightData }));
+      }
+    });
     loadLayers();
-    fetch('/api/conflicts')
-      .then(r => r.json())
-      .then((data: ConflictRule[]) => setConflicts(data))
-      .catch(() => { /* conflicts load silently — modal shows empty state */ });
 
     // Check if there's already a collection saved in session storage
     const savedId = sessionStorage.getItem('nft_collection_id');
@@ -98,10 +104,16 @@ export default function Page() {
   }, []);
 
   const handleWeightChange = useCallback((folder: string, stem: string, value: number) => {
-    setWeights(prev => ({
-      ...prev,
-      [folder]: { ...prev[folder], [stem]: value },
-    }));
+    setWeights(prev => {
+      const updated = { ...prev, [folder]: { ...prev[folder], [stem]: value } };
+      // Persist weights to disk (fire-and-forget)
+      fetch('/api/weights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      }).catch(() => {});
+      return updated;
+    });
   }, []);
 
   async function saveConflicts(rules: ConflictRule[]) {

@@ -189,9 +189,6 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
           }).catch(() => {});
         }
       }
-      if (replace) {
-        await fetch('/api/layers/clear', { method: 'POST' }).catch(() => {});
-      }
       const groups = {};
       for (const file of files) {
         if (!file.type.startsWith('image/') && !file.name.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) continue;

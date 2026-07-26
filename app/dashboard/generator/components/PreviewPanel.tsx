@@ -92,8 +92,16 @@ function NFTPopup({ item, onClose }) {
         <div className="nft-popup-right">
           <div className="nft-popup-num">#{item.index}</div>
           {item.rank && (
-            <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 8 }}>
-              Rarity rank #{item.rank}
+            <div style={{ fontSize: 12, marginBottom: 8, display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+              <span style={{ color: 'var(--dim)' }}>Rank #{item.rank}</span>
+              {item.tier && (
+                <span style={{
+                  fontSize: 10, fontWeight: 700,
+                  color: item.tier === 'Legendary' ? '#F59E0B' : item.tier === 'Epic' ? '#A855F7' : item.tier === 'Rare' ? '#3B82F6' : '#6B7280',
+                  background: item.tier === 'Legendary' ? '#F59E0B22' : item.tier === 'Epic' ? '#A855F722' : item.tier === 'Rare' ? '#3B82F622' : '#6B728022',
+                  padding: '1px 5px', borderRadius: 4,
+                }}>{item.tier}</span>
+              )}
             </div>
           )}
           <div className="nft-popup-attrs-title">Attributes</div>
@@ -221,12 +229,12 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
     await new Promise(r => setTimeout(r, 0));
 
     const combos  = generateAllCombos(supply, layers, weights, conflicts);
-    const rarity  = computeRarity(combos, layers); // [{ index, score, rank, attrs }]
+    const rarity  = computeRarity(combos, layers); // [{ index, score, rank, tier, attrs }]
 
     // Build scored items array (index is 1-based, matching rarity output)
     const scored = combos.map((combo, i) => {
       const r = rarity.find(x => x.index === i + 1);
-      return { combo, index: i + 1, score: r?.score ?? 0, rank: r?.rank ?? i + 1 };
+      return { combo, index: i + 1, score: r?.score ?? 0, rank: r?.rank ?? i + 1, tier: r?.tier ?? 'Common' };
     });
 
     scoredRef.current  = scored;
@@ -252,7 +260,7 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
       const rarity  = computeRarity(combos, layers);
       const scored  = combos.map((combo, i) => {
         const r = rarity.find(x => x.index === i + 1);
-        return { combo, index: i + 1, score: r?.score ?? 0, rank: r?.rank ?? i + 1 };
+        return { combo, index: i + 1, score: r?.score ?? 0, rank: r?.rank ?? i + 1, tier: r?.tier ?? 'Common' };
       });
       scoredRef.current = scored;
       rebuild(scored, s, filterRef.current);
