@@ -12,9 +12,9 @@ function rarityTier(pct: number) {
 
 const TIERS = [
   { label: 'Legendary', color: '#F59E0B', icon: '👑', preRange: '≤ 5%',  postRange: 'Top 1%',  desc: 'Ultra-rare. Highest collector value.' },
-  { label: 'Epic',      color: '#A855F7', icon: '💎', preRange: '≤ 15%', postRange: 'Top 5%',  desc: 'Very rare. Strong collector demand.' },
-  { label: 'Rare',      color: '#3B82F6', icon: '⭐', preRange: '≤ 35%', postRange: 'Top 15%', desc: 'Clearly limited. Noticeably scarce.' },
-  { label: 'Common',    color: '#6B7280', icon: '🔹', preRange: '> 35%', postRange: 'Rest',     desc: 'Most frequent. Baseline traits.' },
+  { label: 'Epic',      color: '#A855F7', icon: '🔮', preRange: '≤ 15%', postRange: 'Top 5%',  desc: 'Very rare. Strong collector demand.' },
+  { label: 'Rare',      color: '#3B82F6', icon: '🔷', preRange: '≤ 35%', postRange: 'Top 15%', desc: 'Clearly limited. Noticeably scarce.' },
+  { label: 'Common',    color: '#6B7280', icon: '🩶', preRange: '> 35%', postRange: 'Rest',     desc: 'Most frequent. Baseline traits.' },
 ];
 
 // ── Tier overview cards ───────────────────────────────────────────────────────
@@ -28,12 +28,13 @@ function TierOverview() {
       <div className="rt-tiers-grid">
         {TIERS.map(t => (
           <div key={t.label} className="rt-tier-card" style={{
-            borderColor: t.color + '66',
-            background: `linear-gradient(135deg, ${t.color}18 0%, ${t.color}08 100%)`,
+            borderColor: t.color,
+            background: `linear-gradient(145deg, ${t.color}22 0%, ${t.color}0a 100%)`,
+            ['--tc' as string]: t.color,
           }}>
             <div className="rt-tier-icon">{t.icon}</div>
             <div className="rt-tier-label" style={{ color: t.color }}>{t.label}</div>
-            <div className="rt-tier-ranges" style={{ borderColor: t.color + '33' }}>
+            <div className="rt-tier-ranges" style={{ borderColor: t.color + '55', background: 'rgba(255,255,255,0.55)' }}>
               <div className="rt-tier-range-row">
                 <span className="rt-tier-range-tag">Pre-gen</span>
                 <span className="rt-tier-range-val" style={{ color: t.color }}>{t.preRange}</span>
@@ -155,30 +156,8 @@ export default function RarityTab({ layers, weights, collection }) {
     return { layer, traits, totalW };
   }), [layers, weights, supply]);
 
-  const totalTraits    = analysis.reduce((s, a) => s + a.traits.filter(t => !t.isNone).length, 0);
-  const legendaryCount = analysis.reduce((s, a) => s + a.traits.filter(t => t.tier.label === 'Legendary').length, 0);
-  const epicCount      = analysis.reduce((s, a) => s + a.traits.filter(t => t.tier.label === 'Epic').length, 0);
-
   return (
     <div className="rt-page">
-
-      {/* ── Stats bar ── */}
-      {analysis.length > 0 && (
-        <div className="rt-stats-bar">
-          {[
-            { label: 'Layers',       value: analysis.length,        color: 'var(--accent2)' },
-            { label: 'Total Traits', value: totalTraits,             color: 'var(--text)'    },
-            { label: 'Legendary',    value: legendaryCount,          color: '#F59E0B'        },
-            { label: 'Epic',         value: epicCount,               color: '#A855F7'        },
-            { label: 'Supply',       value: supply.toLocaleString(), color: 'var(--accent)'  },
-          ].map(s => (
-            <div key={s.label} className="rt-stat">
-              <div className="rt-stat-value" style={{ color: s.color }}>{s.value}</div>
-              <div className="rt-stat-label">{s.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* ── Tier overview ── */}
       <TierOverview />
