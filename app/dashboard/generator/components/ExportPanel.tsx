@@ -215,42 +215,66 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     setRarityItems(scored);
     setPhase('done');
 
-    // Persist generated items + rarity to DB (non-fatal)
+    // Persist generated items + rarity to DB
     if (collectionId) {
+      let dbJobId: string | null = null;
       try {
         const jr = await fetch(`/api/nft-gen/collections/${collectionId}/jobs`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ editionSize: supply }),
         });
+        if (!jr.ok) throw new Error(`Job creation failed (${jr.status})`);
         const jdata = await jr.json();
-        const dbJobId = jdata?.job?.id ?? jdata?.id ?? null;
-        if (dbJobId) {
-          await fetch(`/api/nft-gen/jobs/${dbJobId}/start`, { method: 'POST' });
+        dbJobId = jdata?.job?.id ?? jdata?.id ?? null;
+        if (!dbJobId) throw new Error('Job ID not returned from server');
 
-          const ITEM_BATCH = 100;
-          for (let i = 0; i < scored.length; i += ITEM_BATCH) {
-            const chunk = scored.slice(i, i + ITEM_BATCH).map((item: any) => ({
-              editionNumber: item.index,
-              dnaHash: (item.attrs as any[]).map((a: any) => `${a.trait_type}:${a.value}`).join('|'),
-              score: item.score,
-              rank: item.rank,
-              tier: item.tier,
-              traits: (item.attrs as any[]).map((a: any) => ({
-                traitType: a.trait_type,
-                traitValue: a.value,
-              })),
-            }));
-            await fetch(`/api/nft-gen/jobs/${dbJobId}/items/batch`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ items: chunk }),
-            });
+        await fetch(`/api/nft-gen/jobs/${dbJobId}/start`, { method: 'POST' });
+
+        const ITEM_BATCH = 100;
+        for (let i = 0; i < scored.length; i += ITEM_BATCH) {
+          const chunk = scored.slice(i, i + ITEM_BATCH).map((item: any) => ({
+            editionNumber: item.index,
+            dnaHash: (item.attrs as any[]).map((a: any) => `${a.trait_type}:${a.value}`).join('|'),
+            score: item.score,
+            rank: item.rank,
+            tier: item.tier,
+            traits: (item.attrs as any[]).map((a: any) => ({
+              traitType: a.trait_type,
+              traitValue: a.value,
+            })),
+          }));
+          const br = await fetch(`/api/nft-gen/jobs/${dbJobId}/items/batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: chunk }),
+          });
+          if (!br.ok) {
+            const errData = await br.json().catch(() => ({}));
+            throw new Error(`Batch insert failed (${br.status}): ${(errData as any).error ?? 'server error'}`);
           }
-
-          await fetch(`/api/nft-gen/jobs/${dbJobId}/complete`, { method: 'POST' });
+          // Report real progress to DB as batches complete
+          const pctDone = Math.round(((i + chunk.length) / scored.length) * 100);
+          await fetch(`/api/nft-gen/jobs/${dbJobId}/progress`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ progress: pctDone }),
+          });
         }
-      } catch {}
+
+        await fetch(`/api/nft-gen/jobs/${dbJobId}/complete`, { method: 'POST' });
+      } catch (err: any) {
+        console.error('[DB persist] failed:', err?.message);
+        // Mark job as failed in DB so it doesn't appear as complete with 0 items
+        if (dbJobId) {
+          await fetch(`/api/nft-gen/jobs/${dbJobId}/fail`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ errorMessage: err?.message ?? 'Item batch insert failed' }),
+          }).catch(() => {});
+        }
+        setError(`Generation complete in browser, but failed to save to database: ${err?.message ?? 'unknown error'}. You can still download the ZIP.`);
+      }
     }
   }
 
