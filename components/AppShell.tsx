@@ -84,15 +84,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetch("/api/auth/me", { credentials: "include" })
-      .then(r => r.json())
-      .then(data => {
-        if (!data.authenticated) { router.push("/login"); return; }
+    let mounted = true;
+    async function checkAuth() {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" });
+        const data = await res.json();
+        if (!mounted) return;
+        if (!data.authenticated) {
+          const reason = res.status === 503 ? "service_unavailable" : "session_expired";
+          router.push(`/login?reason=${reason}`);
+          return;
+        }
         const menus = (data.menus ?? []).sort((a: MenuItem, b: MenuItem) => a.sortOrder - b.sortOrder);
         setCtx({ role: data.role, roleName: data.roleName, menus });
         setOpenSections(new Set(menus.map((m: MenuItem) => m.module ?? "").filter(Boolean)));
-      })
-      .catch(() => router.push("/login"));
+      } catch {
+        if (mounted) router.push("/login?reason=network_error");
+      }
+    }
+    checkAuth();
+    return () => { mounted = false; };
   }, [router]);
 
   const toggleSection = (mod: string) => {
