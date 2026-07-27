@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from 'react';
 import JSZip from 'jszip';
 import { generateAllCombos, computeRarity, applyNameFormat } from '../../../../lib/studio/combos';
-import { useLayerFiles } from '../LayerFilesContext';
 import NftPopup from './NftPopup';
 
 const BATCH = 64; // fallback batch size when Web Workers not available
@@ -137,7 +136,6 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const [fbError,   setFbError]   = useState('');
   const imgCidsRef = useRef({});
 
-  const { getBlobUrl } = useLayerFiles();
 
   const [rarityItems, setRarityItems] = useState<any[]>([]);
   const [allCombos,   setAllCombos]   = useState<any[]>([]);
@@ -183,9 +181,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
 
     await Promise.all(rels.map(async (rel) => {
       try {
-        const blobUrl = getBlobUrl(rel);
-        const src = blobUrl ?? `/api/layer-img/${rel}?w=${tW}&h=${tH}`;
-        const res = await fetch(src);
+        const res = await fetch(`/api/layer-img/${rel}?w=${tW}&h=${tH}`);
         if (res.ok) {
           const blob = await res.blob();
           try {
@@ -342,8 +338,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         setLoadMsg(`Loading images… 0 / ${rels.length}`);
         await Promise.all(rels.map(async (rel) => {
           try {
-            const src = getBlobUrl(rel) ?? `/api/layer-raw/${rel}`;
-            const res = await fetch(src);
+            const res = await fetch(`/api/layer-raw/${rel}`);
             if (res.ok) imageBuffers[rel] = await res.arrayBuffer();
           } catch {}
           setLoadMsg(`Loading images… ${++imgLoaded} / ${rels.length}`);
@@ -544,8 +539,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     const imageBuffers = {};
     await Promise.all(rels.map(async (rel) => {
       try {
-        const src = getBlobUrl(rel) ?? `/api/layer-raw/${rel}`;
-        const res = await fetch(src);
+        const res = await fetch(`/api/layer-raw/${rel}`);
         if (res.ok) imageBuffers[rel] = await res.arrayBuffer();
       } catch {}
     }));

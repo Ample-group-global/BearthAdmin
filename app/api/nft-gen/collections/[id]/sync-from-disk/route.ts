@@ -36,35 +36,26 @@ export async function POST(
     return NextResponse.json({ error: "No layers found on disk." }, { status: 404 });
   }
 
-  const results: {
-    layerName: string;
-    layerId: string | null;
-    traitsUpserted: number;
-    traitsDeactivated: number;
-  }[] = [];
-
-  // ── Step 1: Upsert each layer + its traits ──────────────────────────────────
-  for (const diskLayer of diskLayers) {
+  // ── Step 1: Upsert all layers + traits in parallel ─────────────────────────
+  const results = await Promise.all(diskLayers.map(async (diskLayer) => {
     // Upsert layer — ON CONFLICT preserves user-configured weights/sort/rarity
     const layerData = await apiPost(token, `/api/nft-gen/collections/${collectionId}/layers`, {
-      name:             diskLayer.folder,
-      displayName:      diskLayer.label,
-      layerRarityPct:   (diskLayer as any).optional ? 80 : 100,
+      name:           diskLayer.folder,
+      displayName:    diskLayer.label,
+      layerRarityPct: (diskLayer as any).optional ? 80 : 100,
     });
 
     const layerId: string | null = layerData?.layer?.id ?? layerData?.id ?? null;
-    if (!layerId) {
-      results.push({ layerName: diskLayer.folder, layerId: null, traitsUpserted: 0, traitsDeactivated: 0 });
-      continue;
-    }
+    if (!layerId) return { layerName: diskLayer.folder, layerId: null, traitsUpserted: 0, traitsDeactivated: 0 };
 
     const realAssets = diskLayer.assets.filter((a: any) => a.rel !== null);
     const activeFilePaths: string[] = realAssets.map((a: any) => a.rel as string);
 
-    // Upsert traits in batches of 5 — ON CONFLICT preserves rarity_weight/tier
+    // Upsert traits in batches of 50 — ON CONFLICT preserves rarity_weight/tier
     let traitsUpserted = 0;
-    for (let i = 0; i < realAssets.length; i += 5) {
-      const batch = realAssets.slice(i, i + 5);
+    const TRAIT_BATCH = 50;
+    for (let i = 0; i < realAssets.length; i += TRAIT_BATCH) {
+      const batch = realAssets.slice(i, i + TRAIT_BATCH);
       await Promise.all(batch.map(async (asset: any) => {
         const r = await apiPost(token, `/api/nft-gen/layers/${layerId}/traits`, {
           name:            asset.name,
@@ -76,20 +67,20 @@ export async function POST(
       }));
     }
 
-    // Soft-delete traits that are no longer on disk for this layer
+    // Soft-delete traits no longer on disk
     const reconcileTraits = await apiPost(
       token,
       `/api/nft-gen/layers/${layerId}/traits/reconcile`,
       { activeFilePaths }
     );
 
-    results.push({
-      layerName:        diskLayer.folder,
+    return {
+      layerName:         diskLayer.folder,
       layerId,
       traitsUpserted,
       traitsDeactivated: reconcileTraits?.deactivated ?? 0,
-    });
-  }
+    };
+  }));
 
   // ── Step 2: Soft-delete layers no longer on disk ────────────────────────────
   const diskLayerNames = diskLayers.map((l) => l.folder);

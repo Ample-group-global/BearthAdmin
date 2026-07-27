@@ -2,11 +2,9 @@
 'use client';
 import { useState } from 'react';
 import { calcRarity } from '../../../../lib/studio/probability';
-import { useLayerFiles } from '../LayerFilesContext';
 
 function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onClose }) {
   const { prob, tier, pct, expected: exp } = calcRarity(weight, totalWeight, supply);
-  const { getBlobUrl } = useLayerFiles();
 
   return (
     <div className="card-modal-overlay" onClick={onClose}>
@@ -15,7 +13,7 @@ function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onC
 
         <div className="card-modal-img-wrap">
           {asset.rel ? (
-            <img src={getBlobUrl(asset.rel) ?? `/api/thumb/${asset.rel}`} alt={asset.stem} className="card-modal-img" />
+            <img src={`/api/thumb/${asset.rel}`} alt={asset.stem} className="card-modal-img" />
           ) : (
             <div className="card-modal-none">NONE</div>
           )}
@@ -78,7 +76,6 @@ function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onC
 export default function AssetCard({ asset, weight, totalWeight, supply, onChange, onDelete }) {
   const [open, setOpen] = useState(false);
   const { tier, pct } = calcRarity(weight, totalWeight, supply);
-  const { getBlobUrl } = useLayerFiles();
 
   function handleDelete(e) {
     e.stopPropagation();
@@ -96,7 +93,7 @@ export default function AssetCard({ asset, weight, totalWeight, supply, onChange
         <div className="thumb">
           {asset.rel ? (
             <img
-              src={getBlobUrl(asset.rel) ?? `/api/thumb/${asset.rel}`}
+              src={`/api/thumb/${asset.rel}`}
               alt={asset.stem}
               loading="lazy"
               onError={e => {
