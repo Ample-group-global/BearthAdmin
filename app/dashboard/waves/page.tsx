@@ -99,9 +99,7 @@ function WaveCard({
   onRefresh: () => void;
 }) {
   const [recipientInput, setRecipientInput] = useState("");
-  const [txClose,   setTxClose]   = useState(TX0);
-  const [txForfeit, setTxForfeit] = useState(TX0);
-  const [showForfeit, setShowForfeit] = useState(false);
+  const [txClose, setTxClose] = useState(TX0);
 
   const status    = waveStatus(wave);
   const unsold    = (wave.quantity ?? WAVE_QTYS[wave.waveNumber]) - wave.soldCount;
@@ -128,24 +126,6 @@ function WaveCard({
       setTimeout(onRefresh, 3000);
     } catch (e: unknown) {
       setTxClose({ pending: false, hash: "", error: e instanceof Error ? e.message : String(e), success: "" });
-    }
-  };
-
-  const doForfeit = async () => {
-    setTxForfeit({ pending: true, hash: "", error: "", success: "" });
-    try {
-      const res = await fetch(`/api/nft-sell/waves/${wave.waveNumber}/forfeit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Request failed");
-      setTxForfeit({ pending: false, hash: data.txHash ?? "", error: "", success: `Wave ${wave.waveNumber} forfeited — ${unsold} unsold slot${unsold !== 1 ? "s" : ""} discarded` });
-      setShowForfeit(false);
-      setTimeout(onRefresh, 3000);
-    } catch (e: unknown) {
-      setTxForfeit({ pending: false, hash: "", error: e instanceof Error ? e.message : String(e), success: "" });
     }
   };
 
@@ -208,15 +188,11 @@ function WaveCard({
         {/* Closed info */}
         {status === "closed" && wave.closeAction && (
           <div className={`rounded-xl p-3 text-xs ${wave.closeAction === "treasury" ? "bg-indigo-50 border border-indigo-100" : "bg-slate-50 border border-slate-200"}`}>
-            {wave.closeAction === "treasury" ? (
-              <>
-                <p className="font-semibold text-indigo-800 mb-1">Treasury Close</p>
-                <p className="text-indigo-600">{wave.treasuryMintedCount} NFT{wave.treasuryMintedCount !== 1 ? "s" : ""} sent to:</p>
-                <p className="font-mono text-indigo-700 break-all mt-0.5">{wave.treasuryRecipient ?? "—"}</p>
-              </>
-            ) : (
-              <p className="text-slate-500">Closed — unsold supply forfeited ({wave.closeAction})</p>
-            )}
+            <>
+              <p className="font-semibold text-indigo-800 mb-1">Treasury Close</p>
+              <p className="text-indigo-600">{wave.treasuryMintedCount} NFT{wave.treasuryMintedCount !== 1 ? "s" : ""} sent to:</p>
+              <p className="font-mono text-indigo-700 break-all mt-0.5">{wave.treasuryRecipient ?? "—"}</p>
+            </>
           </div>
         )}
 
@@ -249,34 +225,6 @@ function WaveCard({
               {txClose.pending ? "Sending transaction…" : `Close & Send ${unsold} NFT${unsold !== 1 ? "s" : ""} to Wallet`}
             </button>
             <TxStatus tx={txClose} onClear={() => setTxClose(TX0)} />
-
-            {/* Forfeit option */}
-            {!showForfeit ? (
-              <button
-                onClick={() => setShowForfeit(true)}
-                className="w-full py-1.5 text-xs text-red-500 hover:text-red-700 underline"
-              >
-                Or permanently discard unsold supply (forfeit — no minting)
-              </button>
-            ) : (
-              <div className="border border-red-200 rounded-lg p-3 bg-red-50 space-y-2">
-                <p className="text-xs font-semibold text-red-800">Confirm Forfeit</p>
-                <p className="text-xs text-red-600">This discards {unsold} unsold slot{unsold !== 1 ? "s" : ""} permanently. No tokens will be minted. This cannot be undone.</p>
-                <div className="flex gap-2">
-                  <button onClick={() => setShowForfeit(false)} className="flex-1 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">
-                    Cancel
-                  </button>
-                  <button
-                    onClick={doForfeit}
-                    disabled={txForfeit.pending}
-                    className="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
-                  >
-                    {txForfeit.pending ? "Sending…" : "Confirm Forfeit"}
-                  </button>
-                </div>
-                <TxStatus tx={txForfeit} onClear={() => setTxForfeit(TX0)} />
-              </div>
-            )}
           </div>
         )}
 

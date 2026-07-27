@@ -280,12 +280,7 @@ export default function WavesPage() {
   };
 
   const handleCloseTreasury = () =>
-    chainOp("treasury", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/rollover`, {
-      method: "POST", credentials: "include",
-    }));
-
-  const handleCloseBurn = () =>
-    chainOp("burn", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/forfeit`, {
+    chainOp("treasury", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/treasury-close`, {
       method: "POST", credentials: "include",
     }));
 
@@ -986,12 +981,7 @@ export default function WavesPage() {
                     <button onClick={handleCloseTreasury} disabled={!!chainSaving}
                       className="flex-1 py-2.5 text-xs font-bold rounded-xl"
                       style={{ background: "rgba(22,163,74,0.08)", color: "#16a34a", border: "1px solid rgba(22,163,74,0.3)" }}>
-                      {chainSaving === "treasury" ? "Minting…" : "Mint Unsold → Treasury"}
-                    </button>
-                    <button onClick={handleCloseBurn} disabled={!!chainSaving}
-                      className="flex-1 py-2.5 text-xs font-bold rounded-xl"
-                      style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626", border: "1px solid #fecaca" }}>
-                      {chainSaving === "burn" ? "Burning…" : "Burn Unsold (permanent gaps)"}
+                      {chainSaving === "treasury" ? "Minting…" : "Mint Unsold → Any Wallet"}
                     </button>
                   </div>
                 </div>
