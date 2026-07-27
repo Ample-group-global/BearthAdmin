@@ -120,6 +120,9 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const [popup,     setPopup]     = useState(null);
   const [dlLoading, setDlLoading] = useState(false);
   const [error,     setError]     = useState('');
+  const [dbError,   setDbError]   = useState('');
+  const [dbSaving,  setDbSaving]  = useState(false);
+  const [dbSaved,   setDbSaved]   = useState(false);
 
   // ── Filebase IPFS push state ──────────────────────────────────────────────
   const [fbBucket,  setFbBucket]  = useState('');
@@ -214,67 +217,75 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     setAllCombos(combos);
     setRarityItems(scored);
     setPhase('done');
+    setDbError('');
+    setDbSaved(false);
+    if (collectionId) await persistToDb(scored);
+  }
 
-    // Persist generated items + rarity to DB
-    if (collectionId) {
-      let dbJobId: string | null = null;
-      try {
-        const jr = await fetch(`/api/nft-gen/collections/${collectionId}/jobs`, {
+  // ── Persist generated items to DB (can be retried independently) ─────────────
+  async function persistToDb(items: any[]) {
+    if (!collectionId || !items.length) return;
+    setDbSaving(true);
+    setDbSaved(false);
+    setDbError('');
+    let dbJobId: string | null = null;
+    try {
+      const jr = await fetch(`/api/nft-gen/collections/${collectionId}/jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ editionSize: items.length }),
+      });
+      if (!jr.ok) throw new Error(`Job creation failed (${jr.status})`);
+      const jdata = await jr.json();
+      dbJobId = jdata?.job?.id ?? jdata?.id ?? null;
+      if (!dbJobId) throw new Error('Job ID not returned from server');
+
+      await fetch(`/api/nft-gen/jobs/${dbJobId}/start`, { method: 'POST' });
+
+      const ITEM_BATCH = 100;
+      for (let i = 0; i < items.length; i += ITEM_BATCH) {
+        const chunk = items.slice(i, i + ITEM_BATCH).map((item: any) => ({
+          editionNumber: item.index,
+          dnaHash: (item.attrs as any[]).map((a: any) => `${a.trait_type}:${a.value}`).join('|'),
+          score: item.score,
+          rank: item.rank,
+          tier: item.tier,
+          traits: (item.attrs as any[]).map((a: any) => ({
+            traitType: a.trait_type,
+            traitValue: a.value,
+          })),
+        }));
+        const br = await fetch(`/api/nft-gen/jobs/${dbJobId}/items/batch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ editionSize: supply }),
+          body: JSON.stringify({ items: chunk }),
         });
-        if (!jr.ok) throw new Error(`Job creation failed (${jr.status})`);
-        const jdata = await jr.json();
-        dbJobId = jdata?.job?.id ?? jdata?.id ?? null;
-        if (!dbJobId) throw new Error('Job ID not returned from server');
-
-        await fetch(`/api/nft-gen/jobs/${dbJobId}/start`, { method: 'POST' });
-
-        const ITEM_BATCH = 100;
-        for (let i = 0; i < scored.length; i += ITEM_BATCH) {
-          const chunk = scored.slice(i, i + ITEM_BATCH).map((item: any) => ({
-            editionNumber: item.index,
-            dnaHash: (item.attrs as any[]).map((a: any) => `${a.trait_type}:${a.value}`).join('|'),
-            score: item.score,
-            rank: item.rank,
-            tier: item.tier,
-            traits: (item.attrs as any[]).map((a: any) => ({
-              traitType: a.trait_type,
-              traitValue: a.value,
-            })),
-          }));
-          const br = await fetch(`/api/nft-gen/jobs/${dbJobId}/items/batch`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ items: chunk }),
-          });
-          if (!br.ok) {
-            const errData = await br.json().catch(() => ({}));
-            throw new Error(`Batch insert failed (${br.status}): ${(errData as any).error ?? 'server error'}`);
-          }
-          // Report real progress to DB as batches complete
-          const pctDone = Math.round(((i + chunk.length) / scored.length) * 100);
-          await fetch(`/api/nft-gen/jobs/${dbJobId}/progress`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ progress: pctDone }),
-          });
+        if (!br.ok) {
+          const errData = await br.json().catch(() => ({}));
+          throw new Error(`Batch insert failed (${br.status}): ${(errData as any).error ?? 'server error'}`);
         }
-
-        await fetch(`/api/nft-gen/jobs/${dbJobId}/complete`, { method: 'POST' });
-      } catch (err: any) {
-        console.error('[DB persist] failed:', err?.message);
-        // Mark job as failed in DB so it doesn't appear as complete with 0 items
-        if (dbJobId) {
-          await fetch(`/api/nft-gen/jobs/${dbJobId}/fail`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ errorMessage: err?.message ?? 'Item batch insert failed' }),
-          }).catch(() => {});
-        }
-        setError(`Generation complete in browser, but failed to save to database: ${err?.message ?? 'unknown error'}. You can still download the ZIP.`);
+        const pctDone = Math.round(((i + chunk.length) / items.length) * 100);
+        await fetch(`/api/nft-gen/jobs/${dbJobId}/progress`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ progress: pctDone }),
+        });
       }
+
+      await fetch(`/api/nft-gen/jobs/${dbJobId}/complete`, { method: 'POST' });
+      setDbSaved(true);
+    } catch (err: any) {
+      console.error('[DB persist] failed:', err?.message);
+      if (dbJobId) {
+        await fetch(`/api/nft-gen/jobs/${dbJobId}/fail`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ errorMessage: err?.message ?? 'Item batch insert failed' }),
+        }).catch(() => {});
+      }
+      setDbError(err?.message ?? 'Unknown error saving to database');
+    } finally {
+      setDbSaving(false);
     }
   }
 
@@ -783,6 +794,53 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         </div>
 
         {error && <div className="export-error">❌ {error}</div>}
+
+        {/* ── DB save status ── */}
+        {dbSaving && (
+          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px', borderRadius:8, fontSize:13, background:'rgba(65,175,235,0.08)', border:'1px solid rgba(65,175,235,0.25)', color:'#41afeb', marginBottom:8 }}>
+            <svg className="w-4 h-4 animate-spin" style={{width:16,height:16,flexShrink:0}} fill="none" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" opacity={0.25}/>
+              <path fill="currentColor" opacity={0.75} d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            Saving {rarityItems.length.toLocaleString()} items to database…
+          </div>
+        )}
+        {dbError && !dbSaving && (
+          <div style={{ padding:'10px 14px', borderRadius:8, fontSize:13, background:'#fff1f1', border:'1px solid #fca5a5', color:'#dc2626', marginBottom:8 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+              <svg style={{width:16,height:16,flexShrink:0}} fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+              </svg>
+              <span style={{flex:1}}>Failed to save to database: {dbError}</span>
+              <button
+                onClick={() => persistToDb(rarityItems)}
+                style={{ flexShrink:0, padding:'4px 14px', borderRadius:6, border:'1.5px solid #dc2626', background:'#dc2626', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}
+                onMouseEnter={e => { e.currentTarget.style.background='#b91c1c'; }}
+                onMouseLeave={e => { e.currentTarget.style.background='#dc2626'; }}
+              >
+                ↺ Retry Save
+              </button>
+            </div>
+            <div style={{ marginTop:6, fontSize:12, color:'#7f1d1d', lineHeight:1.5 }}>
+              Your {rarityItems.length.toLocaleString()} generated NFTs are still in memory. You can{' '}
+              <button
+                onClick={downloadZip}
+                style={{ background:'none', border:'none', color:'#dc2626', fontWeight:700, textDecoration:'underline', cursor:'pointer', padding:0, fontSize:12 }}
+              >
+                Download ZIP
+              </button>{' '}
+              at any time. When the server recovers, click Retry Save to persist to the database.
+            </div>
+          </div>
+        )}
+        {dbSaved && (
+          <div style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:8, fontSize:12, background:'rgba(22,163,74,0.08)', border:'1px solid rgba(22,163,74,0.25)', color:'#16a34a', marginBottom:8 }}>
+            <svg style={{width:14,height:14,flexShrink:0}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/>
+            </svg>
+            {rarityItems.length.toLocaleString()} items saved to database
+          </div>
+        )}
 
         {/* ── Tier legend ── */}
         <div style={{display:'flex', gap:16, padding:'8px 0', fontSize:11, color:'var(--dim)'}}>
