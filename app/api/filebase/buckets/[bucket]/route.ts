@@ -1,17 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { proxyToApi } from "../../../../../lib/api-proxy";
 
-const fbBase = () => process.env.FILEBASE_URL ?? "http://localhost:8002";
-const fbKey  = () => process.env.FILEBASE_API_KEY ?? "";
-
-// HEAD the bucket on Filebase — returns { exists: bool, bucket }
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ bucket: string }> },
 ) {
   const { bucket } = await params;
-  const r = await fetch(`${fbBase()}/api/buckets/${encodeURIComponent(bucket)}`, {
-    method:  "HEAD",
-    headers: { "x-api-key": fbKey() },
-  });
-  return NextResponse.json({ bucket, exists: r.status === 200 });
+  return proxyToApi(req, `/api/filebase/buckets/${encodeURIComponent(bucket)}`);
 }

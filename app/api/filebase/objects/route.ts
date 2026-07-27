@@ -1,22 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { proxyToApi } from "../../../../lib/api-proxy";
 
-const fbBase = () => process.env.FILEBASE_URL ?? "http://localhost:8002";
-const fbKey  = () => process.env.FILEBASE_API_KEY ?? "";
-
-// List tracked NFT objects (with CIDs) from Bearth-Filebase DB.
-// Query params: bucket (required), prefix (optional)
+// GET /api/filebase/objects?bucket=&prefix=
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
-  const bucket = searchParams.get("bucket") ?? "";
-  const prefix = searchParams.get("prefix") ?? "";
+  const sp = new URLSearchParams();
+  const bucket = searchParams.get("bucket");
+  const prefix = searchParams.get("prefix");
+  if (bucket) sp.set("bucket", bucket);
+  if (prefix) sp.set("prefix", prefix);
+  return proxyToApi(req, "/api/filebase/objects", { searchParams: sp });
+}
 
-  const qs = new URLSearchParams({ bucket });
-  if (prefix) qs.set("prefix", prefix);
-
-  const r = await fetch(`${fbBase()}/api/nft-upload/objects?${qs}`, {
-    headers: { "x-api-key": fbKey() },
-  });
-
-  const data = await r.json();
-  return NextResponse.json(data, { status: r.status });
+// DELETE /api/filebase/objects  — single object: { bucket, key }
+export async function DELETE(req: NextRequest) {
+  const body = await req.json();
+  return proxyToApi(req, "/api/filebase/objects", { method: "DELETE", body });
 }

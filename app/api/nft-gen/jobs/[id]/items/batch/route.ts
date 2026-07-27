@@ -3,5 +3,6 @@ import { proxyToApi } from "../../../../../../../lib/api-proxy";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return proxyToApi(req, `/api/nft-gen/jobs/${id}/items/batch`, { method: "POST" });
+  const body = await req.json();
+  return proxyToApi(req, `/api/nft-gen/jobs/${id}/items/batch`, { method: "POST", body });
 }

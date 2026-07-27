@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSessionToken } from "../../../../lib/api-proxy";
 
-const fbBase = () => process.env.FILEBASE_URL ?? "http://localhost:8002";
-const fbKey  = () => process.env.FILEBASE_API_KEY ?? "";
+const API_BASE = process.env.BEARTH_API_URL!;
 
-// Forward a multipart/form-data image upload to Bearth-Filebase /api/nft-upload/image.
-// The FormData contains: file (binary), bucket (string), key (string).
 export async function POST(req: NextRequest) {
+  const token = getSessionToken(req);
+  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const formData = await req.formData();
 
-  const r = await fetch(`${fbBase()}/api/nft-upload/image`, {
-    method:  "POST",
-    headers: { "x-api-key": fbKey() },
-    body:    formData,
-  });
-
-  const data = await r.json();
-  return NextResponse.json(data, { status: r.status });
+  try {
+    const r = await fetch(`${API_BASE}/api/filebase/nft-upload/image`, {
+      method:  "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body:    formData,
+    });
+    const data = await r.json();
+    return NextResponse.json(data, { status: r.status });
+  } catch {
+    return NextResponse.json({ error: "API unreachable" }, { status: 503 });
+  }
 }
