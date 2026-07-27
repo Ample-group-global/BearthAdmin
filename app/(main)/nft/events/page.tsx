@@ -1,8 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
-import { ErrBanner } from "@/components/nft/ErrBanner";
-import { OkBanner } from "@/components/nft/OkBanner";
+import { ErrBanner, OkBanner } from "@/components/nft/Banner";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
 
 interface NftEvent {

@@ -2,9 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { ErrBanner } from "@/components/nft/ErrBanner";
-import { OkBanner } from "@/components/nft/OkBanner";
-import { TxBanner as SharedTxBanner } from "@/components/nft/TxBanner";
+import { ErrBanner, OkBanner, TxBanner as SharedTxBanner } from "@/components/nft/Banner";
+import { StatusBadge } from "@/components/nft/StatusBadge";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -51,24 +50,14 @@ const STATUS_OPTS = ["upcoming", "active", "completed", "paused"];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: string }) {
-  const cfg: Record<string, { bg: string; color: string; label: string }> = {
-    completed: { bg: "rgba(22,163,74,0.1)",   color: "#16a34a", label: "Completed"  },
-    active:    { bg: "rgba(65,175,235,0.12)",  color: "#41afeb", label: "Active"     },
-    upcoming:  { bg: "rgba(156,163,175,0.12)", color: "#9ca3af", label: "Upcoming"   },
-    paused:    { bg: "rgba(217,119,6,0.1)",    color: "#d97706", label: "Paused"     },
-    closed:    { bg: "rgba(22,163,74,0.1)",    color: "#16a34a", label: "Closed"     },
-    sold_out:  { bg: "rgba(124,58,237,0.1)",   color: "#7c3aed", label: "Sold Out"   },
-  };
-  const c = cfg[status] ?? cfg.upcoming;
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold"
-      style={{ background: c.bg, color: c.color }}>
-      <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: c.color }} />
-      {c.label}
-    </span>
-  );
-}
+const WAVE_COLORS = {
+  completed: { bg: "rgba(22,163,74,0.1)",    color: "#16a34a", label: "Completed" },
+  active:    { bg: "rgba(65,175,235,0.12)",  color: "#41afeb", label: "Active"    },
+  upcoming:  { bg: "rgba(156,163,175,0.12)", color: "#9ca3af", label: "Upcoming"  },
+  paused:    { bg: "rgba(217,119,6,0.1)",    color: "#d97706", label: "Paused"    },
+  closed:    { bg: "rgba(22,163,74,0.1)",    color: "#16a34a", label: "Closed"    },
+  sold_out:  { bg: "rgba(124,58,237,0.1)",   color: "#7c3aed", label: "Sold Out"  },
+};
 
 function SaleMethodBadge({ method, saleMethods }: { method: string; saleMethods: SaleMethod[] }) {
   const sm = saleMethods.find(s => s.code === method);
@@ -508,7 +497,7 @@ export default function WavesPage() {
 
                       <td style={{ padding: "10px 14px" }}>
                         <div className="space-y-1">
-                          <StatusBadge status={w.status} />
+                          <StatusBadge status={w.status} colorMap={WAVE_COLORS} dot />
                           {isClosed && w.closeAction && (
                             <span className="block text-xs" style={{ color: "#9bafc5" }}>
                               {w.closeAction === "treasury" ? "→ Treasury" : "→ Burned"}

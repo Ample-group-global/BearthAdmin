@@ -1,4 +1,4 @@
-import fs   from 'fs';
+import fs from 'fs';
 import path from 'path';
 import { DEFAULT_WEIGHTS } from './default-weights';
 
@@ -14,12 +14,12 @@ export function getActiveFolder(): string {
       const { folder } = JSON.parse(fs.readFileSync(LAYERS_CFG, 'utf8'));
       if (folder && typeof folder === 'string') return folder;
     }
-  } catch {}
+  } catch { }
   return 'BearthLayersv1';
 }
 
 export function setActiveFolder(folder: string) {
-  try { fs.writeFileSync(LAYERS_CFG, JSON.stringify({ folder }), 'utf8'); } catch {}
+  try { fs.writeFileSync(LAYERS_CFG, JSON.stringify({ folder }), 'utf8'); } catch { }
   clearLayersCache();
 }
 
@@ -118,7 +118,7 @@ export function getLayerOrder() {
   const file = path.join(getLayersDir(), '.layer-order.json');
   try {
     if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch {}
+  } catch { }
   return null;
 }
 
@@ -138,7 +138,7 @@ export function getLayerConfig(): { optional: string[] } {
       const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
       return { optional: Array.isArray(parsed.optional) ? parsed.optional : [] };
     }
-  } catch {}
+  } catch { }
   return { optional: [] };
 }
 
@@ -155,7 +155,7 @@ export function getTraitNames(): Record<string, Record<string, string>> {
   const file = path.join(getLayersDir(), '.trait-names.json');
   try {
     if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch {}
+  } catch { }
   return {};
 }
 
@@ -180,7 +180,7 @@ export function getWeights(): Record<string, Record<string, number>> {
   const file = path.join(getLayersDir(), '.weights.json');
   try {
     if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch {}
+  } catch { }
   return {};
 }
 
@@ -196,7 +196,7 @@ export function getConflicts() {
   const file = path.join(getLayersDir(), '.conflicts.json');
   try {
     if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch {}
+  } catch { }
   return [];
 }
 
@@ -225,13 +225,11 @@ function buildCache() {
   } else {
     orderedNames = diskFolders.slice().sort((a, b) => sortKey(a) - sortKey(b));
   }
-
   const { optional = [] } = getLayerConfig();
   const optionalSet = new Set(optional);
-  const traitNames  = getTraitNames();
-
+  const traitNames = getTraitNames();
   return orderedNames.flatMap(fname => {
-    const fpath     = path.join(layersDir, fname);
+    const fpath = path.join(layersDir, fname);
     const rawAssets = collectPngs(fpath, layersDir);
 
     if (optionalSet.has(fname) && !rawAssets.some(a => a.rel === null)) {
@@ -240,7 +238,7 @@ function buildCache() {
 
     const assets = rawAssets.map(({ stem, rel }) => ({
       stem,
-      name:          traitNames[fname]?.[stem] ?? getName(fname, stem, rel),
+      name: traitNames[fname]?.[stem] ?? getName(fname, stem, rel),
       rel,
       defaultWeight: DEFAULT_WEIGHTS[fname]?.[stem] ?? 1,
     }));
@@ -260,9 +258,9 @@ function buildCache() {
 
     if (!assets.length) return [];
     return [{
-      folder:   fname,
-      label:    deriveLabelFromFolder(fname),
-      count:    assets.length,
+      folder: fname,
+      label: deriveLabelFromFolder(fname),
+      count: assets.length,
       optional: optionalSet.has(fname),
       assets,
     }];

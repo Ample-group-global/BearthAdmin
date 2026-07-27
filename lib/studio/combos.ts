@@ -22,10 +22,10 @@ export function resolveConflicts(
   const layerMap = Object.fromEntries(layers.map(l => [l.folder, l]));
   const rules = conflicts
     .map(r => ({
-      type:       r.type ?? 'exclude',
-      ifLayer:    r.ifLayer,
-      ifTrait:    r.ifTrait,
-      thenLayer:  r.thenLayer,
+      type: r.type ?? 'exclude',
+      ifLayer: r.ifLayer,
+      ifTrait: r.ifTrait,
+      thenLayer: r.thenLayer,
       thenTraits: Array.isArray(r.thenTraits) ? r.thenTraits : (r.thenTrait ? [r.thenTrait] : []),
     }))
     .filter(r => r.thenTraits.length);
@@ -82,7 +82,7 @@ export function generateAllCombos(
 export function applyNameFormat(fmt: string, idx: number): string {
   if (!fmt) return `#${idx}`;
   if (fmt.includes('{{id}}')) return fmt.replace(/\{\{id\}\}/g, String(idx));
-  if (fmt.includes('{id}'))   return fmt.replace(/\{id\}/g,   String(idx));
+  if (fmt.includes('{id}')) return fmt.replace(/\{id\}/g, String(idx));
   if (/\d/.test(fmt)) return fmt.replace(/(\d+)(?=[^0-9]*$)/, m => String(idx).padStart(m.length, '0'));
   return `${fmt} #${idx}`;
 }
@@ -95,7 +95,6 @@ export function computeRarity(
 ): { index: number; score: number; rank: number; tier: RarityTier; attrs: { trait_type: string; value: string }[] }[] {
   const supply = allCombos.length;
   const traitCounts: Record<string, number> = {};
-
   for (const combo of allCombos) {
     for (const layer of layers) {
       const pick = combo[layer.folder];
@@ -118,7 +117,6 @@ export function computeRarity(
     }
     return { index: i + 1, score: Math.round(score * 100) / 100, attrs, rank: 0, tier: 'Common' as RarityTier };
   });
-
   // Sort by score DESC; use token index ASC as tiebreaker so every NFT gets a unique rank
   scored.sort((a, b) => b.score - a.score || a.index - b.index);
 
@@ -127,10 +125,10 @@ export function computeRarity(
 
   // Named tiers by rank percentile (same thresholds as OpenSea: 1% / 5% / 15%)
   for (const item of scored) {
-    if (item.rank <= Math.ceil(supply * 0.01))      item.tier = 'Legendary';
+    if (item.rank <= Math.ceil(supply * 0.01)) item.tier = 'Legendary';
     else if (item.rank <= Math.ceil(supply * 0.05)) item.tier = 'Epic';
     else if (item.rank <= Math.ceil(supply * 0.15)) item.tier = 'Rare';
-    else                                             item.tier = 'Common';
+    else item.tier = 'Common';
   }
 
   return scored;

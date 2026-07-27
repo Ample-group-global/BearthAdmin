@@ -1,9 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
-import { TxBanner } from "@/components/nft/TxBanner";
-import { ErrBanner } from "@/components/nft/ErrBanner";
-import { OkBanner } from "@/components/nft/OkBanner";
+import { TxBanner, ErrBanner, OkBanner } from "@/components/nft/Banner";
 import { Toggle } from "@/components/nft/Toggle";
 import { SectionCard } from "@/components/nft/SectionCard";
 import { labelStyle, inputStyle } from "@/components/nft/styles";

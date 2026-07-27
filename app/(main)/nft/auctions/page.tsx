@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ErrBanner } from "@/components/nft/ErrBanner";
-import { OkBanner } from "@/components/nft/OkBanner";
+import { ErrBanner, OkBanner } from "@/components/nft/Banner";
+import { StatusBadge } from "@/components/nft/StatusBadge";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
 
 interface AuctionSession {
@@ -27,21 +27,12 @@ interface AuctionSession {
   created_at: string;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const cfg: Record<string, { bg: string; color: string }> = {
-    upcoming:  { bg: "rgba(156,163,175,0.12)", color: "#9ca3af" },
-    active:    { bg: "rgba(65,175,235,0.12)",  color: "#41afeb" },
-    settled:   { bg: "rgba(22,163,74,0.1)",    color: "#16a34a" },
-    cancelled: { bg: "rgba(220,38,38,0.1)",    color: "#dc2626" },
-  };
-  const c = cfg[status] ?? cfg.upcoming;
-  return (
-    <span className="px-2 py-0.5 rounded-full text-xs font-semibold"
-      style={{ background: c.bg, color: c.color }}>
-      {status}
-    </span>
-  );
-}
+const AUCTION_COLORS = {
+  upcoming:  { bg: "rgba(156,163,175,0.12)", color: "#9ca3af" },
+  active:    { bg: "rgba(65,175,235,0.12)",  color: "#41afeb" },
+  settled:   { bg: "rgba(22,163,74,0.1)",    color: "#16a34a" },
+  cancelled: { bg: "rgba(220,38,38,0.1)",    color: "#dc2626" },
+};
 
 export default function AuctionsPage() {
   const [auctions, setAuctions] = useState<AuctionSession[]>([]);
@@ -219,7 +210,7 @@ export default function AuctionsPage() {
                   <td className="px-3 py-3 text-xs text-gray-500">
                     {a.auction_end_time ? new Date(a.auction_end_time).toLocaleDateString() : "—"}
                   </td>
-                  <td className="px-3 py-3"><StatusBadge status={a.status} /></td>
+                  <td className="px-3 py-3"><StatusBadge status={a.status} colorMap={AUCTION_COLORS} /></td>
                   <td className="px-3 py-3">
                     <div className="flex gap-2">
                       {a.status === "active" && (

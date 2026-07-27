@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ErrBanner } from "@/components/nft/ErrBanner";
-import { OkBanner } from "@/components/nft/OkBanner";
+import { ErrBanner, OkBanner } from "@/components/nft/Banner";
+import { StatusBadge } from "@/components/nft/StatusBadge";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
 
 interface GiftOrder {
@@ -24,21 +24,12 @@ interface GiftOrder {
   sender_name?: string;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const cfg: Record<string, { bg: string; color: string }> = {
-    pending:     { bg: "rgba(217,119,6,0.1)",    color: "#d97706" },
-    paid:        { bg: "rgba(65,175,235,0.12)",  color: "#41afeb" },
-    transferred: { bg: "rgba(22,163,74,0.1)",    color: "#16a34a" },
-    cancelled:   { bg: "rgba(156,163,175,0.12)", color: "#9ca3af" },
-  };
-  const c = cfg[status] ?? cfg.pending;
-  return (
-    <span className="px-2 py-0.5 rounded-full text-xs font-semibold capitalize"
-      style={{ background: c.bg, color: c.color }}>
-      {status}
-    </span>
-  );
-}
+const GIFT_COLORS = {
+  pending:     { bg: "rgba(217,119,6,0.1)",    color: "#d97706" },
+  paid:        { bg: "rgba(65,175,235,0.12)",  color: "#41afeb" },
+  transferred: { bg: "rgba(22,163,74,0.1)",    color: "#16a34a" },
+  cancelled:   { bg: "rgba(156,163,175,0.12)", color: "#9ca3af" },
+};
 
 function TypeBadge({ isAirdrop }: { isAirdrop: boolean }) {
   return (
@@ -288,7 +279,7 @@ export default function GiftsPage() {
                     )}
                   </td>
                   <td className="px-3 py-3"><TypeBadge isAirdrop={gift.is_airdrop} /></td>
-                  <td className="px-3 py-3"><StatusBadge status={gift.status} /></td>
+                  <td className="px-3 py-3"><StatusBadge status={gift.status} colorMap={GIFT_COLORS} capitalize /></td>
                   <td className="px-3 py-3 text-xs font-mono text-gray-400">
                     {gift.transfer_tx_hash
                       ? `${gift.transfer_tx_hash.slice(0, 8)}…${gift.transfer_tx_hash.slice(-4)}`

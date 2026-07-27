@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ErrBanner } from "@/components/nft/ErrBanner";
-import { OkBanner } from "@/components/nft/OkBanner";
+import { ErrBanner, OkBanner } from "@/components/nft/Banner";
+import { StatusBadge } from "@/components/nft/StatusBadge";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
 
 interface DutchWave {
@@ -17,22 +17,11 @@ interface DutchWave {
   sold_count:      number | null;
 }
 
-function StatusBadge({ status }: { status: string | null | undefined }) {
-  const cfg: Record<string, { bg: string; color: string }> = {
-    active:        { bg: "rgba(65,175,235,0.12)",  color: "#41afeb" },
-    floor_reached: { bg: "rgba(22,163,74,0.1)",    color: "#16a34a" },
-    disabled:      { bg: "rgba(156,163,175,0.12)", color: "#9ca3af" },
-  };
-  const s = status ?? "disabled";
-  const c = cfg[s] ?? cfg.disabled;
-  const label = s === "floor_reached" ? "Floor Reached" : s.charAt(0).toUpperCase() + s.slice(1);
-  return (
-    <span className="px-2 py-0.5 rounded-full text-xs font-semibold"
-      style={{ background: c.bg, color: c.color }}>
-      {label}
-    </span>
-  );
-}
+const DUTCH_COLORS = {
+  active:        { bg: "rgba(65,175,235,0.12)",  color: "#41afeb", label: "Active"        },
+  floor_reached: { bg: "rgba(22,163,74,0.1)",    color: "#16a34a", label: "Floor Reached" },
+  disabled:      { bg: "rgba(156,163,175,0.12)", color: "#9ca3af", label: "Disabled"      },
+};
 
 export default function DutchAuctionPage() {
   const [waves, setWaves]             = useState<DutchWave[]>([]);
@@ -208,7 +197,7 @@ export default function DutchAuctionPage() {
                   <td className="px-3 py-3 text-sm font-semibold" style={{ color: "#41afeb" }}>
                     {currentPrices[w.wave_num] != null ? `${currentPrices[w.wave_num]} ETH` : "—"}
                   </td>
-                  <td className="px-3 py-3"><StatusBadge status={w.status} /></td>
+                  <td className="px-3 py-3"><StatusBadge status={w.status} colorMap={DUTCH_COLORS} fallback={DUTCH_COLORS.disabled} /></td>
                   <td className="px-3 py-3">
                     {w.status === "active" && (
                       <button onClick={() => disable(w.wave_num)}

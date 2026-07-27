@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { generateAllCombos, computeRarity } from '../../../../lib/studio/combos';
 import { useLayerFiles } from '../LayerFilesContext';
+import NftPopup from './NftPopup';
 
 const THUMB = 160; // thumbnail px
 
@@ -75,45 +76,6 @@ function NFTCard({ index, rank, combo, layers, bitmapCache, canvasW, canvasH, on
       </div>
       <div className="prev-card-body">
         <div className="prev-card-name">#{index}</div>
-      </div>
-    </div>
-  );
-}
-
-// ── NFT Popup ─────────────────────────────────────────────────────────────────
-function NFTPopup({ item, onClose }) {
-  return (
-    <div className="nft-popup-overlay" onClick={onClose}>
-      <div className="nft-popup" onClick={e => e.stopPropagation()}>
-        <button className="nft-popup-close" onClick={onClose}>✕</button>
-        <div className="nft-popup-left">
-          <img src={item.src} alt={`#${item.index}`} className="nft-popup-img" />
-        </div>
-        <div className="nft-popup-right">
-          <div className="nft-popup-num">#{item.index}</div>
-          {item.rank && (
-            <div style={{ fontSize: 12, marginBottom: 8, display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
-              <span style={{ color: 'var(--dim)' }}>Rank #{item.rank}</span>
-              {item.tier && (
-                <span style={{
-                  fontSize: 10, fontWeight: 700,
-                  color: item.tier === 'Legendary' ? '#F59E0B' : item.tier === 'Epic' ? '#A855F7' : item.tier === 'Rare' ? '#3B82F6' : '#6B7280',
-                  background: item.tier === 'Legendary' ? '#F59E0B22' : item.tier === 'Epic' ? '#A855F722' : item.tier === 'Rare' ? '#3B82F622' : '#6B728022',
-                  padding: '1px 5px', borderRadius: 4,
-                }}>{item.tier}</span>
-              )}
-            </div>
-          )}
-          <div className="nft-popup-attrs-title">Attributes</div>
-          <div className="nft-popup-attrs">
-            {item.attrs.map((a, i) => (
-              <div key={i} className="nft-attr-row">
-                <span className="nft-attr-type">{a.trait_type}</span>
-                <span className="nft-attr-val">{a.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -396,7 +358,7 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
         )}
       </div>
 
-      {popup && <NFTPopup item={popup} onClose={() => setPopup(null)} />}
+      {popup && <NftPopup item={popup} onClose={() => setPopup(null)} />}
     </div>
   );
 }

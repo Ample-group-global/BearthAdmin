@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ErrBanner } from "@/components/nft/ErrBanner";
-import { OkBanner } from "@/components/nft/OkBanner";
+import { ErrBanner, OkBanner } from "@/components/nft/Banner";
+import { StatusBadge } from "@/components/nft/StatusBadge";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
 
 interface OtcDeal {
@@ -20,21 +20,12 @@ interface OtcDeal {
   created_at: string;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const cfg: Record<string, { bg: string; color: string }> = {
-    pending:     { bg: "rgba(217,119,6,0.1)",    color: "#d97706" },
-    confirmed:   { bg: "rgba(65,175,235,0.12)",  color: "#41afeb" },
-    transferred: { bg: "rgba(22,163,74,0.1)",    color: "#16a34a" },
-    cancelled:   { bg: "rgba(156,163,175,0.12)", color: "#9ca3af" },
-  };
-  const c = cfg[status] ?? cfg.pending;
-  return (
-    <span className="px-2 py-0.5 rounded-full text-xs font-semibold capitalize"
-      style={{ background: c.bg, color: c.color }}>
-      {status}
-    </span>
-  );
-}
+const OTC_COLORS = {
+  pending:     { bg: "rgba(217,119,6,0.1)",    color: "#d97706" },
+  confirmed:   { bg: "rgba(65,175,235,0.12)",  color: "#41afeb" },
+  transferred: { bg: "rgba(22,163,74,0.1)",    color: "#16a34a" },
+  cancelled:   { bg: "rgba(156,163,175,0.12)", color: "#9ca3af" },
+};
 
 export default function OtcPage() {
   const [deals, setDeals]         = useState<OtcDeal[]>([]);
@@ -208,7 +199,7 @@ export default function OtcPage() {
                     {deal.negotiated_price_twd != null ? `TWD ${deal.negotiated_price_twd}` : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-3 py-3 text-sm text-gray-500 capitalize">{deal.payment_method ?? "—"}</td>
-                  <td className="px-3 py-3"><StatusBadge status={deal.status} /></td>
+                  <td className="px-3 py-3"><StatusBadge status={deal.status} colorMap={OTC_COLORS} capitalize /></td>
                   <td className="px-3 py-3 text-xs text-gray-400">
                     {new Date(deal.created_at).toLocaleDateString()}
                   </td>

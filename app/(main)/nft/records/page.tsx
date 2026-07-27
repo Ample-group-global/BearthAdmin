@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import DataTable, { type ColumnDef } from "@/components/DataTable";
-import { ErrBanner } from "@/components/nft/ErrBanner";
+import { ErrBanner } from "@/components/nft/Banner";
 import { inputStyle, labelStyle } from "@/components/nft/styles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────

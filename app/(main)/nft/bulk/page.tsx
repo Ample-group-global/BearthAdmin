@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ErrBanner } from "@/components/nft/ErrBanner";
-import { OkBanner } from "@/components/nft/OkBanner";
+import { ErrBanner, OkBanner } from "@/components/nft/Banner";
+import { StatusBadge } from "@/components/nft/StatusBadge";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
 
 interface BulkOrder {
@@ -24,22 +24,13 @@ interface BulkOrder {
   created_at: string;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const cfg: Record<string, { bg: string; color: string }> = {
-    pending:   { bg: "rgba(217,119,6,0.1)",    color: "#d97706" },
-    confirmed: { bg: "rgba(65,175,235,0.12)",  color: "#41afeb" },
-    minting:   { bg: "rgba(124,58,237,0.1)",   color: "#7c3aed" },
-    completed: { bg: "rgba(22,163,74,0.1)",    color: "#16a34a" },
-    cancelled: { bg: "rgba(156,163,175,0.12)", color: "#9ca3af" },
-  };
-  const c = cfg[status] ?? cfg.pending;
-  return (
-    <span className="px-2 py-0.5 rounded-full text-xs font-semibold capitalize"
-      style={{ background: c.bg, color: c.color }}>
-      {status}
-    </span>
-  );
-}
+const BULK_COLORS = {
+  pending:   { bg: "rgba(217,119,6,0.1)",    color: "#d97706" },
+  confirmed: { bg: "rgba(65,175,235,0.12)",  color: "#41afeb" },
+  minting:   { bg: "rgba(124,58,237,0.1)",   color: "#7c3aed" },
+  completed: { bg: "rgba(22,163,74,0.1)",    color: "#16a34a" },
+  cancelled: { bg: "rgba(156,163,175,0.12)", color: "#9ca3af" },
+};
 
 function RarityBadge({ rarity }: { rarity: string | null }) {
   if (!rarity || rarity === "any") return <span className="text-xs text-gray-400">Any</span>;
@@ -249,7 +240,7 @@ export default function BulkPage() {
                   <td className="px-3 py-3 text-sm font-semibold" style={{ color: "#24315f" }}>
                     {order.total_price_eth != null ? `${order.total_price_eth} ETH` : <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-3 py-3"><StatusBadge status={order.status} /></td>
+                  <td className="px-3 py-3"><StatusBadge status={order.status} colorMap={BULK_COLORS} capitalize /></td>
                   <td className="px-3 py-3">
                     <div className="flex gap-2">
                       {(order.status === "pending" || order.status === "confirmed") && (

@@ -73,6 +73,10 @@ test-team-page.cjs
 
 # Backup folders
 _backup_*/
+BearthAdmin-backup-2026-07-27/
+BearthAdmin-backup-2026-07-27-v2/
+BearthApi-backup-2026-07-27/
+bearth-customer/
 screenshot.cjs
 screenshot2.cjs
 test-team-page.cjs

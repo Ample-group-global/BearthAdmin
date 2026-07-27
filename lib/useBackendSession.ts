@@ -14,7 +14,6 @@ export function useBackendSession() {
   const { authenticated } = usePrivy();
   const { wallets } = useWallets();
   const lastSynced = useRef<string | null>(null);
-
   useEffect(() => {
     const address = wallets?.[0]?.address;
     if (!API_BASE || !authenticated || !address) {
@@ -23,7 +22,7 @@ export function useBackendSession() {
         fetch(`${API_BASE}/api/auth/session`, {
           method: "DELETE",
           credentials: "include",
-        }).catch(() => {});
+        }).catch(() => { });
         lastSynced.current = null;
       }
       return;
@@ -41,6 +40,6 @@ export function useBackendSession() {
       .then((res) => {
         if (res.ok) lastSynced.current = address.toLowerCase();
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [authenticated, wallets]);
 }

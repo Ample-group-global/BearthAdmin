@@ -1,7 +1,8 @@
 // @ts-nocheck
 'use client';
 import { useState, useMemo, useCallback } from 'react';
-import { getTier, TIER_PRESET_WEIGHTS } from '../../../../lib/studio/tiers';
+import { TIER_PRESET_WEIGHTS } from '../../../../lib/studio/tiers';
+import { calcRarity } from '../../../../lib/studio/probability';
 
 const TIER_LABELS = [
   { label: 'Legendary', color: '#F59E0B' },
@@ -77,10 +78,7 @@ export default function RarityModal({ layer, weights, supply, onSave, onDelete, 
         <div className="rm-list">
           {layer.assets.map(asset => {
             const w = localWs[asset.stem] ?? 1;
-            const prob = totalW > 0 ? w / totalW : 0;
-            const pct = (prob * 100).toFixed(2);
-            const expected = Math.round(prob * supply);
-            const tier = getTier(prob);
+            const { pct, expected, tier } = calcRarity(w, totalW, supply);
             const enabled = w > 0;
 
             return (

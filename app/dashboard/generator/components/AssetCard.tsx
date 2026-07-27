@@ -1,14 +1,11 @@
 // @ts-nocheck
 'use client';
 import { useState } from 'react';
-import { getTier } from '../../../../lib/studio/tiers';
+import { calcRarity } from '../../../../lib/studio/probability';
 import { useLayerFiles } from '../LayerFilesContext';
 
 function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onClose }) {
-  const prob = totalWeight > 0 ? weight / totalWeight : 0;
-  const tier = getTier(prob);
-  const pct  = (prob * 100).toFixed(1);
-  const exp  = Math.round(prob * supply);
+  const { prob, tier, pct, expected: exp } = calcRarity(weight, totalWeight, supply);
   const { getBlobUrl } = useLayerFiles();
 
   return (
@@ -80,9 +77,7 @@ function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onC
 
 export default function AssetCard({ asset, weight, totalWeight, supply, onChange, onDelete }) {
   const [open, setOpen] = useState(false);
-  const prob = totalWeight > 0 ? weight / totalWeight : 0;
-  const tier = getTier(prob);
-  const pct  = (prob * 100).toFixed(1);
+  const { tier, pct } = calcRarity(weight, totalWeight, supply);
   const { getBlobUrl } = useLayerFiles();
 
   function handleDelete(e) {

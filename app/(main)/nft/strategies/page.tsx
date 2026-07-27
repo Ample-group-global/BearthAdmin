@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ErrBanner } from "@/components/nft/ErrBanner";
+import { ErrBanner } from "@/components/nft/Banner";
 
 interface StrategyStep { step: number; title: string; detail: string; }
 
