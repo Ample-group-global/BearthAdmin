@@ -246,6 +246,17 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
           </div>
 
           <div className="setup-field">
+            <label>Token Symbol</label>
+            <input
+              placeholder="BRT"
+              maxLength={10}
+              value={collection.symbol}
+              onChange={e => set('symbol', e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))}
+            />
+            <span className="field-hint">Short uppercase identifier (e.g. BAYC, AZUKI). Max 10 characters.</span>
+          </div>
+
+          <div className="setup-field">
             <label>Collection Description</label>
             <input
               placeholder="The description will appear in the NFT metadata"

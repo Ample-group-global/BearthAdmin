@@ -4,17 +4,17 @@ import { useMemo } from 'react';
 
 // ── Tier helpers ──────────────────────────────────────────────────────────────
 function rarityTier(pct: number) {
-  if (pct <= 5)  return { label: 'Legendary', color: '#F59E0B' };
-  if (pct <= 15) return { label: 'Epic',      color: '#A855F7' };
-  if (pct <= 35) return { label: 'Rare',      color: '#3B82F6' };
+  if (pct <= 1)  return { label: 'Legendary', color: '#F59E0B' };
+  if (pct <= 5)  return { label: 'Epic',      color: '#A855F7' };
+  if (pct <= 15) return { label: 'Rare',      color: '#3B82F6' };
   return          { label: 'Common',   color: '#6B7280' };
 }
 
 const TIERS = [
-  { label: 'Legendary', color: '#F59E0B', icon: '👑', preRange: '≤ 5%',  postRange: 'Top 1%',  desc: 'Ultra-rare. Highest collector value.' },
-  { label: 'Epic',      color: '#A855F7', icon: '🔮', preRange: '≤ 15%', postRange: 'Top 5%',  desc: 'Very rare. Strong collector demand.' },
-  { label: 'Rare',      color: '#3B82F6', icon: '🔷', preRange: '≤ 35%', postRange: 'Top 15%', desc: 'Clearly limited. Noticeably scarce.' },
-  { label: 'Common',    color: '#6B7280', icon: '🩶', preRange: '> 35%', postRange: 'Rest',     desc: 'Most frequent. Baseline traits.' },
+  { label: 'Legendary', color: '#F59E0B', icon: '👑', preRange: '≤ 1%',  postRange: 'Top 1%',  desc: 'Ultra-rare. Highest collector value.' },
+  { label: 'Epic',      color: '#A855F7', icon: '🔮', preRange: '≤ 5%',  postRange: 'Top 5%',  desc: 'Very rare. Strong collector demand.' },
+  { label: 'Rare',      color: '#3B82F6', icon: '🔷', preRange: '≤ 15%', postRange: 'Top 15%', desc: 'Clearly limited. Noticeably scarce.' },
+  { label: 'Common',    color: '#6B7280', icon: '🩶', preRange: '> 15%', postRange: 'Rest',     desc: 'Most frequent. Baseline traits.' },
 ];
 
 // ── Tier overview cards ───────────────────────────────────────────────────────

@@ -19,7 +19,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ rel: str
   const h   = parseInt(url.searchParams.get('h') ?? '512') || 512;
 
   const buf = await sharp(file)
-    .resize(w, h, { fit: 'fill' })
+    .resize(w, h, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toBuffer();
 

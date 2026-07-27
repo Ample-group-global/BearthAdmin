@@ -146,7 +146,8 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const jobBitmaps = useRef<Record<string, ImageBitmap>>({});
 
   const [layers, setLayers] = useState<any[]>(layersProp);
-  const cancelledRef = useRef(false);
+  const cancelledRef       = useRef(false);
+  const lastFailedJobIdRef = useRef<string | null>(null);
 
   async function generate() {
     cancelledRef.current = false;
@@ -219,6 +220,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     setPhase('done');
     setDbError('');
     setDbSaved(false);
+    lastFailedJobIdRef.current = null;
     if (collectionId) await persistToDb(scored);
   }
 
@@ -228,6 +230,11 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     setDbSaving(true);
     setDbSaved(false);
     setDbError('');
+    // Delete previous failed job before creating a new one — avoids orphan records
+    if (lastFailedJobIdRef.current) {
+      await fetch(`/api/nft-gen/jobs/${lastFailedJobIdRef.current}`, { method: 'DELETE' }).catch(() => {});
+      lastFailedJobIdRef.current = null;
+    }
     let dbJobId: string | null = null;
     try {
       const jr = await fetch(`/api/nft-gen/collections/${collectionId}/jobs`, {
@@ -283,6 +290,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           body: JSON.stringify({ errorMessage: err?.message ?? 'Item batch insert failed' }),
         }).catch(() => {});
       }
+      lastFailedJobIdRef.current = dbJobId;
       setDbError(err?.message ?? 'Unknown error saving to database');
     } finally {
       setDbSaving(false);

@@ -94,12 +94,26 @@ export default function Page() {
     });
     loadLayers();
 
-    // Check if there's already a collection saved in session storage
+    // Restore collection from DB if previously created
     const savedId = sessionStorage.getItem('nft_collection_id');
-    const savedName = sessionStorage.getItem('nft_collection_name');
-    if (savedId && savedName) {
+    if (savedId) {
       setCollectionId(savedId);
-      setCollection(prev => ({ ...prev, name: savedName }));
+      fetch(`/api/nft-gen/collections/${savedId}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          const c = data?.collection ?? data;
+          if (!c?.id) return;
+          setCollection(prev => ({
+            ...prev,
+            name:        c.name        ?? prev.name,
+            description: c.description ?? prev.description,
+            symbol:      c.symbol      ?? prev.symbol,
+            blockchain:  c.network === 'sol' ? 'solana' : 'ethereum',
+            width:       c.formatWidth  ?? prev.width,
+            height:      c.formatHeight ?? prev.height,
+          }));
+        })
+        .catch(() => {});
     }
   }, []);
 
@@ -163,14 +177,17 @@ export default function Page() {
           sessionStorage.setItem('nft_collection_name', collection.name || 'Bearth NFT Collection');
         }
       } else {
-        // Update existing
+        // Update existing — sync all editable fields back to DB
         await fetch(`/api/nft-gen/collections/${cid}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: collection.name,
-            description: collection.description,
-            symbol: collection.symbol,
+            name:         collection.name,
+            description:  collection.description,
+            symbol:       collection.symbol,
+            network:      collection.blockchain === 'solana' ? 'sol' : 'eth',
+            formatWidth:  collection.width  ?? 2000,
+            formatHeight: collection.height ?? 2000,
           }),
         });
       }

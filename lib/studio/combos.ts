@@ -30,9 +30,28 @@ export function resolveConflicts(
     }))
     .filter(r => r.thenTraits.length);
 
+  // Auto-expand exclude rules to be bidirectional — prevents asymmetric conflicts
+  // "IF A=x EXCLUDE B=y" also enforces "IF B=y EXCLUDE A=x"
+  const expanded: typeof rules = [];
+  for (const rule of rules) {
+    if (rule.type === 'exclude') {
+      for (const t of rule.thenTraits) {
+        const reverseExists = rules.some(r =>
+          r.type === 'exclude' &&
+          r.ifLayer === rule.thenLayer && r.ifTrait === t &&
+          r.thenLayer === rule.ifLayer && r.thenTraits.includes(rule.ifTrait)
+        );
+        if (!reverseExists) {
+          expanded.push({ type: 'exclude', ifLayer: rule.thenLayer, ifTrait: t, thenLayer: rule.ifLayer, thenTraits: [rule.ifTrait] });
+        }
+      }
+    }
+  }
+  const allRules = [...rules, ...expanded];
+
   for (let pass = 0; pass < 5; pass++) {
     let changed = false;
-    for (const rule of rules) {
+    for (const rule of allRules) {
       if (picks[rule.ifLayer]?.stem !== rule.ifTrait) continue;
       const thenLayer = layerMap[rule.thenLayer];
       if (!thenLayer) continue;
@@ -42,7 +61,14 @@ export function resolveConflicts(
         const valid = thenLayer.assets.filter(
           (a: any) => !rule.thenTraits.includes(a.stem) && (ws[a.stem] ?? a.defaultWeight ?? 1) > 0
         );
-        if (valid.length) { picks[rule.thenLayer] = pickWeighted(valid, ws); changed = true; }
+        if (valid.length) {
+          picks[rule.thenLayer] = pickWeighted(valid, ws);
+          changed = true;
+        } else {
+          // All valid traits are excluded — impossible constraint, pick from full layer
+          const fallback = thenLayer.assets.filter((a: any) => (ws[a.stem] ?? a.defaultWeight ?? 1) > 0);
+          if (fallback.length) { picks[rule.thenLayer] = pickWeighted(fallback, ws); changed = true; }
+        }
       } else {
         if (rule.thenTraits.includes(picks[rule.thenLayer]?.stem)) continue;
         const valid = thenLayer.assets.filter(
@@ -62,9 +88,11 @@ export function generateAllCombos(
   conflicts: any[]
 ): Record<string, any>[] {
   const seen = new Set<string>();
-  return Array.from({ length: supply }, () => {
+  let duplicateCount = 0;
+  const combos = Array.from({ length: supply }, () => {
     let picks: Record<string, any> = {};
-    for (let attempt = 0; attempt < 10; attempt++) {
+    let unique = false;
+    for (let attempt = 0; attempt < 200; attempt++) {
       picks = {};
       for (const layer of layers) {
         const ws = weights[layer.folder] ?? {};
@@ -73,10 +101,15 @@ export function generateAllCombos(
       }
       resolveConflicts(picks, conflicts, weights, layers);
       const key = layers.map(l => picks[l.folder]?.stem ?? '').join('|');
-      if (!seen.has(key)) { seen.add(key); break; }
+      if (!seen.has(key)) { seen.add(key); unique = true; break; }
     }
+    if (!unique) duplicateCount++;
     return picks;
   });
+  if (duplicateCount > 0) {
+    console.warn(`[NFT Generator] ${duplicateCount} duplicate combo(s) could not be made unique after 200 attempts. Supply may exceed the number of possible unique combinations.`);
+  }
+  return combos;
 }
 
 export function applyNameFormat(fmt: string, idx: number): string {
