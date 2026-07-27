@@ -61,7 +61,7 @@ export async function POST(
           name:            asset.name,
           filePath:        asset.rel,
           rarityTier:      inferTier(asset.stem),
-          storageProvider: "local",
+          storageProvider: "ipfs",
         });
         if (r?.trait?.id ?? r?.id) traitsUpserted++;
       }));
