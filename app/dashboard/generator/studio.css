@@ -182,8 +182,8 @@
 
 /* ── Modal ── */
 .studio-wrap .overlay {
-  position: fixed; inset: 0; background: rgba(30,30,80,.45); display: flex;
-  align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px);
+  position: fixed; inset: 0; background: rgba(30,30,80,.55); display: flex;
+  align-items: center; justify-content: center; z-index: 100;
 }
 .studio-wrap .modal {
   background: var(--bg1); border: 1px solid var(--border2); border-radius: 14px;
@@ -659,8 +659,8 @@
    RARITY MODAL
 ══════════════════════════════ */
 .studio-wrap .rm-overlay {
-  position: fixed; inset: 0; background: rgba(30,30,80,.45); display: flex;
-  align-items: center; justify-content: center; z-index: 200; backdrop-filter: blur(5px);
+  position: fixed; inset: 0; background: rgba(30,30,80,.55); display: flex;
+  align-items: center; justify-content: center; z-index: 200;
 }
 .studio-wrap .rm-modal {
   background: var(--bg1); border: 1px solid var(--border2); border-radius: 14px;
@@ -864,7 +864,7 @@
 .studio-wrap .exp-nft-rank {
   position: absolute; top: 8px; left: 8px;
   font-size: 12px; font-weight: 800;
-  background: rgba(0,0,0,.55); backdrop-filter: blur(6px);
+  background: rgba(0,0,0,.65);
   color: #fff; padding: 3px 9px; border-radius: 20px;
   letter-spacing: .3px;
 }
@@ -889,8 +889,8 @@
 
 /* ── NFT click popup ── */
 .studio-wrap .nft-popup-overlay {
-  position: fixed; inset: 0; background: rgba(20,23,38,.72);
-  display: flex; align-items: center; justify-content: center; z-index: 300; backdrop-filter: blur(5px);
+  position: fixed; inset: 0; background: rgba(20,23,38,.78);
+  display: flex; align-items: center; justify-content: center; z-index: 300;
 }
 .studio-wrap .nft-popup {
   background: var(--bg1); border: 1px solid var(--border2); border-radius: 14px;
@@ -977,7 +977,7 @@
 .studio-wrap .rarity-tier-chip { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 9px; text-transform: uppercase; letter-spacing: .4px; display: inline-block; white-space: nowrap; }
 
 /* ── Per-card detail modal ── */
-.studio-wrap .card-modal-overlay { position: fixed; inset: 0; background: rgba(20,23,38,.72); display: flex; align-items: center; justify-content: center; z-index: 400; backdrop-filter: blur(5px); }
+.studio-wrap .card-modal-overlay { position: fixed; inset: 0; background: rgba(20,23,38,.78); display: flex; align-items: center; justify-content: center; z-index: 400; }
 .studio-wrap .card-modal { background: var(--bg1); border: 1px solid var(--border2); border-radius: 14px; display: flex; gap: 0; max-width: 520px; width: 90vw; overflow: hidden; position: relative; box-shadow: 0 24px 64px rgba(99,102,241,.22); }
 .studio-wrap .card-modal-close { position: absolute; top: 10px; right: 10px; background: var(--bg2); border: 1px solid var(--border2); color: var(--muted); border-radius: 50%; width: 26px; height: 26px; font-size: 12px; cursor: pointer; z-index: 1; display: flex; align-items: center; justify-content: center; transition: all .12s; }
 .studio-wrap .card-modal-close:hover { background: var(--border2); color: var(--text); }
