@@ -32,9 +32,24 @@ async function snap(page: Page, name: string) {
   console.log(`  📸 ${name}.png`);
 }
 
-async function waitForStudio(page: Page) {
-  // 60s: covers slow auth check when BearthApi is under load from background jobs
-  await page.waitForSelector('.studio-wrap', { timeout: 60_000 });
+async function waitForStudio(page: Page, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const result = await Promise.race([
+      page.waitForSelector('.studio-wrap', { timeout: 60_000 }).then(() => 'ok' as const),
+      page.waitForURL('**/login**',         { timeout: 60_000 }).then(() => 'login' as const),
+    ]).catch(() => 'timeout' as const);
+
+    if (result === 'ok') return;
+
+    if (attempt < retries) {
+      // Auth failed (redirected to /login or timed out) — pause 3s and retry
+      console.log(`  ⚠ waitForStudio: ${result} on attempt ${attempt + 1}, retrying…`);
+      await page.waitForTimeout(3_000);
+      await page.goto(page.url().includes('login') ? '/dashboard/generator' : page.url());
+    } else {
+      throw new Error(`waitForStudio: studio-wrap not visible after ${retries + 1} attempts (last result: ${result})`);
+    }
+  }
 }
 
 // Inject collection ID and supply into sessionStorage before page load so generator restores them
