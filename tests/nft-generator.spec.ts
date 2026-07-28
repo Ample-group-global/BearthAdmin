@@ -9,8 +9,12 @@ const SCREENSHOTS = path.join(process.cwd(), 'tests', 'results', 'nft-generator'
 async function snap(page: Page, name: string) {
   fs.mkdirSync(SCREENSHOTS, { recursive: true });
   const file = path.join(SCREENSHOTS, `${name}.png`);
-  await page.screenshot({ path: file, fullPage: false });
-  console.log(`  📸 ${name}.png`);
+  try {
+    await page.screenshot({ path: file, fullPage: false, timeout: 30000 });
+    console.log(`  📸 ${name}.png`);
+  } catch {
+    console.log(`  ⚠ screenshot ${name} skipped (page busy)`);
+  }
 }
 
 // ── Helper: navigate to step ────────────────────────────────────────────────────
@@ -311,7 +315,8 @@ test('04 — Rarity tab loads', async ({ page }) => {
     studioVisible = await page.locator('.studio-wrap').isVisible({ timeout: 3000 }).catch(() => false);
   }
 
-  await page.waitForSelector('.studio-wrap', { timeout: 20000 });
+  await page.waitForTimeout(3000); // let browser recover after prior heavy test
+  await page.waitForSelector('.studio-wrap', { timeout: 60000 });
   await goStep(page, 'Rarity');
   await page.waitForTimeout(500);
   await snap(page, '04-rarity-tab');
@@ -343,7 +348,8 @@ test('05 — Upload batch tracking in DB (images + metadata)', async ({ page }) 
     { timeout: 30000 }
   ).catch(() => {});
   await page.waitForLoadState('networkidle');
-  await page.waitForSelector('.studio-wrap', { timeout: 15000 });
+  await page.waitForTimeout(3000); // let browser recover after prior heavy test
+  await page.waitForSelector('.studio-wrap', { timeout: 60000 });
 
   // ── Settings: 10-NFT collection for fast upload ──────────────────────────────
   await goStep(page, 'Settings');

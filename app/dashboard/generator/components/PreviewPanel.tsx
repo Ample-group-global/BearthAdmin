@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
-import { generateAllCombos, computeRarity } from '../../../../lib/studio/combos';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, memo } from 'react';
+import { pickWeighted, resolveConflicts, computeRarity } from '../../../../lib/studio/combos';
 import { useLayerFiles } from '../LayerFilesContext';
 import NftPopup from './NftPopup';
 
@@ -22,8 +22,9 @@ function applyView(items, sort, filter) {
 }
 
 // ── NFT Card ──────────────────────────────────────────────────────────────────
-// useLayoutEffect draws before browser paint → no gray flash when scrolling
-function NFTCard({ index, rank, tier, score, combo, layers, bitmapCache, canvasW, canvasH, collW, collH, onClick }) {
+// memo prevents re-renders on parent scroll state changes; useLayoutEffect
+// (no deps) redraws after every render so canvas is never left stale/blank.
+const NFTCard = memo(function NFTCard({ index, rank, tier, score, combo, layers, bitmapCache, canvasW, canvasH, collW, collH, onClick }) {
   const canvasRef = useRef(null);
 
   function draw() {
@@ -38,7 +39,9 @@ function NFTCard({ index, rank, tier, score, combo, layers, bitmapCache, canvasW
     }
   }
 
-  useLayoutEffect(() => { draw(); }, []);
+  // No dependency array → redraws after every render, so a canvas that was
+  // cleared (e.g. by a width/height attribute update) is immediately repainted.
+  useLayoutEffect(() => { draw(); });
 
   function handleClick() {
     const attrs = layers
@@ -63,7 +66,7 @@ function NFTCard({ index, rank, tier, score, combo, layers, bitmapCache, canvasW
       </div>
     </div>
   );
-}
+});
 
 // ── Layer filter sidebar row ──────────────────────────────────────────────────
 function ExpandableLayerRow({ layer, activeFilter, onTraitClick }) {
@@ -178,26 +181,68 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
       layers.flatMap(l => l.assets.filter(a => a.rel).map(a => a.rel))
     )];
     let loaded = 0;
-    setLoadMsg(`Loading images… 0 / ${rels.length}`);
+    const imgTotal = rels.length;
+    setLoadMsg('Loading images…');
 
-    await Promise.all(rels.map(async rel => {
-      if (bitmapCache.current[rel]) { setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`); return; }
-      try {
-        const blobUrl = getBlobUrl(rel);
-        const res = blobUrl ? await fetch(blobUrl) : await fetch(`/api/layer-raw/${rel}`);
-        if (res.ok) {
-          const blob = await res.blob();
-          bitmapCache.current[rel] = await createImageBitmap(blob);
+    // Load bitmaps in small batches to avoid OOM from 86 concurrent 2000×2000 images.
+    // Use server-resized 160×160 thumbnails (Sharp) instead of full-res raw PNGs.
+    const BATCH = 10;
+    for (let i = 0; i < rels.length; i += BATCH) {
+      await Promise.all(rels.slice(i, i + BATCH).map(async rel => {
+        if (bitmapCache.current[rel]) { loaded++; setLoadMsg(`Loading images… ${Math.round(loaded / imgTotal * 100)}%`); return; }
+        try {
+          const blobUrl = getBlobUrl(rel);
+          let res: Response;
+          if (blobUrl) {
+            res = await fetch(blobUrl);
+            // If blob URL is stale/revoked, fall back to server thumbnail
+            if (!res.ok) res = await fetch(`/api/layer-img/${rel}?w=${THUMB}&h=${THUMB}`);
+          } else {
+            res = await fetch(`/api/layer-img/${rel}?w=${THUMB}&h=${THUMB}`);
+          }
+          if (res.ok) {
+            const blob = await res.blob();
+            bitmapCache.current[rel] = await createImageBitmap(blob);
+          }
+        } catch (e) {
+          console.warn(`[preview] bitmap load failed for ${rel}:`, e);
         }
-      } catch {}
-      setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`);
-    }));
+        loaded++;
+        setLoadMsg(`Loading images… ${Math.round(loaded / imgTotal * 100)}%`);
+      }));
+    }
 
-    // 2. Generate combos + rarity (O(n) Map lookup, not O(n²) find)
-    setLoadMsg('Generating combinations…');
+    // 2. Generate combos in chunks so the counter updates per-NFT against supply
+    const seen = new Set<string>();
+    const combos: Record<string, any>[] = [];
+    const GEN_CHUNK = 20;
+    for (let i = 0; i < supply; i += GEN_CHUNK) {
+      const end = Math.min(i + GEN_CHUNK, supply);
+      for (let j = i; j < end; j++) {
+        let picks: Record<string, any> = {};
+        let unique = false;
+        for (let attempt = 0; attempt < 200; attempt++) {
+          picks = {};
+          for (const layer of layers) {
+            const ws = weights[layer.folder] ?? {};
+            const pick = pickWeighted(layer.assets, ws);
+            if (pick) picks[layer.folder] = pick;
+          }
+          resolveConflicts(picks, conflicts, weights, layers);
+          const key = layers.map((l: any) => picks[l.folder]?.stem ?? '').join('|');
+          if (!seen.has(key)) { seen.add(key); unique = true; break; }
+        }
+        if (!unique) console.warn('[NFT Generator] Could not generate unique combo after 200 attempts.');
+        combos.push(picks);
+      }
+      setLoadMsg(`Generating NFTs… ${end} / ${supply}`);
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    // 3. Compute rarity
+    setLoadMsg('Computing rarity…');
     await new Promise(r => setTimeout(r, 0));
 
-    const combos    = generateAllCombos(supply, layers, weights, conflicts);
     const rarity    = computeRarity(combos, layers);
     const rarityMap = new Map(rarity.map(r => [r.index, r]));
     const scored    = combos.map((combo, i) => {
@@ -217,20 +262,13 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
   useEffect(() => { if (layers.length > 0) run(); }, []);
 
   function handleSort(s) {
-    setSortBy(s);
-    sortRef.current = s;
     setSortOpen(false);
     if (s === 'shuffle') {
-      const combos    = generateAllCombos(supply, layers, weights, conflicts);
-      const rarity    = computeRarity(combos, layers);
-      const rarityMap = new Map(rarity.map(r => [r.index, r]));
-      const scored    = combos.map((combo, i) => {
-        const r = rarityMap.get(i + 1);
-        return { combo, index: i + 1, score: r?.score ?? 0, rank: r?.rank ?? i + 1, tier: r?.tier ?? 'Common' };
-      });
-      scoredRef.current = scored;
-      rebuild(scored, s, filterRef.current);
+      // Re-shuffle regenerates combos — bitmaps are already cached so loading phase is instant
+      run();
     } else {
+      setSortBy(s);
+      sortRef.current = s;
       rebuild(scoredRef.current, s, filterRef.current);
     }
   }

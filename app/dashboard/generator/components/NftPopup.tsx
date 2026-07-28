@@ -29,12 +29,15 @@ export default function NftPopup({ item, onClose }: { item: NftPopupItem | null;
     if (!item || !canvasRef.current) return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, item.collW, item.collH);
+    // Draw at the bitmap's native size (THUMB×THUMB); CSS scales the canvas element.
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
     for (const layer of item.layers) {
       const pick = item.combo[layer.folder];
       if (!pick?.rel) continue;
       const bm = item.bitmapCache.current[pick.rel];
-      if (bm) ctx.drawImage(bm, 0, 0, item.collW, item.collH);
+      if (bm) ctx.drawImage(bm, 0, 0, W, H);
     }
   }, [item]);
 
@@ -48,8 +51,8 @@ export default function NftPopup({ item, onClose }: { item: NftPopupItem | null;
         <div className="nft-popup-left">
           <canvas
             ref={canvasRef}
-            width={item.collW}
-            height={item.collH}
+            width={512}
+            height={512}
             className="nft-popup-img"
           />
         </div>

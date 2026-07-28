@@ -213,7 +213,8 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     )] as string[];
 
     let loaded = 0;
-    setLoadMsg(`Loading ${rels.length} layer images…`);
+    const imgTotal1 = rels.length;
+    setLoadMsg('Loading images…');
 
     await Promise.all(rels.map(async (rel) => {
       try {
@@ -223,7 +224,8 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           jobBitmaps.current[rel] = await createImageBitmap(blob);
         }
       } catch {}
-      setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`);
+      loaded++;
+      setLoadMsg(`Loading images… ${Math.round(loaded / imgTotal1 * 100)}%`);
     }));
 
     if (cancelledRef.current) { setPhase('idle'); return; }
@@ -406,13 +408,15 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
 
         const imageBuffers: Record<string, ArrayBuffer> = {};
         let imgLoaded = 0;
-        setLoadMsg(`Loading images… 0 / ${rels.length}`);
+        const imgTotal2 = rels.length;
+        setLoadMsg('Loading images…');
         await Promise.all(rels.map(async (rel) => {
           try {
             const res = await fetch(`/api/layer-raw/${rel}`);
             if (res.ok) imageBuffers[rel] = await res.arrayBuffer();
           } catch {}
-          setLoadMsg(`Loading images… ${++imgLoaded} / ${rels.length}`);
+          imgLoaded++;
+          setLoadMsg(`Loading images… ${Math.round(imgLoaded / imgTotal2 * 100)}%`);
         }));
 
         if (cancelledRef.current) { setPhase('done'); setDlLoading(false); return; }
