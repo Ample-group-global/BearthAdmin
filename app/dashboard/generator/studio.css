@@ -632,8 +632,9 @@
 .studio-wrap .plr-filter-badge b { font-weight: 700; }
 .studio-wrap .plr-filter-clear { background: none; border: none; color: var(--accent2); cursor: pointer; font-size: 13px; line-height: 1; padding: 0 2px; flex-shrink: 0; }
 .studio-wrap .plr-filter-clear:hover { color: var(--text); }
-.studio-wrap .preview-right-panel { overflow-y: auto; padding: 20px; background: var(--bg0); }
-.studio-wrap .prev-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px,1fr)); gap: 12px; }
+.studio-wrap .preview-right-panel { display: flex; flex-direction: column; overflow: hidden; padding: 20px; background: var(--bg0); }
+.studio-wrap .prev-grid-scroll { flex: 1; overflow-y: auto; min-height: 0; margin: 0 -4px; padding: 0 4px; }
+.studio-wrap .prev-grid { display: grid; gap: 12px; }
 .studio-wrap .prev-card {
   background: var(--bg1); border: 1px solid var(--border); border-radius: 11px;
   overflow: hidden; cursor: pointer; transition: border-color .2s, transform .2s;
