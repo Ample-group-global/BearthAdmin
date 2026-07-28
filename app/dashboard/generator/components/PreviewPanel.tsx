@@ -24,7 +24,7 @@ function applyView(items, sort, filter) {
 // ── NFT Card ──────────────────────────────────────────────────────────────────
 // memo prevents re-renders on parent scroll state changes; useLayoutEffect
 // (no deps) redraws after every render so canvas is never left stale/blank.
-const NFTCard = memo(function NFTCard({ index, rank, tier, score, combo, layers, bitmapCache, canvasW, canvasH, collW, collH, onClick }) {
+const NFTCard = memo(function NFTCard({ index, rank, tier, score, combo, layers, bitmapCache, bitmapVersion, canvasW, canvasH, collW, collH, onClick }) {
   const canvasRef = useRef(null);
 
   function draw() {
@@ -112,13 +112,14 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
   const canvasW = Math.max(1, Math.round(srcW * scale));
   const canvasH = Math.max(1, Math.round(srcH * scale));
 
-  const [phase,    setPhase]    = useState('idle');
-  const [loadMsg,  setLoadMsg]  = useState('');
-  const [visible,  setVisible]  = useState([]);
-  const [sortBy,   setSortBy]   = useState('shuffle');
-  const [sortOpen, setSortOpen] = useState(false);
-  const [filter,   setFilter]   = useState(null);
-  const [popup,    setPopup]    = useState(null);
+  const [phase,         setPhase]         = useState('idle');
+  const [loadMsg,       setLoadMsg]       = useState('');
+  const [visible,       setVisible]       = useState([]);
+  const [sortBy,        setSortBy]        = useState('shuffle');
+  const [sortOpen,      setSortOpen]      = useState(false);
+  const [filter,        setFilter]        = useState(null);
+  const [popup,         setPopup]         = useState(null);
+  const [bitmapVersion, setBitmapVersion] = useState(0);
 
   // Virtual scroll state
   const [scrollTop,  setScrollTop]  = useState(0);
@@ -195,7 +196,6 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
           let res: Response;
           if (blobUrl) {
             res = await fetch(blobUrl);
-            // If blob URL is stale/revoked, fall back to server thumbnail
             if (!res.ok) res = await fetch(`/api/layer-img/${rel}?w=${THUMB}&h=${THUMB}`);
           } else {
             res = await fetch(`/api/layer-img/${rel}?w=${THUMB}&h=${THUMB}`);
@@ -203,6 +203,8 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
           if (res.ok) {
             const blob = await res.blob();
             bitmapCache.current[rel] = await createImageBitmap(blob);
+          } else {
+            console.warn(`[preview] image HTTP ${res.status} for ${rel}`);
           }
         } catch (e) {
           console.warn(`[preview] bitmap load failed for ${rel}:`, e);
@@ -211,6 +213,9 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
         setLoadMsg(`Loading images… ${Math.round(loaded / imgTotal * 100)}%`);
       }));
     }
+
+    // Signal that bitmaps are ready — forces NFTCard re-renders so canvases draw
+    setBitmapVersion(v => v + 1);
 
     // 2. Generate combos in chunks so the counter updates per-NFT against supply
     const seen = new Set<string>();
@@ -405,6 +410,7 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
                       combo={combo}
                       layers={layers}
                       bitmapCache={bitmapCache}
+                      bitmapVersion={bitmapVersion}
                       canvasW={canvasW}
                       canvasH={canvasH}
                       collW={srcW}

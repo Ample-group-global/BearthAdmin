@@ -98,6 +98,11 @@ export default function Page() {
     const savedId = sessionStorage.getItem('nft_collection_id');
     if (savedId) {
       setCollectionId(savedId);
+      const savedSupply = sessionStorage.getItem('nft_supply');
+      if (savedSupply) {
+        const s = parseInt(savedSupply, 10);
+        if (s > 0) setCollection(prev => ({ ...prev, supply: s }));
+      }
       fetch(`/api/nft-gen/collections/${savedId}`)
         .then(r => r.ok ? r.json() : null)
         .then(data => {
@@ -175,6 +180,7 @@ export default function Page() {
           setCollectionId(cid);
           sessionStorage.setItem('nft_collection_id', cid);
           sessionStorage.setItem('nft_collection_name', collection.name || 'Bearth NFT Collection');
+          sessionStorage.setItem('nft_supply', String(collection.supply ?? 100));
         }
       } else {
         // Update existing — sync all editable fields back to DB
@@ -190,6 +196,7 @@ export default function Page() {
             formatHeight: collection.height ?? 2000,
           }),
         });
+        sessionStorage.setItem('nft_supply', String(collection.supply ?? 100));
       }
 
       // Sync layers from BearthLayersv1 into DB

@@ -188,6 +188,14 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const svrExportIdRef = useRef<string | null>(null);
   const svrPollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Server-side generation state ──────────────────────────────────────────
+  const [svrGenStatus,   setSvrGenStatus]   = useState<'idle'|'running'|'done'|'error'>('idle');
+  const [svrGenProgress, setSvrGenProgress] = useState(0);
+  const [svrGenTotal,    setSvrGenTotal]    = useState(0);
+  const [svrGenPhase,    setSvrGenPhase]    = useState('');
+  const [svrGenError,    setSvrGenError]    = useState('');
+  const svrGenPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const [rarityItems, setRarityItems] = useState<any[]>([]);
   const [allCombos,   setAllCombos]   = useState<any[]>([]);
   const jobBitmaps = useRef<Record<string, ImageBitmap>>({});
@@ -316,6 +324,116 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     if (collectionId) await persistToDb(scored);
   }
 
+  async function generateOnServer() {
+    if (!collectionId) { setError('Save collection settings before generating.'); return; }
+    setSvrGenStatus('running');
+    setSvrGenProgress(0);
+    setSvrGenTotal(supply);
+    setSvrGenPhase('Starting…');
+    setSvrGenError('');
+    setError('');
+
+    try {
+      const r = await fetch('/api/nft-gen/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collectionId, editionSize: supply }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setSvrGenStatus('error'); setSvrGenError(d.error ?? 'Server error'); return; }
+
+      const genId = d.generateId;
+      svrGenPollRef.current = setInterval(async () => {
+        const pr = await fetch(`/api/nft-gen/generate/${genId}`).then(x => x.json()).catch(() => null);
+        if (!pr) return;
+        setSvrGenProgress(pr.progress ?? 0);
+        setSvrGenPhase(pr.phase ?? '');
+        setSvrGenTotal(pr.total ?? supply);
+        if (pr.status === 'done') {
+          if (svrGenPollRef.current) { clearInterval(svrGenPollRef.current); svrGenPollRef.current = null; }
+          const jobIdDone = pr.jobId ?? null;
+          if (jobIdDone) {
+            dbJobIdRef.current = jobIdDone;
+            await loadAndDisplayFromDb(jobIdDone);
+          }
+          setSvrGenStatus('done');
+          setDbSaved(true);
+          setDbSaving(false);
+          setPhase('done');
+        } else if (pr.status === 'error') {
+          if (svrGenPollRef.current) { clearInterval(svrGenPollRef.current); svrGenPollRef.current = null; }
+          setSvrGenStatus('error');
+          setSvrGenError(pr.error ?? 'Generation failed');
+        }
+      }, 2000);
+    } catch (e: any) {
+      setSvrGenStatus('error');
+      setSvrGenError(e.message ?? 'Failed to start generation');
+    }
+  }
+
+  async function loadAndDisplayFromDb(jobId: string) {
+    console.log(`[loadAndDisplayFromDb] jobId=${jobId} layersProp=${layersProp.length} layers=${layers.length}`);
+    try {
+      let layerData: any[] = layersProp.length ? layersProp : layers;
+      if (!layerData.length) {
+        console.log('[loadAndDisplayFromDb] fetching /api/layers');
+        try { const r = await fetch('/api/layers'); layerData = await r.json(); console.log(`[loadAndDisplayFromDb] /api/layers returned ${layerData?.length} items`); } catch (le) { console.error('[loadAndDisplayFromDb] /api/layers error', String(le)); }
+      }
+      if (!layerData.length) { console.log('[loadAndDisplayFromDb] no layers, returning'); return; }
+      setLayers(layerData);
+
+      const rels = [...new Set(
+        layerData.flatMap((l: any) => l.assets.filter((a: any) => a.rel).map((a: any) => a.rel))
+      )] as string[];
+
+      const [itemsResult] = await Promise.all([
+        fetch(`/api/nft-gen/jobs/${jobId}/display-items?limit=50`)
+          .then(r => r.json()).catch(() => ({ items: [] })),
+        Promise.all(rels.map(async (rel) => {
+          if (!jobBitmaps.current[rel]) {
+            try {
+              const res = await fetch(`/api/layer-raw/${rel}`);
+              if (res.ok) {
+                const blob = await res.blob();
+                jobBitmaps.current[rel] = await createImageBitmap(blob);
+              }
+            } catch {}
+          }
+        })),
+      ]);
+
+      console.log(`[loadAndDisplayFromDb] display-items returned ${itemsResult.items?.length} items`);
+      if (!itemsResult.items?.length) { console.log('[loadAndDisplayFromDb] 0 items, returning'); return; }
+
+      const displayed = itemsResult.items.map((item: any) => {
+        const traits: Array<{ traitType: string; traitValue: string }> = item.traits ?? [];
+        const combo: Record<string, any> = {};
+        for (const t of traits) {
+          const layer = layerData.find((l: any) => l.label === t.traitType);
+          if (layer) {
+            const asset = layer.assets.find((a: any) => a.name === t.traitValue);
+            if (asset?.rel) {
+              combo[layer.folder] = { rel: asset.rel, stem: asset.stem ?? asset.name, name: t.traitValue };
+            }
+          }
+        }
+        return {
+          index: item.editionNumber,
+          rank:  item.rarityRank,
+          score: item.rarityScore,
+          tier:  item.rarityTier,
+          attrs: traits.map((t: any) => ({ trait_type: t.traitType, value: t.traitValue })),
+          combo,
+          total: supply,
+        };
+      });
+      setRarityItems(displayed);
+    } catch (e) {
+      console.error('[loadAndDisplayFromDb]', e);
+    }
+  }
+
   async function persistToDb(items: any[]) {
     if (!collectionId || !items.length) return;
     setDbSaving(true);
@@ -369,47 +487,56 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       );
       editionItemMapRef.current = {};
 
-      // ── 3. Insert items in small batches with retry ─────────────────────────
-      // 100 items per batch = ~100ms per DB transaction, minimal timeout risk.
-      // ON CONFLICT DO NOTHING on the server makes every retry fully idempotent.
-      const ITEM_BATCH   = 100;
-      const totalBatches = Math.ceil(items.length / ITEM_BATCH);
+      // ── 3. Insert items in batches — 5 concurrent requests ─────────────────
+      // 500 items per batch × 5 parallel = processes 9999 in ~4 parallel groups.
+      // ON CONFLICT DO NOTHING makes every batch retry fully idempotent.
+      const ITEM_BATCH      = 500;
+      const BATCH_CONCUR    = 5;
+      const totalBatches    = Math.ceil(items.length / ITEM_BATCH);
+      let   completedBatches = 0;
 
-      for (let i = 0; i < items.length; i += ITEM_BATCH) {
-        const batchNum = Math.floor(i / ITEM_BATCH) + 1;
-        const chunk = items.slice(i, i + ITEM_BATCH).map((item: any) => ({
-          editionNumber: item.index,
-          dnaHash: (item.attrs as any[]).map((a: any) => `${a.trait_type}:${a.value}`).join('|'),
-          score: item.score,
-          rank:  item.rank,
-          tier:  item.tier,
-          traits: (item.attrs as any[]).map((a: any) => ({
-            traitType:  a.trait_type,
-            traitValue: a.value,
+      const allChunks = Array.from({ length: totalBatches }, (_, bi) => {
+        const start = bi * ITEM_BATCH;
+        return {
+          batchNum: bi + 1,
+          chunk: items.slice(start, start + ITEM_BATCH).map((item: any) => ({
+            editionNumber: item.index,
+            dnaHash: (item.attrs as any[]).map((a: any) => `${a.trait_type}:${a.value}`).join('|'),
+            score: item.score,
+            rank:  item.rank,
+            tier:  item.tier,
+            traits: (item.attrs as any[]).map((a: any) => ({
+              traitType:  a.trait_type,
+              traitValue: a.value,
+            })),
           })),
+        };
+      });
+
+      for (let g = 0; g < allChunks.length; g += BATCH_CONCUR) {
+        const group = allChunks.slice(g, g + BATCH_CONCUR);
+        await Promise.all(group.map(async ({ batchNum, chunk }) => {
+          const batchData = await withRetry(`batch-${batchNum}/${totalBatches}`, async () => {
+            const res = await fetch(`/api/nft-gen/jobs/${dbJobId}/items/batch`, {
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body:    JSON.stringify({ items: chunk }),
+            });
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              const err  = new Error(`Batch ${batchNum}/${totalBatches} failed (${res.status}): ${(body as any).error ?? 'server error'}`);
+              if (res.status >= 400 && res.status < 500) (err as any).retryable = false;
+              throw err;
+            }
+            return res.json().catch(() => ({}));
+          });
+          for (const row of (batchData?.items ?? [])) {
+            editionItemMapRef.current[row.editionNumber] = row.itemId;
+          }
         }));
 
-        const batchData = await withRetry(`batch-${batchNum}/${totalBatches}`, async () => {
-          const res = await fetch(`/api/nft-gen/jobs/${dbJobId}/items/batch`, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ items: chunk }),
-          });
-          if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            const err  = new Error(`Batch ${batchNum}/${totalBatches} failed (${res.status}): ${(body as any).error ?? 'server error'}`);
-            if (res.status >= 400 && res.status < 500) (err as any).retryable = false;
-            throw err;
-          }
-          return res.json().catch(() => ({}));
-        });
-
-        for (const row of (batchData?.items ?? [])) {
-          editionItemMapRef.current[row.editionNumber] = row.itemId;
-        }
-
-        // Progress update is fire-and-forget — a reporting failure never aborts the sync
-        const pctDone = Math.round(((i + chunk.length) / items.length) * 100);
+        completedBatches += group.length;
+        const pctDone = Math.round((completedBatches / totalBatches) * 100);
         fetch(`/api/nft-gen/jobs/${dbJobId}/progress`, {
           method:  'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -885,6 +1012,26 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const pct = supply > 0 ? Math.min((progress / supply) * 100, 100) : 0;
   const bucketReady = fbStatus === 'exists' || fbStatus === 'created';
 
+  // ── Server-side generation in progress (must come before idle check) ─────────
+  if (svrGenStatus === 'running') {
+    const pctGen = svrGenTotal > 0 ? (svrGenProgress / svrGenTotal) * 100 : 0;
+    return (
+      <div className="export-page">
+        <div className="exp-loading-card">
+          <Spinner size={32} color="var(--accent)" />
+          <div className="exp-loading-title">Generating {supply.toLocaleString()} NFTs on server…</div>
+          <div className="exp-loading-msg">{svrGenPhase || 'Starting…'}</div>
+          {svrGenTotal > 0 && (
+            <>
+              <ProgressBar value={svrGenProgress} max={svrGenTotal} />
+              <div className="exp-gen-pct">{pctGen.toFixed(1)}%</div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // ── Idle ─────────────────────────────────────────────────────────────────────
   if (phase === 'idle') {
     return (
@@ -948,10 +1095,10 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
             </div>
           </div>
 
-          {error && <div className="exp-error-banner">{error}</div>}
+          {(error || svrGenError) && <div className="exp-error-banner">{error || svrGenError}</div>}
 
           <div className="exp-idle-actions">
-            <button className="btn btn-primary btn-lg" onClick={generate}>
+            <button className="btn btn-primary btn-lg" onClick={generateOnServer} disabled={!collectionId || svrGenStatus === 'running'}>
               ⚡ Generate {supply.toLocaleString()} NFTs
             </button>
           </div>
@@ -960,7 +1107,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     );
   }
 
-  // ── Preload / Combos ──────────────────────────────────────────────────────────
+  // ── Preload / Combos (browser generation) ────────────────────────────────────
   if (phase === 'preload' || phase === 'combos') {
     return (
       <div className="export-page">
@@ -1054,7 +1201,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         {dbSaved && !dbSaving && (
           <div className="exp-banner exp-banner-saved" data-job-id={dbJobIdRef.current ?? ''}>
             <CheckIcon size={15} />
-            <span>{rarityItems.length.toLocaleString()} items saved to database</span>
+            <span>{(rarityItems.length || supply).toLocaleString()} items saved to database</span>
           </div>
         )}
         {dbError && !dbSaving && (
