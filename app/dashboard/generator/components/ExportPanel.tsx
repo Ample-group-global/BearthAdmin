@@ -14,9 +14,9 @@ function makeCanvas(w: number, h: number): OffscreenCanvas | HTMLCanvasElement {
   return c;
 }
 
-function canvasToBlob(canvas: any, type: string): Promise<Blob> {
-  if (canvas instanceof OffscreenCanvas) return canvas.convertToBlob({ type });
-  return new Promise(res => canvas.toBlob(res, type));
+function canvasToBlob(canvas: any, type: string, quality?: number): Promise<Blob> {
+  if (canvas instanceof OffscreenCanvas) return canvas.convertToBlob({ type, quality });
+  return new Promise(res => canvas.toBlob(res, type, quality));
 }
 
 const TIER_META = [
@@ -135,8 +135,8 @@ function StepCard({ num, title, status, children }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function ExportPanel({ weights, layers: layersProp = [], collection, conflicts, collectionId = null }) {
   const supply      = collection?.supply      ?? 100;
-  const targetW     = collection?.width       ?? 2000;
-  const targetH     = collection?.height      ?? 2000;
+  const targetW     = collection?.width       ?? 512;
+  const targetH     = collection?.height      ?? 512;
   const wantWebp    = collection?.format      === 'webp';
   const imgExt      = wantWebp ? 'webp' : 'png';
   const imgMime     = wantWebp ? 'image/webp' : 'image/png';
@@ -217,16 +217,10 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
 
     await Promise.all(rels.map(async (rel) => {
       try {
-        const res = await fetch(`/api/layer-img/${rel}?w=${tW}&h=${tH}`);
+        const res = await fetch(`/api/layer-raw/${rel}`);
         if (res.ok) {
           const blob = await res.blob();
-          try {
-            jobBitmaps.current[rel] = await createImageBitmap(blob, {
-              resizeWidth: tW, resizeHeight: tH, resizeQuality: 'medium',
-            });
-          } catch {
-            jobBitmaps.current[rel] = await createImageBitmap(blob);
-          }
+          jobBitmaps.current[rel] = await createImageBitmap(blob);
         }
       } catch {}
       setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`);
@@ -484,7 +478,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
                 const bm = exportBitmaps[pick.rel];
                 if (bm) ctx.drawImage(bm, 0, 0, targetW, targetH);
               }
-              const blob = await canvasToBlob(canvas, imgMime);
+              const blob = await canvasToBlob(canvas, imgMime, wantWebp ? 0.85 : undefined);
               imgsFolder!.file(`${idx + 1}.${imgExt}`, blob, { compression: 'STORE' });
             }));
             done = Math.min(i + BATCH, supply);
@@ -617,7 +611,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           const bm = bitmaps[pick.rel];
           if (bm) ctx.drawImage(bm, 0, 0, targetW, targetH);
         }
-        const blob = await canvasToBlob(canvas, imgMime);
+        const blob = await canvasToBlob(canvas, imgMime, wantWebp ? 0.85 : undefined);
         const fd = new FormData();
         fd.append('file', blob, `${num}.${imgExt}`);
         fd.append('bucket', bucket);

@@ -23,7 +23,7 @@ function applyView(items, sort, filter) {
 
 // ── NFT Card ──────────────────────────────────────────────────────────────────
 // useLayoutEffect draws before browser paint → no gray flash when scrolling
-function NFTCard({ index, rank, combo, layers, bitmapCache, canvasW, canvasH, onClick }) {
+function NFTCard({ index, rank, tier, score, combo, layers, bitmapCache, canvasW, canvasH, collW, collH, onClick }) {
   const canvasRef = useRef(null);
 
   function draw() {
@@ -41,12 +41,10 @@ function NFTCard({ index, rank, combo, layers, bitmapCache, canvasW, canvasH, on
   useLayoutEffect(() => { draw(); }, []);
 
   function handleClick() {
-    draw();
-    const src   = canvasRef.current?.toDataURL() ?? '';
     const attrs = layers
       .filter(l => combo[l.folder] && combo[l.folder].rel !== null)
       .map(l => ({ trait_type: l.label, value: combo[l.folder].name }));
-    onClick({ index, rank, src, attrs });
+    onClick({ index, rank, tier, score, combo, layers, bitmapCache, collW, collH, attrs });
   }
 
   return (
@@ -184,14 +182,14 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
 
     await Promise.all(rels.map(async rel => {
       if (bitmapCache.current[rel]) { setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`); return; }
-      const blobUrl = getBlobUrl(rel);
-      const src = blobUrl ?? `/api/layer-img/${rel}?w=${canvasW}&h=${canvasH}`;
-      const img = new Image();
-      await new Promise<void>(resolve => {
-        img.onload  = () => { bitmapCache.current[rel] = img; resolve(); };
-        img.onerror = () => resolve(); // skip missing images, don't block
-        img.src = src;
-      });
+      try {
+        const blobUrl = getBlobUrl(rel);
+        const res = blobUrl ? await fetch(blobUrl) : await fetch(`/api/layer-raw/${rel}`);
+        if (res.ok) {
+          const blob = await res.blob();
+          bitmapCache.current[rel] = await createImageBitmap(blob);
+        }
+      } catch {}
       setLoadMsg(`Loading images… ${++loaded} / ${rels.length}`);
     }));
 
@@ -357,18 +355,22 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
                 className="prev-grid"
                 style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
               >
-                {window_.map(({ combo, index, rank }) => {
+                {window_.map(({ combo, index, rank, tier, score }) => {
                   const comboKey = `${index}-${Object.values(combo).map((a: any) => a?.stem ?? '').join('|')}`;
                   return (
                     <NFTCard
                       key={comboKey}
                       index={index}
                       rank={sortBy !== 'shuffle' ? rank : null}
+                      tier={tier}
+                      score={score}
                       combo={combo}
                       layers={layers}
                       bitmapCache={bitmapCache}
                       canvasW={canvasW}
                       canvasH={canvasH}
+                      collW={srcW}
+                      collH={srcH}
                       onClick={setPopup}
                     />
                   );

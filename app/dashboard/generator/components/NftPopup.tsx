@@ -1,5 +1,6 @@
 // @ts-nocheck
 'use client';
+import { useRef, useLayoutEffect } from 'react';
 
 const TIER_COLOR: Record<string, string> = {
   Legendary: '#F59E0B',
@@ -10,7 +11,11 @@ const TIER_COLOR: Record<string, string> = {
 
 interface NftPopupItem {
   index: number;
-  src: string;
+  combo: Record<string, { rel: string; name: string; stem: string } | null>;
+  layers: { folder: string; label: string }[];
+  bitmapCache: { current: Record<string, ImageBitmap | HTMLImageElement> };
+  collW: number;
+  collH: number;
   attrs: { trait_type: string; value: string }[];
   rank?: number;
   tier?: string;
@@ -18,6 +23,21 @@ interface NftPopupItem {
 }
 
 export default function NftPopup({ item, onClose }: { item: NftPopupItem | null; onClose: () => void }) {
+  const canvasRef = useRef(null);
+
+  useLayoutEffect(() => {
+    if (!item || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, item.collW, item.collH);
+    for (const layer of item.layers) {
+      const pick = item.combo[layer.folder];
+      if (!pick?.rel) continue;
+      const bm = item.bitmapCache.current[pick.rel];
+      if (bm) ctx.drawImage(bm, 0, 0, item.collW, item.collH);
+    }
+  }, [item]);
+
   if (!item) return null;
   const tierColor = TIER_COLOR[item.tier ?? ''] ?? '#6B7280';
 
@@ -26,7 +46,12 @@ export default function NftPopup({ item, onClose }: { item: NftPopupItem | null;
       <div className="nft-popup" onClick={e => e.stopPropagation()}>
         <button className="nft-popup-close" onClick={onClose}>✕</button>
         <div className="nft-popup-left">
-          <img src={item.src} alt={`#${item.index}`} className="nft-popup-img" />
+          <canvas
+            ref={canvasRef}
+            width={item.collW}
+            height={item.collH}
+            className="nft-popup-img"
+          />
         </div>
         <div className="nft-popup-right">
           <div className="nft-popup-num">#{item.index}</div>
