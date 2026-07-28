@@ -206,6 +206,29 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   // editionNumber → itemId UUID (populated during persistToDb, used for IPFS CID writeback)
   const editionItemMapRef  = useRef<Record<number, string>>({});
 
+  // ── Auto-restore done state from DB on mount ─────────────────────────────
+  useEffect(() => {
+    if (!collectionId || phase !== 'idle') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`/api/nft-gen/jobs?collectionId=${collectionId}&status=complete`);
+        if (!r.ok || cancelled) return;
+        const data = await r.json();
+        if (cancelled || !data.jobs?.length) return;
+        const latestJob = data.jobs[0];
+        dbJobIdRef.current = latestJob.id;
+        await loadAndDisplayFromDb(latestJob.id);
+        if (cancelled) return;
+        setSvrGenStatus('done');
+        setDbSaved(true);
+        setPhase('done');
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collectionId]);
+
   // ── Server export helpers ─────────────────────────────────────────────────
 
   async function startServerExport() {
@@ -372,24 +395,21 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     }
   }
 
-  async function loadAndDisplayFromDb(jobId: string) {
-    console.log(`[loadAndDisplayFromDb] jobId=${jobId} layersProp=${layersProp.length} layers=${layers.length}`);
+  async function loadAndDisplayFromDb(jobId: string, attempt = 0) {
     try {
       let layerData: any[] = layersProp.length ? layersProp : layers;
       if (!layerData.length) {
-        console.log('[loadAndDisplayFromDb] fetching /api/layers');
-        try { const r = await fetch('/api/layers'); layerData = await r.json(); console.log(`[loadAndDisplayFromDb] /api/layers returned ${layerData?.length} items`); } catch (le) { console.error('[loadAndDisplayFromDb] /api/layers error', String(le)); }
+        try { const r = await fetch('/api/layers'); layerData = await r.json(); } catch {}
       }
-      if (!layerData.length) { console.log('[loadAndDisplayFromDb] no layers, returning'); return; }
+      if (!layerData.length) return;
       setLayers(layerData);
 
       const rels = [...new Set(
         layerData.flatMap((l: any) => l.assets.filter((a: any) => a.rel).map((a: any) => a.rel))
       )] as string[];
 
-      const [itemsResult] = await Promise.all([
-        fetch(`/api/nft-gen/jobs/${jobId}/display-items?limit=50`)
-          .then(r => r.json()).catch(() => ({ items: [] })),
+      const [itemsResp] = await Promise.all([
+        fetch(`/api/nft-gen/jobs/${jobId}/display-items?limit=50`),
         Promise.all(rels.map(async (rel) => {
           if (!jobBitmaps.current[rel]) {
             try {
@@ -403,8 +423,24 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         })),
       ]);
 
-      console.log(`[loadAndDisplayFromDb] display-items returned ${itemsResult.items?.length} items`);
-      if (!itemsResult.items?.length) { console.log('[loadAndDisplayFromDb] 0 items, returning'); return; }
+      if (!itemsResp.ok) {
+        console.warn(`[loadAndDisplayFromDb] display-items HTTP ${itemsResp.status} — retrying (${attempt}/3)`);
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+          return loadAndDisplayFromDb(jobId, attempt + 1);
+        }
+        return;
+      }
+
+      const itemsResult = await itemsResp.json().catch(() => ({ items: [] }));
+
+      if (!itemsResult.items?.length) {
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+          return loadAndDisplayFromDb(jobId, attempt + 1);
+        }
+        return;
+      }
 
       const displayed = itemsResult.items.map((item: any) => {
         const traits: Array<{ traitType: string; traitValue: string }> = item.traits ?? [];

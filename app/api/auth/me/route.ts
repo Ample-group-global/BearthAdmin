@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   try {
     const apiRes = await fetch(`${API_BASE}/api/auth/admin/me`, {
       headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(15000),
     });
     if (!apiRes.ok) return NextResponse.json({ authenticated: false }, { status: 401 });
     const data = await apiRes.json() as {

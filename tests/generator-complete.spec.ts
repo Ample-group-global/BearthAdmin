@@ -830,24 +830,28 @@ test.describe('Exports Tab — Server Generation', () => {
 
   test('Export done state: rarity tiers and NFT grid', async ({ page }) => {
     test.setTimeout(GEN_TIMEOUT_MS);
-    page.on('console', msg => { if (msg.text().includes('[loadAndDisplayFromDb]')) console.log('  [Browser]', msg.text()); });
     await gotoWithCollection(page, collectionId);
     await gotoStep(page, /export/i);
 
-    // If not already generated, re-generate
-    const idleCard = await page.locator('.exp-idle-card').isVisible({ timeout: 5_000 }).catch(() => false);
-    if (idleCard) {
-      console.log('  ⚠ Export panel idle — re-generating (page reload cleared in-memory state)');
+    // ExportPanel auto-restores done state from DB on mount (checks for completed jobs).
+    // Wait up to 30s for the tier legend (done state) to appear before falling back to re-generate.
+    const tierLegend = page.locator('.exp-tier-legend');
+    const autoRestored = await tierLegend.isVisible({ timeout: 30_000 }).catch(() => false);
+
+    if (!autoRestored) {
+      console.log('  ⚠ Auto-restore failed — re-generating');
       const genBtn = page.locator('button.btn-primary.btn-lg').filter({ hasText: /Generate.*NFT/i });
+      await expect(genBtn).toBeVisible({ timeout: 5_000 });
       await genBtn.click();
       const dbSavedBanner = page.locator('.exp-banner-saved[data-job-id]');
       await dbSavedBanner.waitFor({ state: 'visible', timeout: GEN_TIMEOUT_MS });
       const savedJobId = await dbSavedBanner.getAttribute('data-job-id');
       if (savedJobId) jobId = savedJobId;
+      await expect(tierLegend).toBeVisible({ timeout: 30_000 });
     }
 
     // Tier legend: 4 tiers visible
-    const tierLegend = page.locator('.exp-tier-legend');
+
     await expect(tierLegend).toBeVisible({ timeout: 20_000 });
     const tierPills = page.locator('.exp-tier-pill');
     const tierCount = await tierPills.count();
@@ -897,9 +901,11 @@ test.describe('Exports Tab — Server Generation', () => {
     await gotoWithCollection(page, collectionId);
     await gotoStep(page, /export/i);
 
-    const idleCard = await page.locator('.exp-idle-card').isVisible({ timeout: 5_000 }).catch(() => false);
-    if (idleCard) {
+    const tierLegend = page.locator('.exp-tier-legend');
+    const autoRestored = await tierLegend.isVisible({ timeout: 30_000 }).catch(() => false);
+    if (!autoRestored) {
       const genBtn = page.locator('button.btn-primary.btn-lg').filter({ hasText: /Generate.*NFT/i });
+      await expect(genBtn).toBeVisible({ timeout: 5_000 });
       await genBtn.click();
       const dbSaved = page.locator('.exp-banner-saved[data-job-id]');
       await dbSaved.waitFor({ state: 'visible', timeout: GEN_TIMEOUT_MS });
@@ -907,6 +913,7 @@ test.describe('Exports Tab — Server Generation', () => {
         const jid = await dbSaved.getAttribute('data-job-id');
         if (jid) jobId = jid;
       }
+      await expect(tierLegend).toBeVisible({ timeout: 30_000 });
     }
 
     await page.waitForSelector('.exp-nft-card', { timeout: 30_000 });
@@ -931,12 +938,15 @@ test.describe('Exports Tab — Server Generation', () => {
     await gotoWithCollection(page, collectionId);
     await gotoStep(page, /export/i);
 
-    const idleCard = await page.locator('.exp-idle-card').isVisible({ timeout: 5_000 }).catch(() => false);
-    if (idleCard) {
+    const tierLegend = page.locator('.exp-tier-legend');
+    const autoRestored = await tierLegend.isVisible({ timeout: 30_000 }).catch(() => false);
+    if (!autoRestored) {
       const genBtn = page.locator('button.btn-primary.btn-lg').filter({ hasText: /Generate.*NFT/i });
+      await expect(genBtn).toBeVisible({ timeout: 5_000 });
       await genBtn.click();
       const dbSaved = page.locator('.exp-banner-saved[data-job-id]');
       await dbSaved.waitFor({ state: 'visible', timeout: GEN_TIMEOUT_MS });
+      await expect(tierLegend).toBeVisible({ timeout: 30_000 });
     }
 
     const downloadBtn = page.locator('button.btn-primary').filter({ hasText: /Download ZIP/i });
@@ -966,16 +976,19 @@ test.describe('Exports Tab — Filebase Server Export', () => {
     await gotoWithCollection(page, collectionId);
     await gotoStep(page, /export/i);
 
-    // Re-generate if needed
-    const idleCard = await page.locator('.exp-idle-card').isVisible({ timeout: 5_000 }).catch(() => false);
-    if (idleCard) {
+    // Wait for auto-restore (ExportPanel checks DB for completed job on mount)
+    const tierLegend = page.locator('.exp-tier-legend');
+    const autoRestored = await tierLegend.isVisible({ timeout: 30_000 }).catch(() => false);
+    if (!autoRestored) {
       const genBtn = page.locator('button.btn-primary.btn-lg').filter({ hasText: /Generate.*NFT/i });
+      await expect(genBtn).toBeVisible({ timeout: 5_000 });
       await genBtn.click();
       const dbSaved = page.locator('.exp-banner-saved[data-job-id]');
       await dbSaved.waitFor({ state: 'visible', timeout: GEN_TIMEOUT_MS });
       const jid = await dbSaved.getAttribute('data-job-id');
       if (jid) jobId = jid;
       console.log(`  ✅ Regenerated — job ID: ${jobId}`);
+      await expect(tierLegend).toBeVisible({ timeout: 30_000 });
     }
 
     // Server export card must be visible (shown only after dbSaved=true)
