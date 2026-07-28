@@ -175,7 +175,8 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const [metaCids,  setMetaCids]  = useState({});
   const [showCids,  setShowCids]  = useState(false);
   const [fbError,   setFbError]   = useState('');
-  const imgCidsRef = useRef({});
+  const imgCidsRef      = useRef({});
+  const imgPathsRef     = useRef<Record<number, string>>({});
 
   const [rarityItems, setRarityItems] = useState<any[]>([]);
   const [allCombos,   setAllCombos]   = useState<any[]>([]);
@@ -183,6 +184,9 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const [layers, setLayers] = useState<any[]>(layersProp);
   const cancelledRef       = useRef(false);
   const lastFailedJobIdRef = useRef<string | null>(null);
+  const dbJobIdRef         = useRef<string | null>(null);
+  // editionNumber → itemId UUID (populated during persistToDb, used for IPFS CID writeback)
+  const editionItemMapRef  = useRef<Record<number, string>>({});
 
   async function generate() {
     cancelledRef.current = false;
@@ -258,58 +262,110 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       await fetch(`/api/nft-gen/jobs/${lastFailedJobIdRef.current}`, { method: 'DELETE' }).catch(() => {});
       lastFailedJobIdRef.current = null;
     }
+
+    // Retry helper — exponential backoff: 1 s → 2 s → 4 s → 8 s
+    // 4xx errors are not retried (bad request / auth — retrying won't help).
+    async function withRetry<T>(label: string, fn: () => Promise<T>, maxRetries = 4): Promise<T> {
+      let lastErr: unknown;
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        if (attempt > 0) {
+          const ms = 1_000 * Math.pow(2, attempt - 1);
+          console.warn(`[nft-db/${label}] retry ${attempt}/${maxRetries} in ${ms}ms`);
+          await new Promise(r => setTimeout(r, ms));
+        }
+        try { return await fn(); } catch (e: any) {
+          lastErr = e;
+          if (e?.retryable === false) throw e;
+        }
+      }
+      throw lastErr;
+    }
+
     let dbJobId: string | null = null;
     try {
-      const jr = await fetch(`/api/nft-gen/collections/${collectionId}/jobs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ editionSize: items.length }),
+      // ── 1. Create job ───────────────────────────────────────────────────────
+      const jr = await withRetry('create-job', async () => {
+        const res = await fetch(`/api/nft-gen/collections/${collectionId}/jobs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ editionSize: items.length }),
+        });
+        if (!res.ok) {
+          const err = new Error(`Job creation failed (${res.status})`);
+          if (res.status >= 400 && res.status < 500) (err as any).retryable = false;
+          throw err;
+        }
+        return res.json();
       });
-      if (!jr.ok) throw new Error(`Job creation failed (${jr.status})`);
-      const jdata = await jr.json();
-      dbJobId = jdata?.job?.id ?? jdata?.id ?? null;
-      if (!dbJobId) throw new Error('Job ID not returned from server');
+      dbJobId = jr?.job?.id ?? jr?.id ?? null;
+      if (!dbJobId) throw Object.assign(new Error('Job ID not returned from server'), { retryable: false });
 
-      await fetch(`/api/nft-gen/jobs/${dbJobId}/start`, { method: 'POST' });
+      // ── 2. Start job ────────────────────────────────────────────────────────
+      await withRetry('start-job', () =>
+        fetch(`/api/nft-gen/jobs/${dbJobId}/start`, { method: 'POST' }),
+      );
+      editionItemMapRef.current = {};
 
-      const ITEM_BATCH = 100;
+      // ── 3. Insert items in small batches with retry ─────────────────────────
+      // 100 items per batch = ~100ms per DB transaction, minimal timeout risk.
+      // ON CONFLICT DO NOTHING on the server makes every retry fully idempotent.
+      const ITEM_BATCH   = 100;
+      const totalBatches = Math.ceil(items.length / ITEM_BATCH);
+
       for (let i = 0; i < items.length; i += ITEM_BATCH) {
+        const batchNum = Math.floor(i / ITEM_BATCH) + 1;
         const chunk = items.slice(i, i + ITEM_BATCH).map((item: any) => ({
           editionNumber: item.index,
           dnaHash: (item.attrs as any[]).map((a: any) => `${a.trait_type}:${a.value}`).join('|'),
           score: item.score,
-          rank: item.rank,
-          tier: item.tier,
+          rank:  item.rank,
+          tier:  item.tier,
           traits: (item.attrs as any[]).map((a: any) => ({
-            traitType: a.trait_type,
+            traitType:  a.trait_type,
             traitValue: a.value,
           })),
         }));
-        const br = await fetch(`/api/nft-gen/jobs/${dbJobId}/items/batch`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: chunk }),
+
+        const batchData = await withRetry(`batch-${batchNum}/${totalBatches}`, async () => {
+          const res = await fetch(`/api/nft-gen/jobs/${dbJobId}/items/batch`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ items: chunk }),
+          });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            const err  = new Error(`Batch ${batchNum}/${totalBatches} failed (${res.status}): ${(body as any).error ?? 'server error'}`);
+            if (res.status >= 400 && res.status < 500) (err as any).retryable = false;
+            throw err;
+          }
+          return res.json().catch(() => ({}));
         });
-        if (!br.ok) {
-          const errData = await br.json().catch(() => ({}));
-          throw new Error(`Batch insert failed (${br.status}): ${(errData as any).error ?? 'server error'}`);
+
+        for (const row of (batchData?.items ?? [])) {
+          editionItemMapRef.current[row.editionNumber] = row.itemId;
         }
+
+        // Progress update is fire-and-forget — a reporting failure never aborts the sync
         const pctDone = Math.round(((i + chunk.length) / items.length) * 100);
-        await fetch(`/api/nft-gen/jobs/${dbJobId}/progress`, {
-          method: 'PATCH',
+        fetch(`/api/nft-gen/jobs/${dbJobId}/progress`, {
+          method:  'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ progress: pctDone }),
-        });
+          body:    JSON.stringify({ progress: pctDone }),
+        }).catch(() => {});
       }
 
-      await fetch(`/api/nft-gen/jobs/${dbJobId}/complete`, { method: 'POST' });
+      // ── 4. Complete job ─────────────────────────────────────────────────────
+      await withRetry('complete-job', () =>
+        fetch(`/api/nft-gen/jobs/${dbJobId}/complete`, { method: 'POST' }),
+      );
+      dbJobIdRef.current = dbJobId;
       setDbSaved(true);
     } catch (err: any) {
       if (dbJobId) {
-        await fetch(`/api/nft-gen/jobs/${dbJobId}/fail`, {
-          method: 'POST',
+        fetch(`/api/nft-gen/jobs/${dbJobId}/fail`, {
+          method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ errorMessage: err?.message ?? 'Item batch insert failed' }),
+          body:    JSON.stringify({ errorMessage: err?.message ?? 'Item batch insert failed' }),
         }).catch(() => {});
       }
       lastFailedJobIdRef.current = dbJobId;
@@ -502,7 +558,34 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     setFbError('');
     setImgDone(0);
     setImgCids({});
-    imgCidsRef.current = {};
+    imgCidsRef.current  = {};
+    imgPathsRef.current = {};
+
+    // Create DB upload batch record
+    let imgBatchId: string | null = null;
+    if (dbJobIdRef.current) {
+      try {
+        const br = await fetch(`/api/nft-gen/jobs/${dbJobIdRef.current}/upload-batches`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: 'filebase', batchType: 'images', totalItems: supply }),
+        });
+        if (br.ok) {
+          const bd = await br.json();
+          imgBatchId = bd?.batch?.id ?? null;
+          if (imgBatchId) {
+            await fetch(`/api/nft-gen/upload-batches/${imgBatchId}/start`, { method: 'POST' }).catch(() => {});
+          }
+        } else {
+          const errBody = await br.json().catch(() => ({}));
+          console.error('[upload-batch-img] create failed:', br.status, JSON.stringify(errBody));
+        }
+      } catch (e) {
+        console.error('[upload-batch-img] create exception:', String(e));
+      }
+    } else {
+      console.error('[upload-batch-img] dbJobIdRef is null — batch skipped');
+    }
 
     const rels = [...new Set(layers.flatMap(l => l.assets.filter(a => a.rel).map(a => a.rel)))];
     const imageBuffers = {};
@@ -517,6 +600,8 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     setImgPhase('uploading');
     const CONCURRENCY = 3;
     let cursor = 0;
+    let uploadedCount = 0;
+    let lastReported = 0;
 
     async function runOne() {
       while (cursor < allCombos.length) {
@@ -541,15 +626,43 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           const r = await fetch('/api/filebase/image', { method: 'POST', body: fd });
           if (r.ok) {
             const d = await r.json();
-            imgCidsRef.current[num] = d.cid || '';
+            imgCidsRef.current[num]  = d.cid || '';
+            imgPathsRef.current[num] = `images/${num}.${imgExt}`;
             setImgCids(prev => ({ ...prev, [num]: d.cid || '' }));
           }
         } catch {}
+        uploadedCount++;
         setImgDone(prev => prev + 1);
+        // Report progress every 10% of supply (min 1, max 100)
+        const imgProgressStep = Math.max(1, Math.min(100, Math.ceil(supply / 10)));
+        if (imgBatchId && uploadedCount - lastReported >= imgProgressStep) {
+          lastReported = uploadedCount;
+          fetch(`/api/nft-gen/upload-batches/${imgBatchId}/progress`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uploadedItems: uploadedCount }),
+          }).catch(() => {});
+        }
       }
     }
-    await Promise.all(Array.from({ length: CONCURRENCY }, runOne));
-    setImgPhase('done');
+
+    try {
+      await Promise.all(Array.from({ length: CONCURRENCY }, runOne));
+      setImgPhase('done');
+      if (imgBatchId) {
+        await fetch(`/api/nft-gen/upload-batches/${imgBatchId}/complete`, { method: 'POST' }).catch(() => {});
+      }
+    } catch (e: any) {
+      setImgPhase('idle');
+      setFbError(e.message ?? 'Image upload failed');
+      if (imgBatchId) {
+        fetch(`/api/nft-gen/upload-batches/${imgBatchId}/fail`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: e.message ?? 'Image upload failed' }),
+        }).catch(() => {});
+      }
+    }
   }
 
   async function clearUploads() {
@@ -600,8 +713,30 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     setFbError('');
     setMetaDone(0);
     setMetaCids({});
+
+    // Create DB upload batch record
+    let metaBatchId: string | null = null;
+    if (dbJobIdRef.current) {
+      try {
+        const br = await fetch(`/api/nft-gen/jobs/${dbJobIdRef.current}/upload-batches`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: 'filebase', batchType: 'metadata', totalItems: supply }),
+        });
+        if (br.ok) {
+          const bd = await br.json();
+          metaBatchId = bd?.batch?.id ?? null;
+          if (metaBatchId) {
+            await fetch(`/api/nft-gen/upload-batches/${metaBatchId}/start`, { method: 'POST' }).catch(() => {});
+          }
+        }
+      } catch {}
+    }
+
     const BATCH_SIZE = 50;
     const resolvedNameFmt = nameFormat || (collName ? `${collName} #{{id}}` : '#{{id}}');
+    let totalUploaded = 0;
+    const localMetaCids: Record<number, string> = {};
 
     for (let i = 0; i < supply; i += BATCH_SIZE) {
       const end   = Math.min(i + BATCH_SIZE, supply);
@@ -638,11 +773,48 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
             if (!isNaN(n)) update[n] = cid || '';
           });
           setMetaCids(prev => ({ ...prev, ...update }));
+          Object.assign(localMetaCids, update);
         }
       } catch {}
+      totalUploaded += items.length;
       setMetaDone(prev => prev + items.length);
+      // Report progress to DB every batch
+      if (metaBatchId) {
+        fetch(`/api/nft-gen/upload-batches/${metaBatchId}/progress`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uploadedItems: totalUploaded }),
+        }).catch(() => {});
+      }
     }
     setMetaPhase('done');
+    if (metaBatchId) {
+      await fetch(`/api/nft-gen/upload-batches/${metaBatchId}/complete`, { method: 'POST' }).catch(() => {});
+    }
+
+    // Write IPFS CIDs back to nft_generated_items in the DB
+    if (dbJobIdRef.current && Object.keys(imgCidsRef.current).length > 0) {
+      const IPFS_BATCH = 500;
+      const editions = Object.keys(imgCidsRef.current).map(Number);
+      for (let i = 0; i < editions.length; i += IPFS_BATCH) {
+        const chunk = editions.slice(i, i + IPFS_BATCH);
+        const payload = chunk
+          .filter(n => imgCidsRef.current[n] && localMetaCids[n])
+          .map(n => ({
+            editionNumber:   n,
+            ipfsImageCid:    imgCidsRef.current[n],
+            ipfsMetadataCid: localMetaCids[n],
+            imagePath:       imgPathsRef.current[n] ?? null,
+          }));
+        if (payload.length > 0) {
+          fetch(`/api/nft-gen/jobs/${dbJobIdRef.current}/items/batch-ipfs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: payload }),
+          }).catch(() => {});
+        }
+      }
+    }
   }
 
   const pct = supply > 0 ? Math.min((progress / supply) * 100, 100) : 0;
