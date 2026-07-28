@@ -178,6 +178,16 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const imgCidsRef      = useRef({});
   const imgPathsRef     = useRef<Record<number, string>>({});
 
+  // ── Server-side export state ──────────────────────────────────────────────
+  const [svrBucket,   setSvrBucket]   = useState('');
+  const [svrStatus,   setSvrStatus]   = useState<'idle'|'running'|'done'|'error'>('idle');
+  const [svrProgress, setSvrProgress] = useState(0);
+  const [svrTotal,    setSvrTotal]    = useState(0);
+  const [svrPhase,    setSvrPhase]    = useState('');
+  const [svrError,    setSvrError]    = useState('');
+  const svrExportIdRef = useRef<string | null>(null);
+  const svrPollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const [rarityItems, setRarityItems] = useState<any[]>([]);
   const [allCombos,   setAllCombos]   = useState<any[]>([]);
   const jobBitmaps = useRef<Record<string, ImageBitmap>>({});
@@ -187,6 +197,63 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const dbJobIdRef         = useRef<string | null>(null);
   // editionNumber → itemId UUID (populated during persistToDb, used for IPFS CID writeback)
   const editionItemMapRef  = useRef<Record<number, string>>({});
+
+  // ── Server export helpers ─────────────────────────────────────────────────
+
+  async function startServerExport() {
+    const bucket = svrBucket.trim();
+    if (!bucket || !dbJobIdRef.current) return;
+    setSvrStatus('running');
+    setSvrProgress(0);
+    setSvrPhase('Starting…');
+    setSvrError('');
+
+    try {
+      const r = await fetch('/api/nft-gen/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId:          dbJobIdRef.current,
+          bucket,
+          format:         imgExt,
+          width:          targetW,
+          height:         targetH,
+          collectionName: collName,
+          description,
+          nameFormat,
+          externalUrl:    externalUrlBase,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setSvrStatus('error'); setSvrError(d.error ?? 'Server error'); return; }
+      svrExportIdRef.current = d.exportId;
+      setSvrTotal(d.total ?? supply);
+
+      svrPollRef.current = setInterval(async () => {
+        const pr = await fetch(`/api/nft-gen/export/${svrExportIdRef.current}`).then(x => x.json()).catch(() => null);
+        if (!pr) return;
+        setSvrProgress(pr.progress ?? 0);
+        setSvrPhase(pr.phase ?? '');
+        setSvrTotal(pr.total ?? supply);
+        if (pr.status === 'done') {
+          setSvrStatus('done');
+          if (svrPollRef.current) { clearInterval(svrPollRef.current); svrPollRef.current = null; }
+        } else if (pr.status === 'error') {
+          setSvrStatus('error');
+          setSvrError(pr.error ?? 'Export failed');
+          if (svrPollRef.current) { clearInterval(svrPollRef.current); svrPollRef.current = null; }
+        }
+      }, 2000);
+    } catch (e: any) {
+      setSvrStatus('error');
+      setSvrError(e.message ?? 'Failed to start server export');
+    }
+  }
+
+  function cancelServerExport() {
+    if (svrPollRef.current) { clearInterval(svrPollRef.current); svrPollRef.current = null; }
+    setSvrStatus('idle');
+  }
 
   async function generate() {
     cancelledRef.current = false;
@@ -1179,6 +1246,72 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           </div>
         )}
       </div>
+
+      {/* ── Server-Side Export ── */}
+      {dbSaved && dbJobIdRef.current && (
+        <div className="exp-fb-card">
+          <div className="exp-fb-header">
+            <div className="exp-fb-title">Server-Side Export</div>
+            <div className="exp-fb-sub">
+              Recommended for large collections — compositing and IPFS upload run on the server (no browser limits)
+            </div>
+          </div>
+
+          {svrStatus === 'idle' && (
+            <>
+              <div className="exp-fb-bucket-row">
+                <input
+                  className="exp-fb-input"
+                  placeholder="Filebase bucket name"
+                  value={svrBucket}
+                  onChange={e => setSvrBucket(e.target.value)}
+                />
+                <button
+                  className="btn btn-primary"
+                  onClick={startServerExport}
+                  disabled={!svrBucket.trim()}
+                >
+                  ⚡ Start Server Export
+                </button>
+              </div>
+              {svrError && <div className="exp-error-banner" style={{ marginTop: 10 }}>{svrError}</div>}
+            </>
+          )}
+
+          {svrStatus === 'running' && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <Spinner size={16} color="var(--accent)" />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{svrPhase || 'Working…'}</span>
+              </div>
+              <ProgressBar value={svrProgress} max={svrTotal} />
+              <div className="exp-step-count">{svrProgress.toLocaleString()} / {svrTotal.toLocaleString()}</div>
+              <button className="btn btn-ghost" onClick={cancelServerExport} style={{ marginTop: 8 }}>
+                Stop polling
+              </button>
+            </div>
+          )}
+
+          {svrStatus === 'done' && (
+            <div className="exp-banner exp-banner-saved" style={{ marginTop: 14 }}>
+              <CheckIcon size={15} />
+              <span>{svrTotal.toLocaleString()} NFTs composited and uploaded to Filebase IPFS</span>
+              <button className="btn btn-ghost" style={{ marginLeft: 'auto' }}
+                onClick={() => { setSvrStatus('idle'); setSvrProgress(0); svrExportIdRef.current = null; }}
+              >
+                Export again
+              </button>
+            </div>
+          )}
+
+          {svrStatus === 'error' && (
+            <div className="exp-banner exp-banner-error" style={{ marginTop: 14 }}>
+              <span>Server export failed: {svrError}</span>
+              <button className="exp-retry-btn" onClick={() => { setSvrStatus('idle'); setSvrError(''); }}>↺ Retry</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {popup && <NftPopup item={{ ...popup, total: supply }} onClose={() => setPopup(null)} />}
     </div>
