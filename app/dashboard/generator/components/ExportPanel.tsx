@@ -1052,7 +1052,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           </div>
         )}
         {dbSaved && !dbSaving && (
-          <div className="exp-banner exp-banner-saved">
+          <div className="exp-banner exp-banner-saved" data-job-id={dbJobIdRef.current ?? ''}>
             <CheckIcon size={15} />
             <span>{rarityItems.length.toLocaleString()} items saved to database</span>
           </div>
@@ -1249,7 +1249,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
 
       {/* ── Server-Side Export ── */}
       {dbSaved && dbJobIdRef.current && (
-        <div className="exp-fb-card">
+        <div className="exp-fb-card exp-svr-card">
           <div className="exp-fb-header">
             <div className="exp-fb-title">Server-Side Export</div>
             <div className="exp-fb-sub">
@@ -1279,7 +1279,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           )}
 
           {svrStatus === 'running' && (
-            <div style={{ marginTop: 14 }}>
+            <div style={{ marginTop: 14 }} data-export-id={svrExportIdRef.current ?? ''}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                 <Spinner size={16} color="var(--accent)" />
                 <span style={{ fontSize: 14, fontWeight: 600 }}>{svrPhase || 'Working…'}</span>
@@ -1293,7 +1293,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           )}
 
           {svrStatus === 'done' && (
-            <div className="exp-banner exp-banner-saved" style={{ marginTop: 14 }}>
+            <div className="exp-banner exp-banner-saved exp-svr-done" style={{ marginTop: 14 }}>
               <CheckIcon size={15} />
               <span>{svrTotal.toLocaleString()} NFTs composited and uploaded to Filebase IPFS</span>
               <button className="btn btn-ghost" style={{ marginLeft: 'auto' }}
