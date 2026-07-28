@@ -11,11 +11,12 @@ const TIER_COLOR: Record<string, string> = {
 
 interface NftPopupItem {
   index: number;
-  combo: Record<string, { rel: string; name: string; stem: string } | null>;
-  layers: { folder: string; label: string }[];
-  bitmapCache: { current: Record<string, ImageBitmap | HTMLImageElement> };
-  collW: number;
-  collH: number;
+  src?: string;  // pre-rendered data URL (export panel path)
+  combo?: Record<string, { rel: string; name: string; stem: string } | null>;
+  layers?: { folder: string; label: string }[];
+  bitmapCache?: { current: Record<string, ImageBitmap | HTMLImageElement> };
+  collW?: number;
+  collH?: number;
   attrs: { trait_type: string; value: string }[];
   rank?: number;
   tier?: string;
@@ -29,14 +30,21 @@ export default function NftPopup({ item, onClose }: { item: NftPopupItem | null;
     if (!item || !canvasRef.current) return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    // Draw at the bitmap's native size (THUMB×THUMB); CSS scales the canvas element.
     const W = canvas.width;
     const H = canvas.height;
     ctx.clearRect(0, 0, W, H);
-    for (const layer of item.layers) {
-      const pick = item.combo[layer.folder];
+    if (item.src) {
+      // Export panel: card was pre-rendered to a data URL — draw it directly
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, W, H);
+      img.src = item.src;
+      return;
+    }
+    // Preview panel: compose from layers + bitmaps
+    for (const layer of (item.layers ?? [])) {
+      const pick = item.combo?.[layer.folder];
       if (!pick?.rel) continue;
-      const bm = item.bitmapCache.current[pick.rel];
+      const bm = item.bitmapCache?.current[pick.rel];
       if (bm) ctx.drawImage(bm, 0, 0, W, H);
     }
   }, [item]);

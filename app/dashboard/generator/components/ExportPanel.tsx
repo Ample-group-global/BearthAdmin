@@ -211,19 +211,26 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     if (!collectionId || phase !== 'idle') return;
     let cancelled = false;
     (async () => {
-      try {
-        const r = await fetch(`/api/nft-gen/jobs?collectionId=${collectionId}&status=complete`);
-        if (!r.ok || cancelled) return;
-        const data = await r.json();
-        if (cancelled || !data.jobs?.length) return;
-        const latestJob = data.jobs[0];
-        dbJobIdRef.current = latestJob.id;
-        await loadAndDisplayFromDb(latestJob.id);
+      // Retry up to 3× with 5s backoff — BearthApi pool may be briefly stressed
+      // after a heavy generation run, causing the first restore attempt to fail.
+      for (let attempt = 0; attempt < 3; attempt++) {
         if (cancelled) return;
-        setSvrGenStatus('done');
-        setDbSaved(true);
-        setPhase('done');
-      } catch {}
+        if (attempt > 0) await new Promise(r => setTimeout(r, 5_000));
+        try {
+          const r = await fetch(`/api/nft-gen/jobs?collectionId=${collectionId}&status=complete`);
+          if (!r.ok || cancelled) continue;
+          const data = await r.json();
+          if (cancelled || !data.jobs?.length) return;
+          const latestJob = data.jobs[0];
+          dbJobIdRef.current = latestJob.id;
+          await loadAndDisplayFromDb(latestJob.id);
+          if (cancelled) return;
+          setSvrGenStatus('done');
+          setDbSaved(true);
+          setPhase('done');
+          return;
+        } catch { /* retry */ }
+      }
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -408,20 +415,8 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         layerData.flatMap((l: any) => l.assets.filter((a: any) => a.rel).map((a: any) => a.rel))
       )] as string[];
 
-      const [itemsResp] = await Promise.all([
-        fetch(`/api/nft-gen/jobs/${jobId}/display-items?limit=50`),
-        Promise.all(rels.map(async (rel) => {
-          if (!jobBitmaps.current[rel]) {
-            try {
-              const res = await fetch(`/api/layer-raw/${rel}`);
-              if (res.ok) {
-                const blob = await res.blob();
-                jobBitmaps.current[rel] = await createImageBitmap(blob);
-              }
-            } catch {}
-          }
-        })),
-      ]);
+      // Fetch items only — don't block on bitmap loading
+      const itemsResp = await fetch(`/api/nft-gen/jobs/${jobId}/display-items?limit=200`);
 
       if (!itemsResp.ok) {
         console.warn(`[loadAndDisplayFromDb] display-items HTTP ${itemsResp.status} — retrying (${attempt}/3)`);
@@ -465,6 +460,19 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         };
       });
       setRarityItems(displayed);
+
+      // Load bitmaps in background — don't block setPhase('done')
+      Promise.all(rels.map(async (rel) => {
+        if (!jobBitmaps.current[rel]) {
+          try {
+            const res = await fetch(`/api/layer-raw/${rel}`);
+            if (res.ok) {
+              const blob = await res.blob();
+              jobBitmaps.current[rel] = await createImageBitmap(blob);
+            }
+          } catch {}
+        }
+      })).catch(() => {});
     } catch (e) {
       console.error('[loadAndDisplayFromDb]', e);
     }
