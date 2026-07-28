@@ -55,17 +55,18 @@ async function snap(page: Page, name: string) {
   console.log(`  📸 ${name}.png`);
 }
 
-async function waitForStudio(page: Page, retries = 2) {
+async function waitForStudio(page: Page, retries = 1) {
+  // Each attempt: 20s max (BearthApi AbortSignal is 15s → redirect lands by ~16s).
+  // With 1 retry: 20 + 3 pause + 20 = 43s total — well within the 60s test budget.
   for (let attempt = 0; attempt <= retries; attempt++) {
     const result = await Promise.race([
-      page.waitForSelector('.studio-wrap', { timeout: 60_000 }).then(() => 'ok' as const),
-      page.waitForURL('**/login**',         { timeout: 60_000 }).then(() => 'login' as const),
+      page.waitForSelector('.studio-wrap', { timeout: 20_000 }).then(() => 'ok' as const),
+      page.waitForURL(/\/login/,            { timeout: 20_000 }).then(() => 'login' as const),
     ]).catch(() => 'timeout' as const);
 
     if (result === 'ok') return;
 
     if (attempt < retries) {
-      // Auth failed (redirected to /login or timed out) — pause 3s and retry
       console.log(`  ⚠ waitForStudio: ${result} on attempt ${attempt + 1}, retrying…`);
       await page.waitForTimeout(3_000);
       await page.goto(page.url().includes('login') ? '/dashboard/generator' : page.url());
