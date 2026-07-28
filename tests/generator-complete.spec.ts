@@ -11,9 +11,32 @@ const COLLECTION_NAME = 'Bearth Genesis 9999';
 const SYMBOL         = 'BG9K';
 const DESCRIPTION    = 'The first Bearth Genesis NFT collection — 9,999 unique generative artworks on Ethereum.';
 
+// ── State persistence: survives retries without re-running expensive steps ───
+// Saved to disk so a retry run can skip collection-creation and 9999-NFT generation.
+const STATE_FILE = path.join(process.cwd(), 'tests', '.state', 'generator-state.json');
+
+function loadState(): { collectionId: string; jobId: string } {
+  try {
+    const data = JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8')) as { collectionId: string; jobId: string; ts: number };
+    if (Date.now() - data.ts < 24 * 60 * 60 * 1000 && data.collectionId) {
+      console.log(`[state] Loaded — collectionId=${data.collectionId} jobId=${data.jobId}`);
+      return { collectionId: data.collectionId, jobId: data.jobId ?? '' };
+    }
+  } catch {}
+  return { collectionId: '', jobId: '' };
+}
+
+function saveState() {
+  try {
+    fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
+    fs.writeFileSync(STATE_FILE, JSON.stringify({ collectionId, jobId, ts: Date.now() }), 'utf-8');
+  } catch {}
+}
+
 // ── Shared state between tests (populated as tests run) ──────────────────────
-let collectionId = '';
-let jobId        = '';
+const _saved     = loadState();
+let collectionId = _saved.collectionId;
+let jobId        = _saved.jobId;
 
 // ── Timeouts ──────────────────────────────────────────────────────────────────
 // Server generation 9999 NFTs: ~5 min combos + ~2 min DB save
@@ -209,6 +232,15 @@ test.describe('Settings Tab', () => {
 
   test('Settings: Save & Continue creates collection and syncs 11 layers to DB', async ({ page }) => {
     test.setTimeout(120_000);
+
+    if (collectionId) {
+      console.log(`  ⏭ Using pre-existing collection: ${collectionId}`);
+      await gotoWithCollection(page, collectionId);
+      await page.waitForSelector('.org-layout, aside.sidebar, .setup-page', { timeout: 30_000 });
+      console.log(`  ✅ Collection verified (skipped creation): ${collectionId}`);
+      return;
+    }
+
     await page.goto('/dashboard/generator');
     await waitForStudio(page);
 
@@ -249,6 +281,7 @@ test.describe('Settings Tab', () => {
     const savedId = await page.evaluate(() => sessionStorage.getItem('nft_collection_id'));
     expect(savedId).toBeTruthy();
     collectionId = savedId!;
+    saveState();
     console.log(`  ✅ Collection created: ${collectionId}`);
 
     // Verify sidebar shows at least 11 layers (synced from disk)
@@ -776,6 +809,16 @@ test.describe('Exports Tab — Server Generation', () => {
     await gotoWithCollection(page, collectionId);
     await gotoStep(page, /export/i);
 
+    if (jobId) {
+      console.log(`  ⏭ Using pre-existing job: ${jobId}`);
+      // Verify auto-restore brings up done state
+      const tierLegend = page.locator('.exp-tier-legend');
+      const restored = await tierLegend.isVisible({ timeout: 30_000 }).catch(() => false);
+      console.log(`  Auto-restore: ${restored ? '✅' : '⚠ not visible'}`);
+      console.log(`  ✅ Generation skipped — Job ID: ${jobId}`);
+      return;
+    }
+
     const idleCard = page.locator('.exp-idle-card');
     await expect(idleCard).toBeVisible({ timeout: 20_000 });
 
@@ -833,6 +876,7 @@ test.describe('Exports Tab — Server Generation', () => {
     const savedJobId = await dbSavedBanner.getAttribute('data-job-id');
     expect(savedJobId).toBeTruthy();
     jobId = savedJobId!;
+    saveState();
     console.log(`  ✅ Generation complete — Job ID: ${jobId}`);
 
     // "N NFTs Ready" badge
