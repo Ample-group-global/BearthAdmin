@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { TIER_PRESET_WEIGHTS } from '../../../../lib/studio/tiers';
 import { calcRarity } from '../../../../lib/studio/probability';
+import { useLayerFiles } from '../LayerFilesContext';
 
 const TIER_LABELS = [
   { label: 'Legendary', color: '#F59E0B' },
@@ -14,6 +15,7 @@ const TIER_LABELS = [
 export default function RarityModal({ layer, weights, supply, onSave, onDelete, onClose }) {
   // Local state for weights - starts from parent weights
   const [localWs, setLocalWs] = useState<Record<string, number>>(() => ({ ...weights }));
+  const { getBlobUrl } = useLayerFiles();
 
   const totalW = useMemo(() => Object.values(localWs).reduce((a, b) => a + b, 0), [localWs]);
 
@@ -87,7 +89,7 @@ export default function RarityModal({ layer, weights, supply, onSave, onDelete, 
                 <div className="rm-thumb">
                   {asset.rel ? (
                     <img
-                      src={`/api/thumb/${asset.rel}`}
+                      src={getBlobUrl(asset.rel) ?? `/api/thumb/${asset.rel}`}
                       alt={asset.name}
                       loading="lazy"
                       onError={e => { e.currentTarget.parentElement.innerHTML = '<span class="rm-noimg">🖼</span>'; }}
