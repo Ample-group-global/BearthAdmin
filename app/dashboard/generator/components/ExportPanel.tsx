@@ -318,9 +318,20 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       svrExportIdRef.current = d.exportId;
       setSvrTotal(d.total ?? supply);
 
+      let exportPollFailures = 0;
       svrPollRef.current = setInterval(async () => {
-        const pr = await fetch(`/api/nft-gen/export/${svrExportIdRef.current}`).then(x => x.json()).catch(() => null);
-        if (!pr) return;
+        let resp: Response;
+        let pr: any = null;
+        try {
+          resp = await fetch(`/api/nft-gen/export/${svrExportIdRef.current}`);
+          pr = await resp.json();
+        } catch { exportPollFailures++; if (exportPollFailures >= 3) { clearInterval(svrPollRef.current!); svrPollRef.current = null; setSvrStatus('error'); setSvrError('Lost connection to server. Please try again.'); } return; }
+        if (!resp.ok) {
+          clearInterval(svrPollRef.current!); svrPollRef.current = null;
+          setSvrStatus('error');
+          setSvrError(pr?.error ?? 'Server restarted during export. Please try again.');
+          return;
+        }
         setSvrProgress(pr.progress ?? 0);
         setSvrPhase(pr.phase ?? '');
         setSvrTotal(pr.total ?? supply);
@@ -365,10 +376,21 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       prevIdRef.current = d.previewId;
       setPrevTotal(d.total ?? supply);
 
+      let prevPollFailures = 0;
       prevPollRef.current = setInterval(async () => {
         if (!prevIdRef.current) return;
-        const pr = await fetch(`/api/nft-gen/export/preview/${prevIdRef.current}`).then(x => x.json()).catch(() => null);
-        if (!pr) return;
+        let resp: Response;
+        let pr: any = null;
+        try {
+          resp = await fetch(`/api/nft-gen/export/preview/${prevIdRef.current}`);
+          pr = await resp.json();
+        } catch { prevPollFailures++; if (prevPollFailures >= 3) { clearInterval(prevPollRef.current!); prevPollRef.current = null; setPrevStatus('error'); setPrevError('Lost connection to server. Please try again.'); } return; }
+        if (!resp.ok) {
+          clearInterval(prevPollRef.current!); prevPollRef.current = null;
+          setPrevStatus('error');
+          setPrevError(pr?.error ?? 'Server restarted during preview. Please try again.');
+          return;
+        }
         setPrevProgress(pr.progress ?? 0);
         setPrevPhase(pr.phase ?? '');
         setPrevTotal(pr.total ?? supply);
@@ -470,9 +492,23 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       if (!r.ok) { setSvrGenStatus('error'); setSvrGenError(d.error ?? 'Server error'); return; }
 
       const genId = d.generateId;
+      let pollFailures = 0;
       svrGenPollRef.current = setInterval(async () => {
-        const pr = await fetch(`/api/nft-gen/generate/${genId}`).then(x => x.json()).catch(() => null);
-        if (!pr) return;
+        let resp: Response;
+        let pr: any = null;
+        try {
+          resp = await fetch(`/api/nft-gen/generate/${genId}`);
+          pr = await resp.json();
+        } catch { pollFailures++; if (pollFailures >= 3) { clearInterval(svrGenPollRef.current!); svrGenPollRef.current = null; setSvrGenStatus('error'); setSvrGenError('Lost connection to server. Please try again.'); } return; }
+
+        // 404 = server restarted and lost in-memory state
+        if (!resp.ok) {
+          clearInterval(svrGenPollRef.current!); svrGenPollRef.current = null;
+          setSvrGenStatus('error');
+          setSvrGenError(pr?.error ?? 'Server restarted during generation. Please try again.');
+          return;
+        }
+
         setSvrGenProgress(pr.progress ?? 0);
         setSvrGenPhase(pr.phase ?? '');
         setSvrGenTotal(pr.total ?? supply);
