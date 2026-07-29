@@ -51,9 +51,33 @@ yarn-error.log*
 
 # Test artifacts
 /test-results/
+/test-screenshots/
+/tests/results/
+/tests/screenshots/
+/tests/.auth/
+/playwright-report/
+/blob-report/
+/opensea-screenshots/
 
-# Backup folders
-_backup_*/
+# Test scripts with credentials / throwaway utilities
+panel-test.js
 screenshot.cjs
 screenshot2.cjs
 test-team-page.cjs
+
+# Logs
+*.log
+
+# Local config artifacts
+.layers-config.json
+
+# Backup folders
+_backup_*/
+BearthAdmin-backup-2026-07-27/
+BearthAdmin-backup-2026-07-27-v2/
+BearthApi-backup-2026-07-27/
+bearth-customer/
+screenshot.cjs
+screenshot2.cjs
+test-team-page.cjs
+tests/.state/

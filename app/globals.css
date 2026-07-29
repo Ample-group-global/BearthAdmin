@@ -75,8 +75,9 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
+  *, *::before, *::after {
+    border-color: var(--color-border);
+    border-width: 0;
   }
   body {
     @apply bg-background text-foreground antialiased;

@@ -9,13 +9,12 @@ interface LayerFilesCtx {
 
 const Ctx = createContext<LayerFilesCtx>({
   getBlobUrl: () => null,
-  storeFiles: () => {},
+  storeFiles: () => { },
   hasFiles: () => false,
 });
 
 export function LayerFilesProvider({ children }: { children: ReactNode }) {
   const urlMap = useRef(new Map<string, string>());
-
   const storeFiles = useCallback((fileMap: Map<string, File>) => {
     urlMap.current.forEach(u => URL.revokeObjectURL(u));
     urlMap.current.clear();
@@ -25,7 +24,7 @@ export function LayerFilesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const getBlobUrl = useCallback((rel: string) => urlMap.current.get(rel) ?? null, []);
-  const hasFiles   = useCallback(() => urlMap.current.size > 0, []);
+  const hasFiles = useCallback(() => urlMap.current.size > 0, []);
 
   return (
     <Ctx.Provider value={{ getBlobUrl, storeFiles, hasFiles }}>

@@ -31,52 +31,69 @@ export async function POST(
   const token = getSessionToken(req);
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const layers = scanLayers();
-
-  if (!layers.length) {
+  const diskLayers = scanLayers();
+  if (!diskLayers.length) {
     return NextResponse.json({ error: "No layers found on disk." }, { status: 404 });
   }
 
-  const results: { layerName: string; traitsCreated: number; layerId: string | null }[] = [];
-
-  for (const layer of layers) {
+  // ── Step 1: Upsert all layers + traits in parallel ─────────────────────────
+  const results = await Promise.all(diskLayers.map(async (diskLayer) => {
+    // Upsert layer — ON CONFLICT preserves user-configured weights/sort/rarity
     const layerData = await apiPost(token, `/api/nft-gen/collections/${collectionId}/layers`, {
-      name: layer.folder,
-      displayName: layer.label,
-      sortOrder: null,
-      layerRarityPct: (layer as any).optional ? 80 : 100,
+      name:           diskLayer.folder,
+      displayName:    diskLayer.label,
+      layerRarityPct: (diskLayer as any).optional ? 80 : 100,
     });
 
-    const layerId: string | null =
-      layerData?.layer?.id ?? layerData?.id ?? null;
+    const layerId: string | null = layerData?.layer?.id ?? layerData?.id ?? null;
+    if (!layerId) return { layerName: diskLayer.folder, layerId: null, traitsUpserted: 0, traitsDeactivated: 0 };
 
-    if (!layerId) {
-      results.push({ layerName: layer.folder, traitsCreated: 0, layerId: null });
-      continue;
-    }
+    const realAssets = diskLayer.assets.filter((a: any) => a.rel !== null);
+    const activeFilePaths: string[] = realAssets.map((a: any) => a.rel as string);
 
-    const realAssets = layer.assets.filter((a: any) => a.rel !== null);
-    let traitsCreated = 0;
-
-    for (let i = 0; i < realAssets.length; i += 5) {
-      const batch = realAssets.slice(i, i + 5);
+    // Upsert traits in batches of 50 — ON CONFLICT preserves rarity_weight/tier
+    let traitsUpserted = 0;
+    const TRAIT_BATCH = 50;
+    for (let i = 0; i < realAssets.length; i += TRAIT_BATCH) {
+      const batch = realAssets.slice(i, i + TRAIT_BATCH);
       await Promise.all(batch.map(async (asset: any) => {
         const r = await apiPost(token, `/api/nft-gen/layers/${layerId}/traits`, {
-          name: asset.name,
-          filePath: asset.rel,
-          rarityTier: inferTier(asset.stem),
-          storageProvider: "local",
+          name:            asset.name,
+          filePath:        asset.rel,
+          rarityTier:      inferTier(asset.stem),
+          storageProvider: "filebase",
         });
-        if (r?.trait?.id ?? r?.id) traitsCreated++;
+        if (r?.trait?.id ?? r?.id) traitsUpserted++;
       }));
     }
 
-    results.push({ layerName: layer.folder, traitsCreated, layerId });
-  }
+    // Soft-delete traits no longer on disk
+    const reconcileTraits = await apiPost(
+      token,
+      `/api/nft-gen/layers/${layerId}/traits/reconcile`,
+      { activeFilePaths }
+    );
+
+    return {
+      layerName:         diskLayer.folder,
+      layerId,
+      traitsUpserted,
+      traitsDeactivated: reconcileTraits?.deactivated ?? 0,
+    };
+  }));
+
+  // ── Step 2: Soft-delete layers no longer on disk ────────────────────────────
+  const diskLayerNames = diskLayers.map((l) => l.folder);
+  const reconcileLayers = await apiPost(
+    token,
+    `/api/nft-gen/collections/${collectionId}/layers/reconcile`,
+    { activeNames: diskLayerNames }
+  );
 
   return NextResponse.json({
     collectionId,
-    layersSynced: results.filter(r => r.layerId).length,
+    layersSynced:     results.filter((r) => r.layerId).length,
+    layersDeactivated: reconcileLayers?.deactivated ?? 0,
     results,
   });
 }

@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 
 const overlay: React.CSSProperties = {
-  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+  position: 'fixed', inset: 0, background: 'rgba(20,23,38,.78)',
   display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
 };
 const panel: React.CSSProperties = {

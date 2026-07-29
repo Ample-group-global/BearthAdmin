@@ -5,3 +5,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
   return proxyToApi(req, `/api/nft-gen/jobs/${id}`);
 }
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return proxyToApi(req, `/api/nft-gen/jobs/${id}`, { method: "DELETE" });
+}

@@ -1,15 +1,10 @@
 // @ts-nocheck
 'use client';
 import { useState } from 'react';
-import { getTier } from '../../../../lib/studio/tiers';
-import { useLayerFiles } from '../LayerFilesContext';
+import { calcRarity } from '../../../../lib/studio/probability';
 
 function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onClose }) {
-  const prob = totalWeight > 0 ? weight / totalWeight : 0;
-  const tier = getTier(prob);
-  const pct  = (prob * 100).toFixed(1);
-  const exp  = Math.round(prob * supply);
-  const { getBlobUrl } = useLayerFiles();
+  const { prob, tier, pct, expected: exp } = calcRarity(weight, totalWeight, supply);
 
   return (
     <div className="card-modal-overlay" onClick={onClose}>
@@ -18,7 +13,7 @@ function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onC
 
         <div className="card-modal-img-wrap">
           {asset.rel ? (
-            <img src={getBlobUrl(asset.rel) ?? `/api/thumb/${asset.rel}`} alt={asset.stem} className="card-modal-img" />
+            <img src={`/api/thumb/${asset.rel}`} alt={asset.stem} className="card-modal-img" />
           ) : (
             <div className="card-modal-none">NONE</div>
           )}
@@ -51,13 +46,13 @@ function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onC
           <input
             className="range-slider"
             type="range"
-            min="0" max="20" step="0.05"
-            value={Math.min(weight, 20)}
+            min="0" max="100" step="0.5"
+            value={Math.min(weight, 100)}
             onChange={e => onChange(asset.stem, parseFloat(e.target.value))}
             style={{ width: '100%', marginBottom: 4 }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--xdim)' }}>
-            <span>0 (disabled)</span><span>10</span><span>20 (max)</span>
+            <span>0 (disabled)</span><span>50</span><span>100 (max)</span>
           </div>
 
           {asset.rel && (
@@ -80,10 +75,7 @@ function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onC
 
 export default function AssetCard({ asset, weight, totalWeight, supply, onChange, onDelete }) {
   const [open, setOpen] = useState(false);
-  const prob = totalWeight > 0 ? weight / totalWeight : 0;
-  const tier = getTier(prob);
-  const pct  = (prob * 100).toFixed(1);
-  const { getBlobUrl } = useLayerFiles();
+  const { tier, pct } = calcRarity(weight, totalWeight, supply);
 
   function handleDelete(e) {
     e.stopPropagation();
@@ -101,7 +93,7 @@ export default function AssetCard({ asset, weight, totalWeight, supply, onChange
         <div className="thumb">
           {asset.rel ? (
             <img
-              src={getBlobUrl(asset.rel) ?? `/api/thumb/${asset.rel}`}
+              src={`/api/thumb/${asset.rel}`}
               alt={asset.stem}
               loading="lazy"
               onError={e => {
@@ -128,8 +120,8 @@ export default function AssetCard({ asset, weight, totalWeight, supply, onChange
           <input
             className="range-slider"
             type="range"
-            min="0" max="20" step="0.05"
-            value={Math.min(weight, 20)}
+            min="0" max="100" step="0.5"
+            value={Math.min(weight, 100)}
             onChange={e => onChange(asset.stem, parseFloat(e.target.value))}
           />
         </div>

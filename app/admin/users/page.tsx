@@ -288,6 +288,7 @@ export default function AdminUsersPage() {
         </div>
       ) : (
         <div className="bg-white rounded-lg overflow-hidden" style={{ border: "1px solid #e4e7ed" }}>
+          <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr style={{ borderBottom: "1px solid #e4e7ed", background: "#f8f9fb" }}>
@@ -333,6 +334,7 @@ export default function AdminUsersPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

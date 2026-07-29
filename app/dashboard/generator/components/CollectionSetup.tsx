@@ -71,7 +71,7 @@ function parseLayersFromFiles(files) {
         rel,
         defaultWeight: 1,
       }))
-      .sort((a, b) => a.stem.localeCompare(b.stem));
+      .sort((a, b) => a.stem.localeCompare(b.stem, undefined, { numeric: true, sensitivity: 'base' }));
 
     // Disambiguate duplicate display names (same logic as server-side buildCache)
     const nameCounts = {};
@@ -189,9 +189,6 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
           }).catch(() => {});
         }
       }
-      if (replace) {
-        await fetch('/api/layers/clear', { method: 'POST' }).catch(() => {});
-      }
       const groups = {};
       for (const file of files) {
         if (!file.type.startsWith('image/') && !file.name.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) continue;
@@ -246,6 +243,17 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
               value={collection.name}
               onChange={e => set('name', e.target.value)}
             />
+          </div>
+
+          <div className="setup-field">
+            <label>Token Symbol</label>
+            <input
+              placeholder="BRT"
+              maxLength={10}
+              value={collection.symbol}
+              onChange={e => set('symbol', e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))}
+            />
+            <span className="field-hint">Short uppercase identifier (e.g. BAYC, AZUKI). Max 10 characters.</span>
           </div>
 
           <div className="setup-field">

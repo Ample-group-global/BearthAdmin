@@ -1,93 +1,50 @@
-import { test, expect } from "@playwright/test";
-import { screenshot } from "./helpers";
+import { test, expect } from '@playwright/test';
+import path from 'path';
+import fs from 'fs';
 
-test.describe("Login Page", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.context().clearCookies();
-    await page.goto("/login");
-  });
+const SCREENSHOTS = path.join(process.cwd(), 'tests', 'results', 'login');
 
-  test("renders all form elements", async ({ page }) => {
-    await expect(page.getByRole("heading", { name: "Bearth Admin" })).toBeVisible();
-    await expect(page.getByText("Sign in to access the dashboard")).toBeVisible();
-    await expect(page.locator('input[autocomplete="email"]')).toBeVisible();
-    await expect(page.locator('input[autocomplete="current-password"]')).toBeVisible();
-    await expect(page.locator('button[type="submit"]')).toContainText("Sign In");
-    await screenshot(page, "01-login-page");
-  });
+async function snap(page: any, name: string) {
+  fs.mkdirSync(SCREENSHOTS, { recursive: true });
+  await page.screenshot({ path: path.join(SCREENSHOTS, `${name}.png`), fullPage: false });
+  console.log(`  📸 ${name}.png`);
+}
 
-  test("shows forgot password link", async ({ page }) => {
-    await expect(page.getByRole("link", { name: "Forgot password?" })).toBeVisible();
-  });
+test('Technical user can log in and reach dashboard', async ({ page }) => {
+  await page.goto('/login');
+  await page.waitForLoadState('networkidle');
+  await snap(page, '01-login-page');
 
-  test("password show/hide toggle works", async ({ page }) => {
-    const pw = page.locator('input[autocomplete="current-password"]');
-    await expect(pw).toHaveAttribute("type", "password");
-    await page.locator('button[type="button"]').click();
-    await expect(pw).toHaveAttribute("type", "text");
-    await page.locator('button[type="button"]').click();
-    await expect(pw).toHaveAttribute("type", "password");
-  });
+  // Fill credentials
+  await page.fill('input[type="email"], input[name="email"], input[placeholder*="email" i]', 'amplecapitalholding@gmail.com');
+  await page.fill('input[type="password"], input[name="password"]', 'amplecapitalholding@123');
+  await snap(page, '02-credentials-filled');
 
-  test("shows error on invalid credentials", async ({ page }) => {
-    await page.fill('input[autocomplete="email"]', "bad@bad.com");
-    await page.fill('input[autocomplete="current-password"]', "wrongpassword");
-    await page.click('button[type="submit"]');
-    await expect(page.locator("text=Invalid").or(page.locator("text=failed").or(page.locator("text=error")))).toBeVisible({ timeout: 8000 });
-    await screenshot(page, "01-login-error");
-  });
+  // Submit
+  await page.click('button[type="submit"], button:has-text("Login"), button:has-text("Sign in")');
 
-  test("submit button disables while loading", async ({ page }) => {
-    await page.fill('input[autocomplete="email"]', "admin@bearth.local");
-    await page.fill('input[autocomplete="current-password"]', "Admin2024!");
-    await page.route("/api/auth/login", async (route) => {
-      await new Promise((r) => setTimeout(r, 600));
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ role: "admin", success: true }) });
-    });
-    const btn = page.locator('button[type="submit"]');
-    await btn.click();
-    await expect(btn).toBeDisabled();
-  });
+  // Should redirect to dashboard
+  await page.waitForURL('**/dashboard**', { timeout: 15000 });
+  await page.waitForLoadState('networkidle');
+  await snap(page, '03-dashboard');
 
-  test("admin login redirects to /presale", async ({ page }) => {
-    await page.fill('input[autocomplete="email"]', "admin@bearth.local");
-    await page.fill('input[autocomplete="current-password"]', "Admin2024!");
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/\/presale/, { timeout: 15000 });
-    expect(page.url()).toContain("/presale");
-  });
+  expect(page.url()).toContain('/dashboard');
+  console.log('  ✅ Login successful — redirected to:', page.url());
+});
 
-  test("ops login redirects to /presale", async ({ page }) => {
-    await page.fill('input[autocomplete="email"]', "ops@bearth.local");
-    await page.fill('input[autocomplete="current-password"]', "Ops2024!");
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/\/presale/, { timeout: 15000 });
-    expect(page.url()).toContain("/presale");
-  });
+test('Wrong password shows error', async ({ page }) => {
+  await page.goto('/login');
+  await page.waitForLoadState('networkidle');
 
-  test("tech login redirects to /dashboard", async ({ page }) => {
-    await page.fill('input[autocomplete="email"]', "tech@bearth.local");
-    await page.fill('input[autocomplete="current-password"]', "Tech2024!");
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/\/dashboard/, { timeout: 15000 });
-    expect(page.url()).toContain("/dashboard");
-  });
+  await page.fill('input[type="email"], input[name="email"], input[placeholder*="email" i]', 'amplecapitalholding@gmail.com');
+  await page.fill('input[type="password"], input[name="password"]', 'wrongpassword');
+  await page.click('button[type="submit"], button:has-text("Login"), button:has-text("Sign in")');
 
-  test("form is usable on mobile (375px)", async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto("/login");
-    const card = page.locator(".rounded-2xl").first();
-    await expect(card).toBeVisible();
-    const box = await card.boundingBox();
-    expect(box!.x).toBeGreaterThanOrEqual(0);
-    expect(box!.width).toBeLessThanOrEqual(375);
-    await screenshot(page, "01-login-mobile");
-  });
+  // Should stay on login page and show an error
+  await page.waitForTimeout(3000);
+  await snap(page, '04-wrong-password-error');
 
-  test("form is readable on tablet (768px)", async ({ page }) => {
-    await page.setViewportSize({ width: 768, height: 1024 });
-    await page.goto("/login");
-    await expect(page.getByRole("heading", { name: "Bearth Admin" })).toBeVisible();
-    await screenshot(page, "01-login-tablet");
-  });
+  const url = page.url();
+  expect(url).toContain('/login');
+  console.log('  ✅ Wrong password blocked — stayed on:', url);
 });

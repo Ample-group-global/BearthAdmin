@@ -7,14 +7,16 @@ export async function GET(req: NextRequest) {
   const token = req.cookies.get("admin_session")?.value;
   if (!token) return NextResponse.json({ authenticated: false }, { status: 401 });
 
-  // Local HMAC check first (fast path — avoids API round-trip on invalid tokens)
+  // Fast local HMAC check — reject obviously invalid tokens before hitting BearthApi
   const local = verifyToken(token);
   if (!local) return NextResponse.json({ authenticated: false }, { status: 401 });
 
   // Proxy to BearthApi for DB-fresh context (permissions + menus)
+  // Any failure (network, timeout, 4xx, 5xx) → logout; no silent fallback
   try {
     const apiRes = await fetch(`${API_BASE}/api/auth/admin/me`, {
       headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(15000),
     });
     if (!apiRes.ok) return NextResponse.json({ authenticated: false }, { status: 401 });
     const data = await apiRes.json() as {
@@ -25,18 +27,8 @@ export async function GET(req: NextRequest) {
       permissions: string[];
       menus: unknown[];
     };
-    // Expose `role` as alias for roleCode so existing layout code keeps working
     return NextResponse.json({ ...data, role: data.roleCode });
   } catch {
-    // BearthApi unreachable — fall back to local token data only
-    return NextResponse.json({
-      authenticated: true,
-      userId: local.userId,
-      role: local.role,
-      roleCode: local.role,
-      roleName: local.role,
-      permissions: [],
-      menus: [],
-    });
+    return NextResponse.json({ authenticated: false }, { status: 503 });
   }
 }
