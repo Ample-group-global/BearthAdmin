@@ -55,7 +55,7 @@ export default function SalesHistoryPage() {
   const [wallet,   setWallet]   = useState("");
   const [from,     setFrom]     = useState("");
   const [to,       setTo]       = useState("");
-  const [waves,    setWaves]    = useState<Array<{ wave_number: number; name: string }>>([]);
+  const [waves,    setWaves]    = useState<Array<{ waveNumber: number; name: string }>>([]);
 
   const LIMIT = 50;
 
@@ -113,7 +113,7 @@ export default function SalesHistoryPage() {
 
   const waveName = (num: number | null) => {
     if (num == null) return "—";
-    const w = waves.find(w => w.wave_number === num);
+    const w = waves.find(w => w.waveNumber === num);
     return w ? `W${num} — ${w.name}` : `Wave ${num}`;
   };
 
@@ -170,8 +170,8 @@ export default function SalesHistoryPage() {
           style={{ border: "1px solid #e5e7eb", color: wave ? "#111827" : "#9bafc5" }}>
           <option value="">All Waves</option>
           {waves.map(w => (
-            <option key={w.wave_number} value={String(w.wave_number)}>
-              W{w.wave_number} — {w.name}
+            <option key={w.waveNumber} value={String(w.waveNumber)}>
+              W{w.waveNumber} — {w.name}
             </option>
           ))}
         </select>

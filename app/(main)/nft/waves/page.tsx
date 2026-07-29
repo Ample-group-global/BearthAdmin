@@ -501,8 +501,6 @@ export default function WavesPage() {
           <span>Totals across all 7 waves</span>
           <div className="flex items-center gap-6">
             <span>Qty: <strong>{totalNfts.toLocaleString()} / 9,999</strong></span>
-            <span>Sold: <strong style={{ color: "#41afeb" }}>{totalSold.toLocaleString()}</strong></span>
-            <span>NFTs in DB: <strong style={{ color: "#7c3aed" }}>{waves.reduce((s, w) => s + Number(w.nftCount ?? 0), 0).toLocaleString()}</strong></span>
           </div>
         </div>
       )}
