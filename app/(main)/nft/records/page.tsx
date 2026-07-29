@@ -169,6 +169,7 @@ export default function NftPage() {
   const [sortKey, setSortKey]         = useState<string | undefined>(undefined);
   const [sortDir, setSortDir]         = useState<"asc" | "desc">("asc");
   const [viewRecord, setViewRecord]   = useState<NftRecord | null>(null);
+  const [waves, setWaves]             = useState<Array<{ wave_number: number; name: string }>>([]);
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -202,6 +203,8 @@ export default function NftPage() {
   useEffect(() => {
     fetch("/api/master", { credentials: "include" })
       .then(r => r.json()).then(d => setMaster(d)).catch(() => {});
+    fetch("/api/nft-sell/waves", { credentials: "include" })
+      .then(r => r.json()).then(d => setWaves(d.waves ?? [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -410,7 +413,11 @@ export default function NftPage() {
           className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
           style={{ border: "1px solid #e5e7eb", color: waveFilter ? "#111827" : "#9bafc5" }}>
           <option value="">All Waves</option>
-          {[1,2,3,4,5,6,7].map(w => <option key={w} value={String(w)}>Wave {w}</option>)}
+          {waves.map(w => (
+            <option key={w.wave_number} value={String(w.wave_number)}>
+              W{w.wave_number} — {w.name}
+            </option>
+          ))}
         </select>
 
         {master && (

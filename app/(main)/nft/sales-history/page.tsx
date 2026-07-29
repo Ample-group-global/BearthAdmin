@@ -59,6 +59,7 @@ export default function SalesHistoryPage() {
   const [wallet,   setWallet]   = useState("");
   const [from,     setFrom]     = useState("");
   const [to,       setTo]       = useState("");
+  const [waves,    setWaves]    = useState<Array<{ wave_number: number; name: string }>>([]);
 
   const LIMIT = 50;
 
@@ -82,6 +83,11 @@ export default function SalesHistoryPage() {
     setSummary(sumJson.summary ?? []);
     setLoading(false);
   }, [wave, wallet, from, to]);
+
+  useEffect(() => {
+    fetch("/api/nft-sell/waves", { credentials: "include" })
+      .then(r => r.json()).then(d => setWaves(d.waves ?? [])).catch(() => {});
+  }, []);
 
   useEffect(() => { setPage(0); fetchData(0); }, [fetchData]);
 
@@ -141,7 +147,11 @@ export default function SalesHistoryPage() {
         <select value={wave} onChange={e => setWave(e.target.value)}
           style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "8px 12px", color: "#e2e8f0", fontSize: 13 }}>
           <option value="">All Waves</option>
-          {[1,2,3,4,5,6,7].map(w => <option key={w} value={w}>Wave {w}</option>)}
+          {waves.map(w => (
+            <option key={w.wave_number} value={w.wave_number}>
+              W{w.wave_number} — {w.name}
+            </option>
+          ))}
         </select>
         <input placeholder="Search wallet 0x..." value={wallet} onChange={e => setWallet(e.target.value)}
           style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "8px 12px", color: "#e2e8f0", fontSize: 13, width: 220 }} />
@@ -195,7 +205,11 @@ export default function SalesHistoryPage() {
                   </td>
                   {/* Wave */}
                   <td style={{ padding: "10px 14px", color: "#94a3b8" }}>
-                    {r.wave_num != null ? <span style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, padding: "2px 8px", fontSize: 12 }}>Wave {r.wave_num}</span> : "—"}
+                    {r.wave_num != null ? (
+                      <span style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, padding: "2px 8px", fontSize: 12 }}>
+                        W{r.wave_num} — {waves.find(w => w.wave_number === r.wave_num)?.name ?? `Wave ${r.wave_num}`}
+                      </span>
+                    ) : "—"}
                   </td>
                   {/* Wallet */}
                   <td style={{ padding: "10px 14px", fontFamily: "monospace" }}>
