@@ -1,4 +1,9 @@
 {
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "next build --webpack"
+  "buildCommand": "next build --webpack",
+  "functions": {
+    "app/api/layer-img/[...rel]/route.ts": { "maxDuration": 60 },
+    "app/api/thumb/[...rel]/route.ts":     { "maxDuration": 60 },
+    "app/api/nft-gen/**":                  { "maxDuration": 60 }
+  }
 }
