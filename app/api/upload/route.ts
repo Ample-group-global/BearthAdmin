@@ -1,46 +1,33 @@
-import path from 'path';
-import fs   from 'fs';
-import { NextResponse } from 'next/server';
-import { getLayersDir, clearLayersCache } from '../../../lib/studio/layers';
+import { NextRequest, NextResponse } from 'next/server';
+import { getSessionToken } from '../../../lib/api-proxy';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: Request) {
-  const form = await request.formData();
-  const layer = form.get('layer') as string;           // e.g. "4-clothes"
-  const files = form.getAll('files') as File[];        // File[]
-  const subpaths = form.getAll('subpaths') as string[]; // parallel array to files
+const API_BASE = process.env.BEARTH_API_URL!;
 
-  if (!layer) return NextResponse.json({ error: 'layer required' }, { status: 400 });
-
-  // Sanitize layer name – only allow alphanumeric, dash, underscore
-  const safe = layer.replace(/[^a-zA-Z0-9\-_]/g, '');
-  if (!safe) return NextResponse.json({ error: 'invalid layer name' }, { status: 400 });
-
-  const layerDir = path.join(getLayersDir(), safe);
-  const added: string[] = [];
+// Forward layer PNG uploads to BearthApi which:
+//   1. Saves to LAYERS_DIR on Railway disk
+//   2. Uploads to Filebase bearth-layers S3 bucket
+// This way thumbnails work everywhere (local disk on Railway, S3 on Vercel).
+export async function POST(request: NextRequest) {
+  const token = getSessionToken(request);
+  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    fs.mkdirSync(layerDir, { recursive: true });
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const sub = (subpaths[i] || '').replace(/\.\./g, '').replace(/^\//, '');
-      const safeSubDir = sub.split('/').slice(0, -1).join('/');
-      const baseName = file.name.split(/[\\/]/).pop() ?? file.name;
-      const name = baseName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-      if (!name.match(/\.(png|webp|jpg|jpeg|gif)$/i)) continue;
-      const targetDir = safeSubDir ? path.join(layerDir, safeSubDir) : layerDir;
-      fs.mkdirSync(targetDir, { recursive: true });
-      const buf = Buffer.from(await file.arrayBuffer());
-      fs.writeFileSync(path.join(targetDir, name), buf);
-      added.push(sub ? sub + '/' + name : name);
-    }
-
-    clearLayersCache();
+    const contentType = request.headers.get('content-type') ?? '';
+    const resp = await fetch(`${API_BASE}/api/nft-gen/layers/upload`, {
+      method:  'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type':  contentType,
+      },
+      // @ts-expect-error — duplex required for streaming body in Node 18+
+      duplex: 'half',
+      body: request.body,
+    });
+    const data = await resp.json();
+    return NextResponse.json(data, { status: resp.status });
   } catch {
-    // Serverless / read-only filesystem — files are held client-side, this is non-fatal
+    return NextResponse.json({ error: 'API unreachable' }, { status: 503 });
   }
-
-  return NextResponse.json({ ok: true, added });
 }
