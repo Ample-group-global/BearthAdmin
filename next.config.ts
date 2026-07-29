@@ -15,6 +15,12 @@ const nextConfig: NextConfig = {
     "archiver",
   ],
   webpack(config) {
+    // Stub out optional Privy peer dependencies not used in this project
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@farcaster/mini-app-solana': false,
+    };
+
     config.externals = config.externals ?? [];
     if (Array.isArray(config.externals)) {
       config.externals.push(function ({ request }: { request: string }, callback: (err?: Error | null, result?: string) => void) {
