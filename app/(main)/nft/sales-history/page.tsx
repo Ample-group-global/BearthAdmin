@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { proxyToApi } from "@/app/lib/proxyToApi";
 
 const IPFS_GATEWAY = "https://amgbearth.myfilebase.com/ipfs";
 const ETHERSCAN    = process.env.NEXT_PUBLIC_NETWORK === "mainnet"
@@ -72,8 +71,8 @@ export default function SalesHistoryPage() {
     if (to)     qs.set("to",     to);
 
     const [histRes, sumRes] = await Promise.all([
-      proxyToApi(`/api/nft-sell/admin-sales/history?${qs}`),
-      proxyToApi("/api/nft-sell/admin-sales/history/summary"),
+      fetch(`/api/nft-sell/admin-sales/history?${qs}`, { credentials: "include" }),
+      fetch("/api/nft-sell/admin-sales/history/summary", { credentials: "include" }),
     ]);
     const histJson = await histRes.json().catch(() => ({}));
     const sumJson  = await sumRes.json().catch(() => ({}));
@@ -94,7 +93,7 @@ export default function SalesHistoryPage() {
     if (wallet) qs.set("wallet", wallet);
     if (from)   qs.set("from",   from);
     if (to)     qs.set("to",     to);
-    const res  = await proxyToApi(`/api/nft-sell/admin-sales/history?${qs}`);
+    const res  = await fetch(`/api/nft-sell/admin-sales/history?${qs}`, { credentials: "include" });
     const json = await res.json();
     const rows: SaleRecord[] = json.records ?? [];
     const header = ["Serial #","Token ID","Wave","Wallet","Mint Price (ETH)","Rarity","Mint Tx Hash","Minted At","Last Sale (ETH)","Last Tx Hash","Sold At"];
