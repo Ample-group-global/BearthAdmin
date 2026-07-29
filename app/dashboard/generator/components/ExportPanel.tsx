@@ -201,7 +201,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
 
   const [externalUrlBase, setExternalUrlBase] = useState(defaultExternalUrl);
 
-  const [fbBucket,  setFbBucket]  = useState('');
+  const [fbBucket,  setFbBucket]  = useState('bearth-nft-it');
   const [fbStatus,  setFbStatus]  = useState('idle');
   const [imgPhase,  setImgPhase]  = useState('idle');
   const [imgDone,   setImgDone]   = useState(0);
@@ -215,7 +215,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const imgPathsRef     = useRef<Record<number, string>>({});
 
   // ── Server-side export state ──────────────────────────────────────────────
-  const [svrBucket,   setSvrBucket]   = useState('');
+  const [svrBucket,   setSvrBucket]   = useState('bearth-nft-it');
   const [svrStatus,   setSvrStatus]   = useState<'idle'|'running'|'done'|'error'>('idle');
   const [svrProgress, setSvrProgress] = useState(0);
   const [svrTotal,    setSvrTotal]    = useState(0);
