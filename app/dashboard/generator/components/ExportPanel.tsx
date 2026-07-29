@@ -1,6 +1,6 @@
 // @ts-nocheck
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import JSZip from 'jszip';
 import { generateAllCombos, computeRarity, applyNameFormat } from '../../../../lib/studio/combos';
 import NftPopup from './NftPopup';
@@ -47,23 +47,25 @@ function CheckIcon({ size = 14 }: { size?: number }) {
 }
 
 // ── Rarity card ───────────────────────────────────────────────────────────────
-function RarityCard({ item, jobBitmaps, layers, canvasW, canvasH, onClick }) {
+function RarityCard({ item, jobBitmaps, layers, canvasW, canvasH, onClick, bitmapsVer }) {
   const tierColor = TIER_COLOR[item.tier] ?? '#6B7280';
-  const canvasRef = useRef(null);
-  const cardRef   = useRef(null);
-  const drawn     = useRef(false);
+  const canvasRef    = useRef(null);
+  const cardRef      = useRef(null);
+  const drawn        = useRef(false);
+  const [imgReady, setImgReady] = useState(false);
 
   function draw() {
-    if (drawn.current || !canvasRef.current) return;
-    drawn.current = true;
+    if (!canvasRef.current) return;
     const ctx = canvasRef.current.getContext('2d');
     ctx.clearRect(0, 0, canvasW, canvasH);
+    let didDraw = false;
     for (const layer of layers) {
       const pick = item.combo[layer.folder];
       if (!pick?.rel) continue;
       const bm = jobBitmaps.current[pick.rel];
-      if (bm) ctx.drawImage(bm, 0, 0, canvasW, canvasH);
+      if (bm) { ctx.drawImage(bm, 0, 0, canvasW, canvasH); didDraw = true; }
     }
+    if (didDraw) { drawn.current = true; setImgReady(true); }
   }
 
   useEffect(() => {
@@ -77,6 +79,11 @@ function RarityCard({ item, jobBitmaps, layers, canvasW, canvasH, onClick }) {
     return () => obs.disconnect();
   }, []);
 
+  // Re-draw when bitmaps finish loading (fixes blank canvas on first render)
+  useEffect(() => {
+    if (bitmapsVer > 0) { drawn.current = false; draw(); }
+  }, [bitmapsVer]);
+
   const [open, setOpen] = useState(false);
 
   function handleClick() {
@@ -89,7 +96,8 @@ function RarityCard({ item, jobBitmaps, layers, canvasW, canvasH, onClick }) {
   return (
     <div ref={cardRef} className={`exp-nft-card${open ? ' exp-nft-open' : ''}`} onClick={handleClick}>
       <div className="exp-nft-thumb">
-        <canvas ref={canvasRef} width={canvasW} height={canvasH} />
+        <canvas ref={canvasRef} width={canvasW} height={canvasH} style={{ opacity: imgReady ? 1 : 0 }} />
+        {!imgReady && <div className="exp-nft-shimmer" />}
         <div className="exp-nft-rank" style={{ color: tierColor }}>#{item.rank}</div>
         <div className="exp-nft-tier-chip" style={{ background: tierColor }}>
           {item.tier}
@@ -128,6 +136,34 @@ function StepCard({ num, title, status, children }) {
         {isDone && <span className="exp-step-done-badge">Complete</span>}
       </div>
       {children}
+    </div>
+  );
+}
+
+// ── Layer row for filter sidebar ──────────────────────────────────────────────
+function ExpandableLayerRow({ layer, activeFilter, onTraitClick }) {
+  const [open, setOpen] = useState(false);
+  const isActive = activeFilter?.folder === layer.folder;
+  return (
+    <div className="plr-group">
+      <div className="preview-layer-row" onClick={() => setOpen(o => !o)}>
+        <span className="plr-chevron">{open ? '▾' : '▸'}</span>
+        <span className="plr-name">{layer.label}</span>
+        <span className="plr-count">{layer.count}</span>
+      </div>
+      {open && (
+        <div className="plr-traits">
+          {[...layer.assets].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(a => (
+            <div
+              key={a.stem}
+              className={`plr-trait-row${isActive && activeFilter?.stem === a.stem ? ' plr-trait-active' : ''}`}
+              onClick={() => onTraitClick(layer, a)}
+            >
+              <span className="plr-trait-name">{a.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -188,6 +224,18 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const svrExportIdRef = useRef<string | null>(null);
   const svrPollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Server-side image preview/validation state ────────────────────────────
+  const [prevStatus,   setPrevStatus]   = useState<'idle'|'running'|'done'|'error'>('idle');
+  const [prevProgress, setPrevProgress] = useState(0);
+  const [prevTotal,    setPrevTotal]    = useState(0);
+  const [prevPhase,    setPrevPhase]    = useState('');
+  const [prevValid,    setPrevValid]    = useState(0);
+  const [prevInvalid,  setPrevInvalid]  = useState<Array<{ edition: number; reason: string }>>([]);
+  const [prevError,    setPrevError]    = useState('');
+  const [prevPage,     setPrevPage]     = useState(0);
+  const prevIdRef  = useRef<string | null>(null);
+  const prevPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // ── Server-side generation state ──────────────────────────────────────────
   const [svrGenStatus,   setSvrGenStatus]   = useState<'idle'|'running'|'done'|'error'>('idle');
   const [svrGenProgress, setSvrGenProgress] = useState(0);
@@ -196,8 +244,11 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const [svrGenError,    setSvrGenError]    = useState('');
   const svrGenPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [rarityItems, setRarityItems] = useState<any[]>([]);
-  const [allCombos,   setAllCombos]   = useState<any[]>([]);
+  const [rarityItems,  setRarityItems]  = useState<any[]>([]);
+  const [allCombos,    setAllCombos]    = useState<any[]>([]);
+  const [bitmapsVer,   setBitmapsVer]   = useState(0);
+  const [filter,       setFilter]       = useState<{ folder: string; stem: string; layerLabel: string; assetName: string } | null>(null);
+  const [gridPage,     setGridPage]     = useState(0);
   const jobBitmaps = useRef<Record<string, ImageBitmap>>({});
   const [layers, setLayers] = useState<any[]>(layersProp);
   const cancelledRef       = useRef(false);
@@ -293,6 +344,51 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     setSvrStatus('idle');
   }
 
+  async function startPreview() {
+    if (!dbJobIdRef.current) return;
+    setPrevStatus('running');
+    setPrevProgress(0);
+    setPrevPhase('Starting…');
+    setPrevError('');
+    setPrevInvalid([]);
+    setPrevValid(0);
+    setPrevPage(0);
+
+    try {
+      const r = await fetch('/api/nft-gen/export/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: dbJobIdRef.current, width: targetW, height: targetH }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setPrevStatus('error'); setPrevError(d.error ?? 'Server error'); return; }
+      prevIdRef.current = d.previewId;
+      setPrevTotal(d.total ?? supply);
+
+      prevPollRef.current = setInterval(async () => {
+        if (!prevIdRef.current) return;
+        const pr = await fetch(`/api/nft-gen/export/preview/${prevIdRef.current}`).then(x => x.json()).catch(() => null);
+        if (!pr) return;
+        setPrevProgress(pr.progress ?? 0);
+        setPrevPhase(pr.phase ?? '');
+        setPrevTotal(pr.total ?? supply);
+        setPrevValid(pr.validCount ?? 0);
+        setPrevInvalid(pr.invalidItems ?? []);
+        if (pr.status === 'done') {
+          setPrevStatus('done');
+          if (prevPollRef.current) { clearInterval(prevPollRef.current); prevPollRef.current = null; }
+        } else if (pr.status === 'error') {
+          setPrevStatus('error');
+          setPrevError(pr.error ?? 'Preview failed');
+          if (prevPollRef.current) { clearInterval(prevPollRef.current); prevPollRef.current = null; }
+        }
+      }, 3000);
+    } catch (e: any) {
+      setPrevStatus('error');
+      setPrevError(e.message ?? 'Failed to start preview');
+    }
+  }
+
   async function generate() {
     cancelledRef.current = false;
     setError('');
@@ -301,6 +397,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     setRarityItems([]);
     setAllCombos([]);
     jobBitmaps.current = {};
+    setBitmapsVer(0);
 
     let layerData: any[] = layersProp.length ? layersProp : layers;
     if (!layerData.length) {
@@ -416,7 +513,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       )] as string[];
 
       // Fetch items only — don't block on bitmap loading
-      const itemsResp = await fetch(`/api/nft-gen/jobs/${jobId}/display-items?limit=200`);
+      const itemsResp = await fetch(`/api/nft-gen/jobs/${jobId}/display-items?limit=${supply}`);
 
       if (!itemsResp.ok) {
         console.warn(`[loadAndDisplayFromDb] display-items HTTP ${itemsResp.status} — retrying (${attempt}/3)`);
@@ -461,7 +558,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       });
       setRarityItems(displayed);
 
-      // Load bitmaps in background — don't block setPhase('done')
+      // Load bitmaps in background — increment bitmapsVer when done to trigger re-draw
       Promise.all(rels.map(async (rel) => {
         if (!jobBitmaps.current[rel]) {
           try {
@@ -472,7 +569,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
             }
           } catch {}
         }
-      })).catch(() => {});
+      })).then(() => setBitmapsVer(v => v + 1)).catch(() => {});
     } catch (e) {
       console.error('[loadAndDisplayFromDb]', e);
     }
@@ -1053,6 +1150,39 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     }
   }
 
+  const PAGE_SIZE = 200;
+
+  const visibleItems = useMemo(() => {
+    const base = filter
+      ? rarityItems.filter(({ combo }) => combo[filter.folder]?.stem === filter.stem)
+      : rarityItems;
+    if (sortBy === 'rarity') return [...base].sort((a, b) => a.rank - b.rank);
+    return [...base].sort((a, b) => a.index - b.index);
+  }, [rarityItems, filter, sortBy]);
+
+  // Only render one page at a time — full sort/filter on all items, display is paginated
+  const pageItems = useMemo(() =>
+    visibleItems.slice(gridPage * PAGE_SIZE, (gridPage + 1) * PAGE_SIZE),
+  [visibleItems, gridPage]);
+
+  const totalPages = Math.max(1, Math.ceil(visibleItems.length / PAGE_SIZE));
+
+  // Reset to first page whenever filter or sort changes
+  useEffect(() => { setGridPage(0); }, [filter, sortBy]);
+
+  const layerBreakdown = useMemo(() =>
+    layers.map(layer => ({ ...layer, count: layer.assets.length })),
+  [layers]);
+
+  function handleTraitClick(layer: any, asset: any) {
+    setFilter(prev =>
+      prev?.folder === layer.folder && prev?.stem === asset.stem
+        ? null
+        : { folder: layer.folder, stem: asset.stem, layerLabel: layer.label, assetName: asset.name }
+    );
+  }
+  function clearFilter() { setFilter(null); }
+
   const pct = supply > 0 ? Math.min((progress / supply) * 100, 100) : 0;
   const bucketReady = fbStatus === 'exists' || fbStatus === 'created';
 
@@ -1193,11 +1323,11 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
             <div className="exp-sort-group">
               <button
                 className={`exp-sort-btn${sortBy === 'rarity' ? ' exp-sort-active' : ''}`}
-                onClick={() => { setSortBy('rarity'); setRarityItems(prev => [...prev].sort((a, b) => a.rank - b.rank)); }}
+                onClick={() => setSortBy('rarity')}
               >🏆 Rarity</button>
               <button
                 className={`exp-sort-btn${sortBy === 'id' ? ' exp-sort-active' : ''}`}
-                onClick={() => { setSortBy('id'); setRarityItems(prev => [...prev].sort((a, b) => a.index - b.index)); }}
+                onClick={() => setSortBy('id')}
               ># ID</button>
             </div>
           </div>
@@ -1245,7 +1375,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         {dbSaved && !dbSaving && (
           <div className="exp-banner exp-banner-saved" data-job-id={dbJobIdRef.current ?? ''}>
             <CheckIcon size={15} />
-            <span>{(rarityItems.length || supply).toLocaleString()} items saved to database</span>
+            <span>{supply.toLocaleString()} items saved to database</span>
           </div>
         )}
         {dbError && !dbSaving && (
@@ -1262,30 +1392,74 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           </div>
         )}
 
-        {/* ── Tier legend ── */}
-        <div className="exp-tier-legend">
-          {TIER_META.map(t => (
-            <div key={t.label} className="exp-tier-pill" style={{ borderColor: `${t.color}33` }}>
-              <span className="exp-tier-dot" style={{ background: t.color }} />
-              <span style={{ color: t.color, fontWeight: 700 }}>{t.label}</span>
-              <span className="exp-tier-pill-sub">{t.sub}</span>
+        {/* ── Filter sidebar + content ── */}
+        <div className="exp-with-filter">
+          {layers.length > 0 && (
+            <div className="exp-filter-side preview-layer-breakdown">
+              {filter && (
+                <div className="plr-filter-badge">
+                  <span>{filter.layerLabel}: {filter.assetName}</span>
+                  <button className="plr-filter-clear" onClick={clearFilter}>✕</button>
+                </div>
+              )}
+              {layerBreakdown.map(layer => (
+                <ExpandableLayerRow
+                  key={layer.folder}
+                  layer={layer}
+                  activeFilter={filter}
+                  onTraitClick={handleTraitClick}
+                />
+              ))}
             </div>
-          ))}
-        </div>
-
-        {/* ── NFT grid ── */}
-        <div className="exp-nft-grid">
-          {rarityItems.map(item => (
-            <RarityCard
-              key={item.index}
-              item={item}
-              jobBitmaps={jobBitmaps}
-              layers={layers}
-              canvasW={tW}
-              canvasH={tH}
-              onClick={setPopup}
-            />
-          ))}
+          )}
+          <div className="exp-filter-main">
+            {/* Count row + pagination — always show when viewing, highlight when filtered */}
+            {visibleItems.length > 0 && (
+              <div className="exp-grid-nav">
+                <div className="preview-count-row">
+                  <span className="preview-count-num">{visibleItems.length.toLocaleString()}</span>
+                  {' '}
+                  <span className="preview-count-label">
+                    {filter ? `of ${rarityItems.length.toLocaleString()} NFTs` : 'NFTs'}
+                  </span>
+                </div>
+                {totalPages > 1 && (
+                  <div className="exp-page-group">
+                    <button className="exp-sort-btn" onClick={() => setGridPage(p => Math.max(0, p - 1))} disabled={gridPage === 0}>← Prev</button>
+                    <span className="exp-page-label">Page {gridPage + 1} / {totalPages}</span>
+                    <button className="exp-sort-btn" onClick={() => setGridPage(p => Math.min(totalPages - 1, p + 1))} disabled={gridPage >= totalPages - 1}>Next →</button>
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="exp-tier-legend">
+              {TIER_META.map(t => (
+                <div key={t.label} className="exp-tier-pill" style={{ borderColor: `${t.color}33` }}>
+                  <span className="exp-tier-dot" style={{ background: t.color }} />
+                  <span style={{ color: t.color, fontWeight: 700 }}>{t.label}</span>
+                  <span className="exp-tier-pill-sub">{t.sub}</span>
+                </div>
+              ))}
+            </div>
+            {pageItems.length > 0 ? (
+              <div className="exp-nft-grid">
+                {pageItems.map(item => (
+                  <RarityCard
+                    key={item.index}
+                    item={item}
+                    jobBitmaps={jobBitmaps}
+                    layers={layers}
+                    canvasW={tW}
+                    canvasH={tH}
+                    onClick={setPopup}
+                    bitmapsVer={bitmapsVer}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="exp-empty-filter">No NFTs match this filter.</div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1438,9 +1612,132 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         )}
       </div>
 
+      {/* ── Server-Side Image Preview/Validation ── */}
+      {dbSaved && dbJobIdRef.current && (
+        <div className="exp-fb-card exp-svr-card" data-testid="image-preview-section">
+          <div className="exp-fb-header">
+            <div className="exp-fb-title">Validate Images Before Export</div>
+            <div className="exp-fb-sub">
+              Server composites all {supply.toLocaleString()} NFTs using Sharp — same pipeline as Filebase upload — and validates each image for quality
+            </div>
+          </div>
+
+          {prevStatus === 'idle' && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 10 }}>
+              <button
+                className="btn btn-primary"
+                onClick={startPreview}
+                data-testid="validate-images-btn"
+              >
+                🔍 Validate All {supply.toLocaleString()} NFT Images
+              </button>
+            </div>
+          )}
+
+          {prevStatus === 'running' && (
+            <div style={{ marginTop: 14 }} data-testid="preview-progress">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <Spinner size={16} color="var(--accent)" />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{prevPhase || 'Compositing…'}</span>
+              </div>
+              <ProgressBar value={prevProgress} max={prevTotal} />
+              <div className="exp-step-count">{prevProgress.toLocaleString()} / {prevTotal.toLocaleString()}</div>
+            </div>
+          )}
+
+          {prevStatus === 'error' && (
+            <div className="exp-banner exp-banner-error" style={{ marginTop: 10 }}>
+              <span>Validation failed: {prevError}</span>
+              <button className="exp-retry-btn" onClick={() => { setPrevStatus('idle'); setPrevError(''); }}>↺ Retry</button>
+            </div>
+          )}
+
+          {prevStatus === 'done' && (
+            <div data-testid="preview-done">
+              {/* Validation summary */}
+              <div style={{ display: 'flex', gap: 16, marginTop: 14, marginBottom: 14, flexWrap: 'wrap' }}>
+                <div className="exp-cid-stat">
+                  <div className="exp-cid-stat-label">Total</div>
+                  <div className="exp-cid-stat-val">{prevTotal.toLocaleString()}</div>
+                </div>
+                <div className="exp-cid-stat">
+                  <div className="exp-cid-stat-label">Valid</div>
+                  <div className="exp-cid-stat-val" style={{ color: '#16a34a' }}>{prevValid.toLocaleString()}</div>
+                </div>
+                <div className="exp-cid-stat">
+                  <div className="exp-cid-stat-label">Issues</div>
+                  <div className="exp-cid-stat-val" style={{ color: prevInvalid.length ? '#dc2626' : '#16a34a' }}>
+                    {prevInvalid.length}
+                  </div>
+                </div>
+                <div className="exp-cid-stat">
+                  <div className="exp-cid-stat-label">Quality</div>
+                  <div className="exp-cid-stat-val" style={{ color: prevInvalid.length === 0 ? '#16a34a' : '#f59e0b' }}>
+                    {prevTotal > 0 ? ((prevValid / prevTotal) * 100).toFixed(1) : 0}%
+                  </div>
+                </div>
+              </div>
+
+              {prevInvalid.length === 0 && (
+                <div className="exp-banner exp-banner-saved" style={{ marginBottom: 14 }} data-testid="all-valid-banner">
+                  <CheckIcon size={15} />
+                  <span>All {prevValid.toLocaleString()} NFT images passed quality validation — safe to upload to Filebase</span>
+                </div>
+              )}
+
+              {prevInvalid.length > 0 && (
+                <div className="exp-banner exp-banner-error" style={{ marginBottom: 14 }}>
+                  <span>{prevInvalid.length} NFTs failed validation — review before uploading</span>
+                </div>
+              )}
+
+              {/* Thumbnail grid — paginated, 100 per page */}
+              {prevIdRef.current && prevTotal > 0 && (
+                <div data-testid="thumbnail-grid">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dim)' }}>
+                      Showing {prevPage * 100 + 1}–{Math.min((prevPage + 1) * 100, prevTotal)} of {prevTotal.toLocaleString()} NFTs
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="btn btn-ghost" onClick={() => setPrevPage(p => Math.max(0, p - 1))} disabled={prevPage === 0}>← Prev</button>
+                      <button className="btn btn-ghost" onClick={() => setPrevPage(p => Math.min(Math.ceil(prevTotal / 100) - 1, p + 1))} disabled={(prevPage + 1) * 100 >= prevTotal}>Next →</button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 6 }}>
+                    {Array.from({ length: Math.min(100, prevTotal - prevPage * 100) }, (_, i) => {
+                      const edition = prevPage * 100 + i + 1;
+                      const isInvalid = prevInvalid.some(x => x.edition === edition);
+                      return (
+                        <div key={edition} style={{ position: 'relative', borderRadius: 4, overflow: 'hidden', border: isInvalid ? '2px solid #dc2626' : '1px solid var(--border)' }}>
+                          <img
+                            src={`/api/nft-gen/export/preview/${prevIdRef.current}/img/${edition}`}
+                            alt={`NFT #${edition}`}
+                            style={{ width: '100%', display: 'block', aspectRatio: '1/1', objectFit: 'cover' }}
+                            loading="lazy"
+                          />
+                          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 9, padding: '2px 3px', textAlign: 'center' }}>
+                            #{edition}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ marginTop: 14 }}>
+                <button className="btn btn-ghost" onClick={() => { setPrevStatus('idle'); prevIdRef.current = null; }}>
+                  ↺ Re-validate
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Server-Side Export ── */}
       {dbSaved && dbJobIdRef.current && (
-        <div className="exp-fb-card exp-svr-card">
+        <div className="exp-fb-card exp-svr-card" data-testid="server-export-section">
           <div className="exp-fb-header">
             <div className="exp-fb-title">Server-Side Export</div>
             <div className="exp-fb-sub">

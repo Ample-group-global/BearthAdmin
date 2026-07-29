@@ -15,7 +15,7 @@ export default defineConfig({
     baseURL: "http://localhost:3000",
     actionTimeout: 5000,
     trace: "off",
-    screenshot: "on",
+    screenshot: "off",
     video: "off",
     headless: false,
   },

@@ -10,19 +10,26 @@ export async function GET(_req: Request, { params }: { params: Promise<{ rel: st
   const layersDir = getLayersDir();
   const file      = path.join(layersDir, rel);
 
-  if (!file.startsWith(layersDir) || !fs.existsSync(file)) {
+  const relCheck = path.relative(layersDir, file);
+  if (relCheck.startsWith('..') || path.isAbsolute(relCheck) || !fs.existsSync(file)) {
     return new Response(null, { status: 404 });
   }
 
-  const buf = await sharp(file)
-    .resize(200, 200, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png()
-    .toBuffer();
+  try {
+    const buf = await sharp(file)
+      .trim({ threshold: 10 })
+      .resize(160, 160, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .extend({ top: 20, bottom: 20, left: 20, right: 20, background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer();
 
-  return new Response(new Uint8Array(buf), {
-    headers: {
-      'Content-Type': 'image/png',
-      'Cache-Control': 'public, max-age=86400',
-    },
-  });
+    return new Response(new Uint8Array(buf), {
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=86400',
+      },
+    });
+  } catch {
+    return new Response(null, { status: 500 });
+  }
 }

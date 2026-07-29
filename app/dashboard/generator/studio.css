@@ -222,6 +222,7 @@
   height: 180px; color: var(--xdim); font-size: 13px; gap: 9px;
 }
 @keyframes studio-spin { to { transform: rotate(360deg); } }
+@keyframes exp-shimmer { to { background-position: -200% 0; } }
 .studio-wrap .spinner {
   width: 18px; height: 18px; border: 2px solid var(--border2);
   border-top-color: var(--accent); border-radius: 50%; animation: studio-spin .75s linear infinite;
@@ -1410,7 +1411,13 @@
 .studio-wrap .exp-nft-thumb {
   position: relative; aspect-ratio: 1; background: var(--bg2); overflow: hidden;
 }
-.studio-wrap .exp-nft-thumb canvas { width: 100%; height: 100%; display: block; }
+.studio-wrap .exp-nft-thumb canvas { width: 100%; height: 100%; display: block; transition: opacity .2s; }
+.studio-wrap .exp-nft-shimmer {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, var(--bg2) 25%, var(--bg3) 50%, var(--bg2) 75%);
+  background-size: 200% 100%;
+  animation: exp-shimmer 1.4s infinite;
+}
 .studio-wrap .exp-nft-rank {
   position: absolute; top: 7px; left: 7px;
   background: rgba(0,0,0,.65); font-size: 10px; font-weight: 800;
@@ -1680,10 +1687,62 @@
   line-height: 1.7;
 }
 
+/* ── Export grid nav (count + pagination) ─────────────────────────────────── */
+.studio-wrap .exp-grid-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.studio-wrap .exp-page-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.studio-wrap .exp-page-label {
+  font-size: 12px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+/* ── Export filter sidebar layout ─────────────────────────────────────────── */
+.studio-wrap .exp-with-filter {
+  display: flex;
+  gap: 0;
+  align-items: flex-start;
+  margin-top: 4px;
+}
+.studio-wrap .exp-filter-side {
+  width: 200px;
+  min-width: 160px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  padding: 8px 8px 12px 0;
+  max-height: 560px;
+  overflow-y: auto;
+}
+.studio-wrap .exp-filter-main {
+  flex: 1;
+  min-width: 0;
+  padding-left: 14px;
+}
+.studio-wrap .exp-empty-filter {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--dim);
+  font-size: 14px;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .studio-wrap .rt-formula-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 860px) {
   .studio-wrap .rt-tiers-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 860px) {
+  .studio-wrap .exp-with-filter { flex-direction: column; }
+  .studio-wrap .exp-filter-side { width: 100%; max-height: 200px; border-right: none; border-bottom: 1px solid var(--border); padding: 8px 0; }
 }

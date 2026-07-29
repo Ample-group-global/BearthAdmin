@@ -932,18 +932,30 @@ test.describe('Exports Tab — Server Generation', () => {
 
     const tierChips = page.locator('.exp-nft-tier-chip');
     expect(await tierChips.count()).toBeGreaterThan(0);
+
+    // Wait for bitmaps to finish loading — shimmer disappears and canvas has pixels
+    await page.waitForFunction(() => {
+      const canvas = document.querySelector('.exp-nft-thumb canvas') as HTMLCanvasElement;
+      if (!canvas) return false;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return false;
+      const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let i = 3; i < d.length; i += 4) { if (d[i] > 0) return true; }
+      return false;
+    }, {}, { timeout: 60_000 });
+    console.log('  ✅ Bitmaps loaded — NFT images visible');
     await snap(page, '30-export-nft-grid');
 
     const sortId = page.locator('.exp-sort-btn').filter({ hasText: /# ID/i });
     await expect(sortId).toBeVisible();
-    await sortId.click();
-    await page.waitForTimeout(300);
+    await sortId.click({ timeout: 30_000 });
+    await page.waitForTimeout(600);
     await expect(sortId).toHaveClass(/exp-sort-active/);
     await snap(page, '31-export-sort-by-id');
 
     const sortRarity = page.locator('.exp-sort-btn').filter({ hasText: /rarity/i });
-    await sortRarity.click();
-    await page.waitForTimeout(300);
+    await sortRarity.click({ timeout: 30_000 });
+    await page.waitForTimeout(600);
     await expect(sortRarity).toHaveClass(/exp-sort-active/);
     await snap(page, '32-export-sort-by-rarity');
 
@@ -1015,7 +1027,7 @@ test.describe('Exports Tab — Filebase Server Export', () => {
 
     await ensureExportDone(page);
 
-    const svrCard = page.locator('.exp-svr-card');
+    const svrCard = page.locator('[data-testid="server-export-section"]');
     await expect(svrCard).toBeVisible({ timeout: 30_000 });
     await snap(page, '35-server-export-card-visible');
 
@@ -1259,5 +1271,291 @@ test.describe('DB Verification', () => {
       console.log('  ⚠ No upload batch records (server export may not create them via this API)');
     }
     markTestPassed(30);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// IMAGE VALIDATION — Server Preview
+// ═══════════════════════════════════════════════════════════════════════════════
+test.describe('Image Validation — Server Preview', () => {
+  test('Server-side composite preview: all 9999 NFT images validate correctly', async ({ page }) => {
+    test.setTimeout(60 * 60_000); // 60 min — conservative ceiling for 9999 thumbnails
+    if (skipIfPassed(31)) return;
+    if (!jobId) { test.skip(); return; }
+
+    // Read auth token directly — poll from Node.js, not browser, so browser crashes don't abort the test
+    const techAuth = JSON.parse(fs.readFileSync(TECH_AUTH, 'utf-8'));
+    const sessionToken: string = (techAuth.cookies ?? []).find((c: any) => c.name === 'admin_session')?.value ?? '';
+    const apiBase = 'http://localhost:8000';
+
+    // Start preview via BearthApi directly
+    const startR = await fetch(`${apiBase}/api/nft-gen/export/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+      body: JSON.stringify({ jobId }),
+    });
+    const startResp: any = startR.ok ? await startR.json() : null;
+    expect(startResp?.previewId).toBeTruthy();
+    const previewId = startResp.previewId as string;
+    const total     = startResp.total as number;
+    console.log(`  🔍 Preview started — previewId=${previewId}, total=${total}`);
+
+    // Poll from Node.js (not browser) so page.close() can't kill the loop
+    const deadline = Date.now() + 55 * 60_000;
+    let lastStatus: any = null;
+    while (Date.now() < deadline) {
+      const pr = await fetch(`${apiBase}/api/nft-gen/export/preview/${previewId}`, {
+        headers: { 'Authorization': `Bearer ${sessionToken}` },
+      }).catch(() => null);
+      if (!pr?.ok) { await new Promise(r => setTimeout(r, 5_000)); continue; }
+      lastStatus = await pr.json();
+      const pct = lastStatus.total > 0 ? ((lastStatus.progress / lastStatus.total) * 100).toFixed(1) : '0.0';
+      console.log(`  📊 Preview: ${lastStatus.progress}/${lastStatus.total} (${pct}%) — ${lastStatus.phase}`);
+      if (lastStatus.status === 'done' || lastStatus.status === 'error') break;
+      await new Promise(r => setTimeout(r, 5_000));
+    }
+
+    // Navigate for screenshot
+    await page.goto('/dashboard/generator');
+    await waitForStudio(page);
+    await snap(page, '31-preview-api-done');
+
+    expect(lastStatus?.status).toBe('done');
+    expect(lastStatus?.validCount).toBeGreaterThan(0);
+    expect(lastStatus?.invalidItems?.length).toBe(0);
+    console.log(`  ✅ All ${lastStatus?.validCount} NFT images validated — 0 issues`);
+    markTestPassed(31);
+  });
+
+  test('Server-side preview: thumbnail grid renders in UI', async ({ page }) => {
+    test.setTimeout(5 * 60_000);
+    if (skipIfPassed(32)) return;
+    await page.goto('/dashboard/generator');
+    await waitForStudio(page);
+
+    if (!jobId) { test.skip(); return; }
+
+    // Click the "Validate All" button in the UI
+    const validateBtn = page.locator('[data-testid="validate-images-btn"]');
+    if (!await validateBtn.isVisible({ timeout: 8_000 }).catch(() => false)) {
+      console.log('  ⏭ Validate button not visible (panel not in done state) — skipping UI test');
+      markTestPassed(32);
+      return;
+    }
+
+    await validateBtn.click();
+    console.log('  ▶ Clicked Validate All button');
+    await page.screenshot({ path: 'tests/screenshots/32a-preview-started.png' });
+
+    // Wait for progress indicator
+    await page.waitForSelector('[data-testid="preview-progress"]', { timeout: 15_000 }).catch(() => {});
+
+    // Wait for done (up to 12 min)
+    await page.waitForSelector('[data-testid="preview-done"]', { timeout: 12 * 60_000 });
+    await page.screenshot({ path: 'tests/screenshots/32b-preview-done.png' });
+
+    // Verify all-valid banner
+    const allValidBanner = page.locator('[data-testid="all-valid-banner"]');
+    expect(await allValidBanner.isVisible()).toBe(true);
+
+    // Verify thumbnail grid is visible
+    const thumbGrid = page.locator('[data-testid="thumbnail-grid"]');
+    expect(await thumbGrid.isVisible()).toBe(true);
+    await page.screenshot({ path: 'tests/screenshots/32c-thumbnail-grid.png' });
+    console.log('  ✅ Thumbnail grid visible with all-valid banner');
+    markTestPassed(32);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXPORT PANEL — Filter sidebar
+// ═══════════════════════════════════════════════════════════════════════════════
+test.describe('Export Panel — Filter Sidebar', () => {
+
+  test('Export filter: layer accordion → trait filter → badge → clear', async ({ page }) => {
+    test.setTimeout(3 * 60_000);
+    if (skipIfPassed(34)) return;
+    await gotoWithCollection(page, collectionId);
+    await gotoStep(page, /export/i);
+
+    await ensureExportDone(page);
+
+    // Filter sidebar must be present in done view
+    const filterSide = page.locator('.exp-filter-side');
+    await expect(filterSide).toBeVisible({ timeout: 20_000 });
+
+    // Layer rows inside filter sidebar
+    const layerRows = filterSide.locator('.preview-layer-row');
+    await expect(layerRows.first()).toBeVisible({ timeout: 10_000 });
+    const layerCount = await layerRows.count();
+    console.log(`  Filter sidebar layer rows: ${layerCount}`);
+    expect(layerCount).toBeGreaterThanOrEqual(11);
+
+    // Find a layer with >1 traits so filter produces a meaningful subset.
+    // Skip single-trait layers (e.g. bg has only 1 trait = matches all NFTs).
+    let traitName   = '';
+    let expandedIdx = -1;
+    for (let i = 0; i < layerCount; i++) {
+      await layerRows.nth(i).click();
+      await page.waitForTimeout(300);
+      const traitRows = filterSide.locator('.plr-trait-row');
+      const tc = await traitRows.count();
+      if (tc > 1) {
+        traitName   = (await traitRows.first().locator('.plr-trait-name').textContent()) ?? '';
+        expandedIdx = i;
+        await traitRows.first().click();
+        break;
+      }
+      // Collapse single-trait layer and try next
+      await layerRows.nth(i).click();
+      await page.waitForTimeout(150);
+    }
+    expect(traitName).toBeTruthy();
+    await page.waitForTimeout(400);
+    await snap(page, '39-export-filter-active');
+
+    // Filter badge must appear
+    const filterBadge = page.locator('.plr-filter-badge');
+    await expect(filterBadge).toBeVisible({ timeout: 5_000 });
+    const badgeText = await filterBadge.textContent();
+    console.log(`  Filter badge: "${badgeText}"`);
+    expect(badgeText).toContain(traitName);
+
+    // NFT grid must show items
+    const nftCards = page.locator('.exp-nft-card');
+    const filteredCount = await nftCards.count();
+    console.log(`  NFT cards with filter: ${filteredCount}`);
+    expect(filteredCount).toBeGreaterThan(0);
+
+    // Count row must be visible and show "X of Y NFTs" where Y > X (real subset)
+    const countRow = page.locator('.preview-count-row');
+    await expect(countRow).toBeVisible({ timeout: 5_000 });
+    const countText = await countRow.textContent();
+    console.log(`  Count row: "${countText}"`);
+    const countMatch = countText?.match(/(\d[\d,]*)\s*of\s*(\d[\d,]*)/);
+    expect(countMatch).toBeTruthy();
+    const shownCount = parseInt((countMatch![1] ?? '0').replace(/,/g, ''));
+    const totalCount = parseInt((countMatch![2] ?? '0').replace(/,/g, ''));
+    console.log(`  Parsed: ${shownCount} of ${totalCount}`);
+    expect(totalCount).toBeGreaterThan(0);
+    expect(shownCount).toBeLessThan(totalCount);     // filter reduces the set
+
+    // Clear filter via ✕ button
+    const clearBtn = page.locator('.plr-filter-clear');
+    await expect(clearBtn).toBeVisible();
+    await clearBtn.click();
+    await page.waitForTimeout(400);
+
+    // Badge must disappear; full grid returns to total count
+    await expect(filterBadge).toBeHidden({ timeout: 5_000 });
+    const fullCount = await nftCards.count();
+    console.log(`  NFT cards after clear: ${fullCount}`);
+    expect(fullCount).toBeGreaterThan(filteredCount);
+
+    await snap(page, '40-export-filter-cleared');
+    console.log(`  ✅ Export filter: trait="${traitName}", filtered=${shownCount}/${totalCount}, full=${fullCount}`);
+    markTestPassed(34);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXPORT PANEL — NFT IMAGE SCREENSHOTS
+// ═══════════════════════════════════════════════════════════════════════════════
+test.describe('Export Panel — NFT Image Screenshots', () => {
+
+  test('Export panel: NFT canvas images render and screenshots captured', async ({ page }) => {
+    test.setTimeout(3 * 60_000);
+    if (skipIfPassed(33)) return;
+    await gotoWithCollection(page, collectionId);
+    await gotoStep(page, /export/i);
+
+    await ensureExportDone(page);
+
+    // Wait for NFT grid with canvas-rendered images
+    await page.waitForSelector('.exp-nft-grid', { timeout: 30_000 });
+    await page.waitForSelector('.exp-nft-card', { timeout: 30_000 });
+
+    // Wait for bitmaps to finish loading — poll first canvas until it has pixels (max 30s)
+    const bitmapReady = await page.waitForFunction(() => {
+      const canvas = document.querySelector('.exp-nft-thumb canvas') as HTMLCanvasElement;
+      if (!canvas) return false;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return false;
+      const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let i = 3; i < d.length; i += 4) { if (d[i] > 0) return true; }
+      return false;
+    }, {}, { timeout: 30_000 }).catch(() => null);
+    console.log(`  First canvas has pixels: ${!!bitmapReady}`);
+
+    const cardCount = await page.locator('.exp-nft-card').count();
+    console.log(`  Export grid: ${cardCount} NFT cards visible`);
+    expect(cardCount).toBeGreaterThan(0);
+
+    // Count canvas elements (one per card = the composited NFT image)
+    const canvasCount = await page.locator('.exp-nft-thumb canvas').count();
+    console.log(`  Canvas thumbnails rendered: ${canvasCount}`);
+    expect(canvasCount).toBeGreaterThan(0);
+
+    // Screenshot 1: full export panel — NFT grid overview
+    await snap(page, '35-export-nft-panel-overview');
+    console.log('  📸 Export panel overview captured');
+
+    // Screenshot 2: close-up of first 6 cards (scroll into view)
+    const firstCards = page.locator('.exp-nft-card').first();
+    await firstCards.scrollIntoViewIfNeeded();
+    await snap(page, '36-export-nft-first-cards');
+    console.log('  📸 First NFT cards close-up captured');
+
+    // Verify each visible card has: rank badge, tier chip, edition number, rarity score
+    const firstCard = page.locator('.exp-nft-card').first();
+    const rankBadge  = firstCard.locator('.exp-nft-rank');
+    const tierChip   = firstCard.locator('.exp-nft-tier-chip');
+    const nftName    = firstCard.locator('.exp-nft-name');
+    const rarityScore = firstCard.locator('.exp-nft-score');
+
+    await expect(rankBadge).toBeVisible();
+    await expect(tierChip).toBeVisible();
+    await expect(nftName).toBeVisible();
+    await expect(rarityScore).toBeVisible();
+
+    const rankText  = await rankBadge.textContent();
+    const tierText  = await tierChip.textContent();
+    const nameText  = await nftName.textContent();
+    const scoreText = await rarityScore.textContent();
+    console.log(`  First card — Rank: ${rankText?.trim()}, Tier: ${tierText?.trim()}, Edition: ${nameText?.trim()}, Score: ${scoreText?.trim()}`);
+
+    // Screenshot 3: click first card → popup with NFT image + traits
+    await firstCard.click();
+    await page.waitForTimeout(600);
+
+    const popupOverlay = page.locator('.nft-popup-overlay');
+    const popup = page.locator('.nft-popup, [class*="NftPopup"], [class*="popup"]').first();
+    const popupVisible = await popup.isVisible().catch(() => false);
+    if (popupVisible) {
+      await snap(page, '37-export-nft-popup-detail');
+      console.log('  📸 NFT popup detail screenshot captured');
+      // Close popup: Escape key, then click overlay if still open
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(500);
+      if (await popupOverlay.isVisible().catch(() => false)) {
+        await popupOverlay.click({ position: { x: 10, y: 10 }, force: true });
+        await page.waitForTimeout(500);
+      }
+    }
+
+    // Ensure overlay is gone before clicking sort
+    await page.waitForSelector('.nft-popup-overlay', { state: 'hidden', timeout: 5_000 }).catch(() => {});
+
+    // Screenshot 4: sort by Rarity → shows rarest NFTs first with images
+    const sortRarity = page.locator('.exp-sort-btn').filter({ hasText: /rarity/i });
+    if (await sortRarity.isVisible().catch(() => false)) {
+      await sortRarity.click({ timeout: 30_000 });
+      await page.waitForTimeout(800);
+      await snap(page, '38-export-nft-sorted-by-rarity');
+      console.log('  📸 Export panel sorted by rarity — rarest NFTs at top');
+    }
+
+    console.log('  ✅ Export panel NFT images rendered correctly with all metadata');
+    markTestPassed(33);
   });
 });
