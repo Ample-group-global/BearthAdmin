@@ -830,7 +830,7 @@ export default function TechDashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <QuickLink href="/dashboard/whitelist" label="Manage Whitelist" desc="Add, remove, export addresses" color="bg-blue-600" />
               <QuickLink href="/dashboard/contract" label="Contract Operations" desc="Phase, reveal, withdraw, emergency" color="bg-slate-700" />
-              <QuickLink href="/dashboard/nfts" label="NFT Explorer" desc="Ownership, mint type, reveal status" color="bg-violet-600" />
+              <QuickLink href="/nft/records" label="NFT Records" desc="Ownership, mint type, reveal status" color="bg-violet-600" />
             </div>
           </div>
         </div>
