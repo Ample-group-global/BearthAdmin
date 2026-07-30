@@ -53,16 +53,27 @@ export async function fetchMintedEvents(chainId: number): Promise<{
     royaltyEnforced: true, purchaseLimitEnabled: false, normalMaxPerWallet: 5,
   };
   try {
-    const info = await contract.getCollectionInfo();
+    const [phase, totalMinted, maxSupply, sbtFlag, purchaseLimit, normalMax,
+           transferValidator, ...waveRevealedArr] = await Promise.all([
+      contract.currentPhase(),
+      contract.totalSupply(),
+      contract.MAX_SUPPLY(),
+      contract.sbt(),
+      contract.purchaseLimitEnabled(),
+      contract.normalMaxPerWallet(),
+      contract.getTransferValidator(),
+      ...[1,2,3,4,5,6,7].map(i => contract.waveRevealed(i).catch(() => false)),
+    ]);
+    const revealCount = (waveRevealedArr as boolean[]).filter(Boolean).length;
     contractState = {
-      phase: Number(info.phase_),
-      totalMinted: Number(info.totalMinted_),
-      maxSupply: Number(info.maxSupply_),
-      sbt: Boolean(info.sbt_),
-      revealCount: Number(info.revealCount_),
-      royaltyEnforced: Boolean(info.royaltyEnforced_),
-      purchaseLimitEnabled: Boolean(info.purchaseLimitEnabled_),
-      normalMaxPerWallet: Number(info.normalMaxPerWallet_),
+      phase: Number(phase),
+      totalMinted: Number(totalMinted),
+      maxSupply: Number(maxSupply),
+      sbt: Boolean(sbtFlag),
+      revealCount,
+      royaltyEnforced: transferValidator !== ethers.ZeroAddress,
+      purchaseLimitEnabled: Boolean(purchaseLimit),
+      normalMaxPerWallet: Number(normalMax),
     };
   } catch {
     // continue without contract state

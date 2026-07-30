@@ -200,9 +200,14 @@ export default function Page() {
         sessionStorage.setItem('nft_supply', String(collection.supply ?? 100));
       }
 
-      // Sync layers from disk/S3 into DB (no-op on Vercel if no local disk)
+      // Sync layers into DB. On Vercel, local disk is empty so we pass the
+      // parsed layer manifest from React state as a fallback.
       if (cid) {
-        await fetch(`/api/nft-gen/collections/${cid}/sync-from-disk`, { method: 'POST' }).catch(() => {});
+        await fetch(`/api/nft-gen/collections/${cid}/sync-from-disk`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ layers }),
+        }).catch(() => {});
         loadLayers(undefined, cid);
       }
 

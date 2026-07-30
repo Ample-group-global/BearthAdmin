@@ -73,23 +73,35 @@ export default function TechDashboardPage() {
       const provider = new ethers.JsonRpcProvider(activeChain.rpcUrl);
       const contract = new ethers.Contract(activeChain.contractAddress, BearthNFTArtifact.abi, provider);
 
-      const [info, root, wave1Start, wave1End, balance] = await Promise.all([
-        contract.getCollectionInfo(),
-        contract.merkleRoot(),
+      const [phase, totalMinted, maxSupply, sbtFlag, purchaseLimit, normalMax,
+             transferValidator, root, wave1Start, wave1End, balance,
+             ...waveRevealedArr] = await Promise.all([
+        contract.currentPhase(),
+        contract.totalSupply(),
+        contract.MAX_SUPPLY(),
+        contract.sbt(),
+        contract.purchaseLimitEnabled(),
+        contract.normalMaxPerWallet(),
+        contract.getTransferValidator(),
+        contract.allowlistRoot(),
         contract.waveStartTime(1),
         contract.waveEndTime(1),
         provider.getBalance(activeChain.contractAddress),
+        ...[1,2,3,4,5,6,7].map(i => contract.waveRevealed(i).catch(() => false)),
       ]);
 
+      const revealCount = (waveRevealedArr as boolean[]).filter(Boolean).length;
+      const royaltyEnforced = transferValidator !== ethers.ZeroAddress;
+
       setStats({
-        phase: Number(info.phase_),
-        totalMinted: Number(info.totalCounter),
-        maxSupply: Number(info.maxSupply_),
-        sbt: Boolean(info.sbt_),
-        revealCount: Number(info.revealCount_),
-        royaltyEnforced: Boolean(info.royaltyEnforced_),
-        purchaseLimitEnabled: Boolean(info.purchaseLimitEnabled_),
-        normalMaxPerWallet: Number(info.normalMaxPerWallet_),
+        phase: Number(phase),
+        totalMinted: Number(totalMinted),
+        maxSupply: Number(maxSupply),
+        sbt: Boolean(sbtFlag),
+        revealCount,
+        royaltyEnforced,
+        purchaseLimitEnabled: Boolean(purchaseLimit),
+        normalMaxPerWallet: Number(normalMax),
         root: String(root),
         wave1Start: Number(wave1Start),
         wave1End: Number(wave1End),

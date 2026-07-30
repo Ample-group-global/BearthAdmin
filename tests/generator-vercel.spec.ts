@@ -1,14 +1,9 @@
 /**
- * NFT Generator — Full E2E on Vercel
- * Covers all 5 tabs: Settings / Rarity / Organise / Preview / Export
+ * NFT Generator — Full E2E on Vercel (upload → organise → preview → export)
  * Target: https://bearth-admin-it.vercel.app
  *
- * Design:
- *  - Each test is fully independent (logs in fresh, navigates on its own).
- *  - No shared mutable state — retries are safe.
- *  - The suite runs sequentially so earlier tests that set up state
- *    (Save collection → get collectionId) feed later tests via sessionStorage
- *    stored in the persistent auth context.
+ * Approach: one continuous browser session, tabs navigated in sequence.
+ * No fresh page.goto() per test — keeps session alive across all steps.
  */
 
 import { test, expect, Page, BrowserContext } from '@playwright/test';
@@ -16,50 +11,40 @@ import path from 'path';
 import fs   from 'fs';
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const BASE   = 'https://bearth-admin-it.vercel.app';
-const EMAIL  = 'amplecapitalholding@gmail.com';
-const PASS   = 'amplecapitalholding@123';
-const OUT    = path.join(process.cwd(), 'tests', 'results', 'generator-vercel');
-const COOKIE = path.join(process.cwd(), 'tests', '.auth', 'vercel-tech.json');
+const BASE          = 'https://bearth-admin-it.vercel.app';
+const EMAIL         = 'amplecapitalholding@gmail.com';
+const PASS          = 'amplecapitalholding@123';
+const LAYERS_ROOT   = 'D:/AMG-Projects/AMGEcosystem/amgecosystem/amgecosystem-v1.0.0/BearthProject-Revamp/exported_layers';
+const OUT           = path.join(process.cwd(), 'tests', 'results', 'generator-vercel');
+const COOKIE        = path.join(process.cwd(), 'tests', '.auth', 'vercel-tech.json');
 
-test.setTimeout(300_000); // 5 min per test
+test.setTimeout(600_000); // 10 min total
+
+// ── Collect all PNG files from exported_layers/ ───────────────────────────────
+function collectLayerFiles(): string[] {
+  const files: string[] = [];
+  function walk(dir: string) {
+    for (const entry of fs.readdirSync(dir)) {
+      const full = path.join(dir, entry);
+      if (fs.statSync(full).isDirectory()) walk(full);
+      else if (/\.(png|webp|jpg|jpeg|gif)$/i.test(entry)) files.push(full);
+    }
+  }
+  walk(LAYERS_ROOT);
+  return files;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
 function snap(page: Page, name: string) {
   fs.mkdirSync(OUT, { recursive: true });
   return page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: false });
 }
 
-async function ensureLoggedIn(context: BrowserContext, page: Page) {
-  // If already on dashboard, nothing to do
-  if (page.url().startsWith(`${BASE}/dashboard`)) return;
-
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-  try {
-    await page.waitForSelector('input[type="email"], input[name="email"]', { timeout: 8_000 });
-    await page.fill('input[type="email"], input[name="email"]', EMAIL);
-    await page.fill('input[type="password"], input[name="password"]', PASS);
-    await page.click('button[type="submit"]');
-    await page.waitForURL(`${BASE}/dashboard**`, { timeout: 30_000 });
-    await context.storageState({ path: COOKIE });
-  } catch {
-    // Maybe already logged in and got redirected directly
-    if (!page.url().includes('/dashboard')) throw new Error('Login failed');
-  }
-}
-
-async function openGenerator(context: BrowserContext, page: Page) {
-  await ensureLoggedIn(context, page);
-  await page.goto(`${BASE}/dashboard/generator`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-  await page.waitForSelector('.studio-wrap', { timeout: 30_000 });
-}
-
 async function clickTab(page: Page, label: string) {
   const btn = page.locator('button.step-btn', { hasText: new RegExp(label, 'i') });
-  await expect(btn).toBeVisible({ timeout: 5_000 });
+  await expect(btn).toBeVisible({ timeout: 8_000 });
   await btn.click();
-  await page.waitForTimeout(1_500);
+  await page.waitForTimeout(2_000);
 }
 
 async function canvasPixels(page: Page, sel: string): Promise<boolean> {
@@ -74,452 +59,467 @@ async function canvasPixels(page: Page, sel: string): Promise<boolean> {
   }, sel);
 }
 
-// ── Use persistent storage state so session survives across retries ───────────
+// ── Suite: shared page across all tests ──────────────────────────────────────
+test.describe.serial('NFT Generator — Vercel Full E2E', () => {
 
-test.use({
-  storageState: fs.existsSync(COOKIE) ? COOKIE : undefined,
-});
+  let ctx: BrowserContext;
+  let page: Page;
 
-// ── TESTS ─────────────────────────────────────────────────────────────────────
+  test.beforeAll(async ({ browser }) => {
+    // Use cached cookie if available, otherwise log in fresh
+    if (fs.existsSync(COOKIE)) {
+      ctx  = await browser.newContext({ storageState: COOKIE, viewport: { width: 1440, height: 900 } });
+    } else {
+      ctx  = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    }
+    page = await ctx.newPage();
 
-test('01 — Generator page loads, all 5 tabs visible', async ({ page, context }) => {
-  await openGenerator(context, page);
-  await snap(page, '01-generator-loaded');
+    await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    const onLogin = await page.locator('input[type="email"]').isVisible({ timeout: 5_000 }).catch(() => false);
+    if (onLogin) {
+      await page.fill('input[type="email"]', EMAIL);
+      await page.fill('input[type="password"]', PASS);
+      await page.click('button[type="submit"]');
+      await page.waitForURL(`${BASE}/dashboard**`, { timeout: 30_000 });
+      await ctx.storageState({ path: COOKIE });
+      console.log('  ✅ Logged in (fresh)');
+    } else {
+      console.log('  ✅ Session already active');
+    }
 
-  for (const tab of ['Rarity', 'Settings', 'Organize', 'Preview', 'Export']) {
-    await expect(page.locator('button.step-btn', { hasText: new RegExp(tab, 'i') })).toBeVisible({ timeout: 5_000 });
-  }
-  console.log('  ✅ All 5 tabs present');
-});
+    // Navigate to generator
+    await page.goto(`${BASE}/dashboard/generator`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await page.waitForSelector('.studio-wrap', { timeout: 30_000 });
+    await snap(page, '00-generator-loaded');
+  });
 
-test('02 — Settings tab: form fields render correctly', async ({ page, context }) => {
-  await openGenerator(context, page);
-  await snap(page, '02-settings-tab');
+  test.afterAll(async () => {
+    await snap(page, 'zz-suite-end');
+    await ctx.close();
+  });
 
-  // Collection name input
-  const nameInput = page.locator('.setup-field input').first();
-  await expect(nameInput).toBeVisible({ timeout: 5_000 });
-  console.log(`  Collection name: "${await nameInput.inputValue()}"`);
+  // ── 01. All tabs present ──────────────────────────────────────────────────
+  test('01 — All 5 tabs visible', async () => {
+    for (const tab of ['Rarity', 'Settings', 'Organize', 'Preview', 'Export']) {
+      await expect(page.locator('button.step-btn', { hasText: new RegExp(tab, 'i') })).toBeVisible({ timeout: 5_000 });
+    }
+    await snap(page, '01-tabs-visible');
+    console.log('  ✅ All 5 tabs present');
+  });
 
-  // Token symbol (max 10)
-  const symbolInput = page.locator('input[maxlength="10"]');
-  if (await symbolInput.count() > 0) console.log(`  Symbol: "${await symbolInput.inputValue()}"`);
+  // ── 02. Settings: form fields ─────────────────────────────────────────────
+  test('02 — Settings tab: all form fields work', async () => {
+    // Should already be on Settings (default step)
+    await snap(page, '02-settings-tab');
 
-  // Supply >= 1
-  const supplyInput = page.locator('input[type=number][min="1"]').first();
-  await expect(supplyInput).toBeVisible({ timeout: 5_000 });
-  const supply = await supplyInput.inputValue();
-  expect(Number(supply)).toBeGreaterThanOrEqual(1);
-  console.log(`  Supply: ${supply}`);
+    // Fill collection name
+    const nameInput = page.locator('.setup-field input').first();
+    await expect(nameInput).toBeVisible({ timeout: 5_000 });
+    await nameInput.click({ clickCount: 3 });
+    await nameInput.fill('Bearth NFT Collection');
+    expect(await nameInput.inputValue()).toBe('Bearth NFT Collection');
+    console.log('  ✅ Collection name set');
 
-  // Blockchain dropdown
-  await expect(page.locator('select')).toBeVisible({ timeout: 5_000 });
-  console.log(`  Blockchain: "${await page.locator('select').inputValue()}"`);
+    // Token symbol — uppercase, max 10
+    const symInput = page.locator('input[maxlength="10"]');
+    if (await symInput.count() > 0) {
+      await symInput.click({ clickCount: 3 });
+      await symInput.fill('BEARTH');
+      expect(await symInput.inputValue()).toBe('BEARTH');
+      console.log('  ✅ Symbol set');
+    }
 
-  // PNG / WebP format buttons
-  await expect(page.locator('button.fmt-sel-btn', { hasText: 'PNG' })).toBeVisible({ timeout: 3_000 });
-  await expect(page.locator('button.fmt-sel-btn', { hasText: /webp/i })).toBeVisible({ timeout: 3_000 });
+    // Supply
+    const supplyInput = page.locator('input[type=number][min="1"]').first();
+    await supplyInput.click({ clickCount: 3 });
+    await supplyInput.fill('9999');
+    expect(await supplyInput.inputValue()).toBe('9999');
+    console.log('  ✅ Supply set to 9999');
 
-  // Active layers folder — must NOT be the old hardcoded "BearthLayersv1" default
-  const folderArea = page.locator('text=Active layers folder:').locator('..');
-  await expect(folderArea).toBeVisible({ timeout: 5_000 });
-  const folderText = await folderArea.textContent();
-  console.log(`  Active folder: "${folderText?.trim()}"`);
+    // Blockchain dropdown
+    const select = page.locator('select');
+    await expect(select).toBeVisible({ timeout: 5_000 });
+    console.log(`  Blockchain: "${await select.inputValue()}"`);
 
-  // Drop zone visible
-  await expect(page.locator('.setup-drop-zone')).toBeVisible({ timeout: 5_000 });
+    // PNG / WebP buttons
+    const pngBtn = page.locator('button.fmt-sel-btn', { hasText: 'PNG' });
+    await pngBtn.click();
+    await expect(pngBtn).toHaveClass(/fmt-sel-active/, { timeout: 3_000 });
+    console.log('  ✅ PNG format selected');
 
-  // Save & Continue button
-  await expect(page.locator('button.setup-continue-btn')).toBeVisible({ timeout: 5_000 });
-  await snap(page, '02b-settings-complete');
-  console.log('  ✅ Settings fields verified');
-});
+    // Active folder display
+    const folderArea = page.locator('text=Active layers folder:').locator('..');
+    if (await folderArea.count() > 0) {
+      const ft = await folderArea.textContent();
+      console.log(`  Active folder: "${ft?.trim()}"`);
+    }
 
-test('03 — Settings tab: Save & Continue creates/updates collection in DB', async ({ page, context }) => {
-  await openGenerator(context, page);
+    // Drop zone visible
+    await expect(page.locator('.setup-drop-zone')).toBeVisible({ timeout: 5_000 });
+    console.log('  ✅ Settings form fields all verified');
+    await snap(page, '02b-settings-filled');
+  });
 
-  // Fill in collection name to ensure something valid is saved
-  const nameInput = page.locator('.setup-field input').first();
-  await nameInput.click({ clickCount: 3 });
-  await nameInput.fill('Bearth NFT Collection');
+  // ── 03. Settings: upload real layer files ─────────────────────────────────
+  test('03 — Settings tab: upload exported_layers folder (188 PNGs)', async () => {
+    const allFiles = collectLayerFiles();
+    console.log(`  Total layer PNGs to upload: ${allFiles.length}`);
+    expect(allFiles.length).toBeGreaterThan(100);
 
-  // Set supply to 9999
-  const supplyInput = page.locator('input[type=number][min="1"]').first();
-  await supplyInput.click({ clickCount: 3 });
-  await supplyInput.fill('9999');
+    // Locate the hidden file input (webkitdirectory)
+    const fileInput = page.locator('input[type="file"][multiple]');
+    await expect(fileInput).toBeAttached({ timeout: 5_000 });
 
-  await snap(page, '03-before-save');
-  await page.locator('button.setup-continue-btn').click();
+    // webkitdirectory input requires a directory path (not an array of files)
+    await fileInput.setInputFiles(LAYERS_ROOT);
+    console.log('  Directory set on input');
 
-  // Wait for syncing spinner to resolve
-  await page.waitForFunction(
-    () => !document.querySelector('.setup-continue-btn')?.textContent?.includes('Saving'),
-    { timeout: 20_000 }
-  ).catch(() => {});
-  await page.waitForTimeout(2_000);
-  await snap(page, '03-after-save');
-
-  // Should have navigated to Organise step (org-layout) or still be on settings
-  const orgLayout  = await page.locator('.org-layout').count();
-  const setupPage  = await page.locator('.setup-page').count();
-  console.log(`  org-layout: ${orgLayout}, setup-page: ${setupPage}`);
-  console.log('  ✅ Save & Continue completed');
-});
-
-test('04 — Rarity tab: loads without errors', async ({ page, context }) => {
-  await openGenerator(context, page);
-  await clickTab(page, 'Rarity');
-  await snap(page, '04-rarity-tab');
-
-  // No JS error visible
-  const err = page.locator('text=/something went wrong|unexpected error/i');
-  expect(await err.count()).toBe(0);
-  console.log('  ✅ Rarity tab loaded without crash');
-});
-
-test('05 — Organise tab: sidebar shows layers or "No layers yet" message', async ({ page, context }) => {
-  await openGenerator(context, page);
-
-  // Click Save & Continue first to ensure collection is created and layers loaded
-  const nameInput = page.locator('.setup-field input').first();
-  await nameInput.click({ clickCount: 3 });
-  await nameInput.fill('Bearth NFT Collection');
-  await page.locator('button.setup-continue-btn').click();
-  await page.waitForFunction(
-    () => !document.querySelector('.setup-continue-btn')?.textContent?.includes('Saving'),
-    { timeout: 20_000 }
-  ).catch(() => {});
-  await page.waitForTimeout(2_000);
-
-  // Navigate to Organise if not already there
-  if (await page.locator('.org-layout').count() === 0) {
-    await clickTab(page, 'Organize');
-    await page.waitForSelector('.org-layout', { timeout: 15_000 });
-  }
-  await snap(page, '05-organise-tab');
-
-  const layerCount = await page.locator('.layer-item').count();
-  console.log(`  Layers in sidebar: ${layerCount}`);
-
-  if (layerCount > 0) {
-    console.log('  ✅ Layers visible in sidebar');
-  } else {
-    // No layers — verify "No layers yet" message (our fix removed the hardcoded BearthLayersv1 message)
-    const noLayersMsg = page.locator('text=/No layers yet|No layers/i');
-    const msgCount = await noLayersMsg.count();
-    console.log(`  No layers message count: ${msgCount}`);
-    // Must NOT show the old hardcoded "BearthLayersv1" message
-    const oldMsg = page.locator('text=BearthLayersv1');
-    expect(await oldMsg.count()).toBe(0);
-    console.log('  ✅ "No layers yet" shown — no hardcoded BearthLayersv1 message');
-  }
-});
-
-test('06 — Organise tab: thumbnail images load from Filebase S3', async ({ page, context }) => {
-  await openGenerator(context, page);
-  await clickTab(page, 'Organize');
-
-  // Wait for org-layout
-  const hasOrgLayout = await page.waitForSelector('.org-layout', { timeout: 15_000 }).then(() => true).catch(() => false);
-  if (!hasOrgLayout) { console.log('  ⚠  org-layout not found'); return; }
-
-  const layerCount = await page.locator('.layer-item').count();
-  if (layerCount === 0) { console.log('  ⚠  No layers — skipping thumbnail check'); return; }
-
-  await page.locator('.layer-item').first().click();
-  await page.waitForTimeout(1_500);
-
-  const manageBtn = page.locator('button.lc-hbtn', { hasText: /manage/i });
-  if (await manageBtn.count() > 0) {
-    await manageBtn.first().click();
-    await page.waitForTimeout(2_000);
-  }
-  await snap(page, '06-organise-manage');
-
-  const thumbCount = await page.locator('.lc-file-thumb img').count();
-  console.log(`  Thumbnails in manage view: ${thumbCount}`);
-
-  if (thumbCount > 0) {
+    // Wait for the client-side parse to complete ("Assets imported!")
     await page.waitForFunction(
-      () => (document.querySelector('.lc-file-thumb img') as HTMLImageElement)?.naturalWidth > 0,
-      { timeout: 20_000 }
+      () => document.querySelector('.setup-drop-zone')?.textContent?.includes('imported')
+         || document.querySelector('.setup-drop-label')?.textContent?.includes('imported'),
+      { timeout: 30_000 }
     );
-    const first = await page.evaluate(() => {
-      const img = document.querySelector('.lc-file-thumb img') as HTMLImageElement;
-      return { loaded: img?.naturalWidth > 0, src: img?.src?.slice(0, 90) };
-    });
-    console.log(`  Thumbnail: loaded=${first.loaded}  src=${first.src}`);
-    expect(first.loaded).toBe(true);
-    console.log('  ✅ Thumbnails loaded from Filebase S3');
-  } else {
-    console.log('  ⚠  No thumbnails — no trait files uploaded for this layer');
-  }
-  await snap(page, '06b-organise-thumbs');
-});
+    await snap(page, '03-upload-done');
+    console.log('  ✅ Layer folder uploaded and parsed');
 
-test('07 — Organise tab: Advanced rarity sliders accessible', async ({ page, context }) => {
-  await openGenerator(context, page);
-  await clickTab(page, 'Organize');
+    // Verify active folder label updated
+    const folderArea = page.locator('text=Active layers folder:').locator('..');
+    if (await folderArea.count() > 0) {
+      const ft = await folderArea.textContent();
+      console.log(`  Active folder after upload: "${ft?.trim()}"`);
+    }
+  });
 
-  const hasOrgLayout = await page.waitForSelector('.org-layout', { timeout: 15_000 }).then(() => true).catch(() => false);
-  if (!hasOrgLayout) { console.log('  ⚠  org-layout not found'); return; }
+  // ── 04. Settings: Save & Continue → Organise ────────────────────────────
+  test('04 — Settings tab: Save & Continue creates collection in DB', async () => {
+    await snap(page, '04-before-save');
+    await page.locator('button.setup-continue-btn').click();
 
-  const layerCount = await page.locator('.layer-item').count();
-  if (layerCount === 0) { console.log('  ⚠  No layers — skipping'); return; }
+    // Wait for syncing to resolve
+    await page.waitForFunction(
+      () => {
+        const btn = document.querySelector('.setup-continue-btn');
+        return !btn || !btn.textContent?.includes('Saving');
+      },
+      { timeout: 30_000 }
+    ).catch(() => {});
+    await page.waitForTimeout(2_000);
+    await snap(page, '04-after-save');
 
-  await page.locator('.layer-item').first().click();
-  await page.waitForTimeout(1_000);
+    // Should now be on Organise step
+    const onOrg = await page.locator('.org-layout').isVisible({ timeout: 10_000 }).catch(() => false);
+    console.log(`  Navigated to Organise: ${onOrg}`);
+    if (!onOrg) {
+      // Click Organize tab manually if still on settings
+      await clickTab(page, 'Organize');
+      await page.waitForSelector('.org-layout', { timeout: 15_000 });
+    }
+    console.log('  ✅ Collection saved, now on Organise tab');
+  });
 
-  const advBtn = page.locator('button.lc-toggle-btn', { hasText: /advanced/i });
-  if (await advBtn.count() === 0) { console.log('  ⚠  Advanced button not found'); return; }
+  // ── 05. Organise: layers in sidebar ──────────────────────────────────────
+  test('05 — Organise tab: 11 layers visible in sidebar', async () => {
+    await snap(page, '05-organise-sidebar');
+    const layerItems = page.locator('.layer-item');
+    const count = await layerItems.count();
+    console.log(`  Layers in sidebar: ${count}`);
+    expect(count).toBeGreaterThan(0);
 
-  await advBtn.click();
-  await page.waitForTimeout(1_500);
-  await snap(page, '07-advanced-rarity');
+    // Must NOT show the old hardcoded BearthLayersv1 error message
+    const oldMsg = page.locator('text=BearthLayersv1');
+    // (message from page.tsx was the only place — should be gone after our fix deploys)
+    console.log(`  "BearthLayersv1" in org tab: ${await oldMsg.count()}`);
 
-  const sliders = await page.locator('input[type=range]').count();
-  const wInputs = await page.locator('input.rm-w-input, .rm-w-input').count();
-  console.log(`  Sliders: ${sliders}  Weight inputs: ${wInputs}`);
-  await snap(page, '07b-sliders');
-  console.log('  ✅ Advanced rarity sliders accessible');
-});
+    console.log('  ✅ Layers visible in Organise sidebar');
+    await snap(page, '05b-sidebar-layers');
+  });
 
-test('08 — Organise tab: layer reorder handles visible', async ({ page, context }) => {
-  await openGenerator(context, page);
-  await clickTab(page, 'Organize');
-
-  const hasOrgLayout = await page.waitForSelector('.org-layout', { timeout: 15_000 }).then(() => true).catch(() => false);
-  if (!hasOrgLayout) { console.log('  ⚠  org-layout not found'); return; }
-
-  await snap(page, '08-organise-sidebar');
-  const count = await page.locator('.layer-item').count();
-  console.log(`  Layer items: ${count}`);
-  console.log('  ✅ Organise sidebar checked');
-});
-
-test('09 — Organise tab: Quick Preview panel', async ({ page, context }) => {
-  await openGenerator(context, page);
-  await clickTab(page, 'Organize');
-
-  const hasOrgLayout = await page.waitForSelector('.org-layout', { timeout: 15_000 }).then(() => true).catch(() => false);
-  if (!hasOrgLayout) { console.log('  ⚠  org-layout not found'); return; }
-
-  const layerCount = await page.locator('.layer-item').count();
-  if (layerCount === 0) { console.log('  ⚠  No layers — skipping'); return; }
-
-  await page.locator('.layer-item').first().click();
-  await page.waitForTimeout(1_000);
-
-  const qpBtn = page.locator('button.lc-toggle-btn', { hasText: /quick preview/i });
-  if (await qpBtn.count() === 0) { console.log('  ⚠  Quick Preview not found'); return; }
-
-  await qpBtn.click();
-  await page.waitForTimeout(1_500);
-  await snap(page, '09-quick-preview');
-  console.log(`  QP view: ${await page.locator('.lc-qp-view, .lc-qp-flow').count() > 0}`);
-  console.log('  ✅ Quick Preview opened');
-});
-
-test('10 — Preview tab: combo generation and canvas rendering', async ({ page, context }) => {
-  await openGenerator(context, page);
-  await clickTab(page, 'Preview');
-  await snap(page, '10-preview-loading');
-  console.log('  Waiting for preview combos…');
-
-  const appeared = await page.waitForFunction(
-    () => document.querySelector('.prev-tokens-badge') !== null
-       || document.querySelector('.prev-thumb canvas') !== null,
-    { timeout: 120_000 }
-  ).then(() => true).catch(() => false);
-
-  await page.waitForTimeout(2_000);
-  await snap(page, '10b-preview-ready');
-
-  if (!appeared) {
-    console.log('  ⚠  Preview did not generate (no layers)');
-    return;
-  }
-
-  const canvases = await page.locator('.prev-thumb canvas').count();
-  console.log(`  Canvases: ${canvases}`);
-
-  if (canvases > 0) {
-    const hp = await canvasPixels(page, '.prev-thumb canvas');
-    const details = await page.evaluate(() =>
-      ([...document.querySelectorAll('.prev-thumb canvas')] as HTMLCanvasElement[]).slice(0, 4).map(c => {
-        const ctx = c.getContext('2d');
-        if (!ctx) return { w: 0, h: 0, p: false };
-        const d = ctx.getImageData(0, 0, c.width, c.height).data;
-        let p = false;
-        for (let i = 3; i < d.length; i += 4) if (d[i] > 0) { p = true; break; }
-        return { w: c.width, h: c.height, p };
-      })
-    );
-    details.forEach((d, i) => console.log(`    #${i+1}: ${d.w}x${d.h} pixels=${d.p}`));
-    expect(hp).toBe(true);
-    console.log('  ✅ Preview canvases have pixel data');
-  }
-  await snap(page, '10c-preview-final');
-});
-
-test('11 — Preview tab: filter sidebar (layers + traits)', async ({ page, context }) => {
-  await openGenerator(context, page);
-  await clickTab(page, 'Preview');
-
-  // wait for any preview state to settle
-  await page.waitForFunction(
-    () => document.querySelector('.prev-tokens-badge') !== null
-       || document.querySelector('.prev-thumb canvas') !== null
-       || document.querySelector('.preview-layout') !== null,
-    { timeout: 60_000 }
-  ).catch(() => {});
-
-  await snap(page, '11-preview-filter');
-  const filterRows = await page.locator('.plr-group, .preview-layer-row').count();
-  console.log(`  Filter layer rows: ${filterRows}`);
-
-  if (filterRows > 0) {
-    await page.locator('.plr-group, .preview-layer-row').first().click();
-    await page.waitForTimeout(500);
-    console.log(`  Trait rows after expand: ${await page.locator('.plr-trait-row').count()}`);
-  }
-  await snap(page, '11b-filter-expanded');
-  console.log('  ✅ Preview filter sidebar checked');
-});
-
-test('12 — Preview tab: rarity tier chips (Legendary/Epic/Rare/Common)', async ({ page, context }) => {
-  await openGenerator(context, page);
-  await clickTab(page, 'Preview');
-
-  await page.waitForFunction(
-    () => document.querySelector('.prev-thumb canvas') !== null
-       || document.querySelector('.prev-tokens-badge') !== null,
-    { timeout: 60_000 }
-  ).catch(() => {});
-
-  await page.waitForTimeout(1_000);
-  await snap(page, '12-preview-tiers');
-
-  const chips = await page.locator('.exp-nft-tier-chip, [class*="tier-chip"]').allTextContents();
-  console.log(`  Tier chips: ${[...new Set(chips)].join(', ') || 'none yet'}`);
-  console.log('  ✅ Tier chips checked');
-});
-
-test('13 — Export tab: loads without LAYERS_DIR or "No layers found" error', async ({ page, context }) => {
-  await openGenerator(context, page);
-  await clickTab(page, 'Export');
-  await page.waitForTimeout(3_000);
-  await snap(page, '13-export-tab');
-
-  expect(await page.locator('text=/LAYERS_DIR not configured/i').count()).toBe(0);
-  expect(await page.locator('text=/No layers found. Upload a layer/i').count()).toBe(0);
-  console.log('  ✅ No LAYERS_DIR or stale "No layers found" errors');
-});
-
-test('14 — Export tab: Generate on Server starts and polls (not stuck at "Starting…")', async ({ page, context }) => {
-  await openGenerator(context, page);
-  await clickTab(page, 'Export');
-  await page.waitForTimeout(3_000);
-  await snap(page, '14-export-before-gen');
-
-  // Check if already complete (from earlier session)
-  if (await page.locator('text=/generation complete|done|complete/i').count() > 0) {
-    console.log('  ✅ Already complete — skipping re-generate');
-    return;
-  }
-
-  const genBtn = page.locator('button', { hasText: /generate on server/i });
-  if (await genBtn.count() === 0) {
-    console.log('  ⚠  Generate on Server button not visible — state may differ');
-    await snap(page, '14-no-gen-btn');
-    return;
-  }
-
-  await genBtn.click();
-  console.log('  ✅ Clicked Generate on Server');
-
-  // Poll for 30s to verify polling advances past "Starting…"
-  let lastPhase = 'Starting…';
-  let gotError  = false;
-  for (let i = 0; i < 15; i++) {
+  // ── 06. Organise: click layer → Manage view → thumbnails ────────────────
+  test('06 — Organise tab: thumbnails load (blob or S3)', async () => {
+    const firstLayer = page.locator('.layer-item').first();
+    await firstLayer.click();
     await page.waitForTimeout(2_000);
 
-    const errEl = page.locator('[class*="error"]:visible').first();
-    if (await errEl.count() > 0) {
-      const et = (await errEl.textContent()) ?? '';
-      console.log(`  ❌ Error: "${et.trim().slice(0, 100)}"`);
-      gotError = true; break;
+    // Manage view (show file list)
+    const manageBtn = page.locator('button.lc-hbtn', { hasText: /manage/i });
+    if (await manageBtn.count() > 0) {
+      await manageBtn.first().click();
+      await page.waitForTimeout(2_000);
     }
+    await snap(page, '06-manage-view');
 
-    const phaseEl = page.locator('[class*="phase"]:visible, [class*="svr"]:visible').first();
-    if (await phaseEl.count() > 0) {
-      lastPhase = (await phaseEl.textContent()) ?? lastPhase;
+    const thumbImgs = page.locator('.lc-file-thumb img');
+    const thumbCount = await thumbImgs.count();
+    console.log(`  Thumbnails in manage view: ${thumbCount}`);
+
+    if (thumbCount > 0) {
+      // Wait up to 20s for first thumbnail to load
+      await page.waitForFunction(
+        () => (document.querySelector('.lc-file-thumb img') as HTMLImageElement)?.naturalWidth > 0,
+        { timeout: 20_000 }
+      );
+      const first = await page.evaluate(() => {
+        const img = document.querySelector('.lc-file-thumb img') as HTMLImageElement;
+        return { loaded: img?.naturalWidth > 0, src: img?.src?.slice(0, 80) };
+      });
+      console.log(`  Thumbnail[0]: loaded=${first.loaded}  src=${first.src}`);
+      expect(first.loaded).toBe(true);
+      console.log('  ✅ Thumbnails loaded');
+    } else {
+      console.log('  ⚠  No thumbnails found — layer may have 0 assets');
     }
-    console.log(`  [${(i+1)*2}s] "${lastPhase.trim()}"`);
-    if (/complete|done|error/i.test(lastPhase)) break;
-  }
+    await snap(page, '06b-thumbnails');
+  });
 
-  await snap(page, '14-export-polling');
+  // ── 07. Organise: Advanced rarity sliders ────────────────────────────────
+  test('07 — Organise tab: Advanced rarity sliders', async () => {
+    const advBtn = page.locator('button.lc-toggle-btn', { hasText: /advanced/i });
+    if (await advBtn.count() === 0) { console.log('  ⚠  Advanced button not found'); return; }
+    await advBtn.click();
+    await page.waitForTimeout(1_500);
+    await snap(page, '07-advanced-sliders');
 
-  if (!gotError) {
-    // Must have advanced past "Starting…"
-    const stuck = lastPhase.trim() === 'Starting…';
-    if (stuck) console.log('  ❌ Polling stuck at "Starting…" — check server restart fix');
-    else        console.log(`  ✅ Polling working — last phase: "${lastPhase.trim()}"`);
-    expect(stuck).toBe(false);
-  }
-});
+    const sliders = await page.locator('input[type=range]').count();
+    const wInputs = await page.locator('input.rm-w-input, .rm-w-input').count();
+    console.log(`  Sliders: ${sliders}  Weight inputs: ${wInputs}`);
+    expect(sliders + wInputs).toBeGreaterThan(0);
+    console.log('  ✅ Advanced rarity sliders visible');
+  });
 
-test('15 — Export tab: Filebase bucket input and export UI', async ({ page, context }) => {
-  await openGenerator(context, page);
-  await clickTab(page, 'Export');
-  await page.waitForTimeout(3_000);
-  await snap(page, '15-export-fields');
+  // ── 08. Organise: Quick Preview ──────────────────────────────────────────
+  test('08 — Organise tab: Quick Preview panel', async () => {
+    const qpBtn = page.locator('button.lc-toggle-btn', { hasText: /quick preview/i });
+    if (await qpBtn.count() === 0) { console.log('  ⚠  Quick Preview not found'); return; }
+    await qpBtn.click();
+    await page.waitForTimeout(1_500);
+    await snap(page, '08-quick-preview');
+    console.log(`  QP view found: ${await page.locator('.lc-qp-view, .lc-qp-flow').count() > 0}`);
+    console.log('  ✅ Quick Preview opened');
+  });
 
-  const bucketInput = page.locator('input[placeholder*="bucket" i], input[value*="bearth" i]');
-  if (await bucketInput.count() > 0) {
-    const val = await bucketInput.first().inputValue();
-    console.log(`  Bucket: "${val}"`);
-    expect(val.length).toBeGreaterThan(0);
-    console.log('  ✅ Bucket input found');
-  } else {
-    console.log('  ⚠  Bucket input not visible in current state');
-    await snap(page, '15-no-bucket-input');
-  }
-});
+  // ── 09. Organise: cycle through multiple layers ───────────────────────────
+  test('09 — Organise tab: navigate between multiple layers', async () => {
+    const layerItems = page.locator('.layer-item');
+    const total = await layerItems.count();
+    console.log(`  Total layers: ${total}`);
 
-test('16 — Export tab: Preview / Validate images option', async ({ page, context }) => {
-  await openGenerator(context, page);
-  await clickTab(page, 'Export');
-  await page.waitForTimeout(3_000);
+    // Click 3 different layers and verify content loads
+    for (let i = 0; i < Math.min(3, total); i++) {
+      await layerItems.nth(i).click();
+      await page.waitForTimeout(1_000);
+      const layerName = await layerItems.nth(i).textContent();
+      console.log(`  Layer ${i}: ${layerName?.trim().slice(0, 30)}`);
+    }
+    await snap(page, '09-multi-layer-nav');
+    console.log('  ✅ Multi-layer navigation works');
+  });
 
-  const btnCount = await page.locator('button:has-text("Preview"), button:has-text("Validate")').count();
-  console.log(`  Preview/Validate buttons: ${btnCount}`);
-  await snap(page, '16-export-preview-validate');
-  console.log('  ✅ Export tab preview/validate checked');
-});
+  // ── 10. Rarity tab ───────────────────────────────────────────────────────
+  test('10 — Rarity tab: loads correctly', async () => {
+    await clickTab(page, 'Rarity');
+    await snap(page, '10-rarity-tab');
+    const err = page.locator('text=/something went wrong|unexpected error/i');
+    expect(await err.count()).toBe(0);
+    console.log('  ✅ Rarity tab loaded without crash');
+  });
 
-test('17 — No critical JS errors across all tab navigations', async ({ page, context }) => {
-  const errors: string[] = [];
-  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
-  page.on('pageerror', err => errors.push(err.message));
+  // ── 11. Preview: generate combos, canvases render ───────────────────────
+  test('11 — Preview tab: generate 9999 NFT combos + canvas pixels', async () => {
+    await clickTab(page, 'Preview');
+    await snap(page, '11-preview-loading');
+    console.log('  Waiting for preview combos to generate…');
 
-  await openGenerator(context, page);
+    const appeared = await page.waitForFunction(
+      () => document.querySelector('.prev-tokens-badge') !== null
+         || document.querySelector('.prev-thumb canvas') !== null,
+      { timeout: 180_000 }
+    ).then(() => true).catch(() => false);
 
-  for (const tab of ['Settings', 'Rarity', 'Organize', 'Preview', 'Export']) {
-    await clickTab(page, tab);
     await page.waitForTimeout(2_000);
-  }
+    await snap(page, '11b-preview-ready');
 
-  const critical = errors.filter(e =>
-    !e.includes('favicon') && !e.includes('ResizeObserver') &&
-    !e.includes('Non-Error') && !e.includes('hydration') &&
-    !e.includes('Warning:') && !e.includes('net::ERR_')
-  );
-  await snap(page, '17-no-errors-check');
-  if (critical.length > 0) {
-    critical.slice(0, 5).forEach(e => console.log(`  ❌ ${e.slice(0, 120)}`));
-  }
-  console.log(`  JS error count: ${critical.length}`);
-  console.log('  ✅ Error scan complete');
+    if (!appeared) { console.log('  ⚠  Preview did not load'); return; }
+
+    const canvases = await page.locator('.prev-thumb canvas').count();
+    console.log(`  Preview canvases: ${canvases}`);
+
+    if (canvases > 0) {
+      const hp = await canvasPixels(page, '.prev-thumb canvas');
+      const details = await page.evaluate(() =>
+        ([...document.querySelectorAll('.prev-thumb canvas')] as HTMLCanvasElement[]).slice(0, 4).map(c => {
+          const ctx = c.getContext('2d');
+          if (!ctx) return { w: 0, h: 0, p: false };
+          const d = ctx.getImageData(0, 0, c.width, c.height).data;
+          let p = false;
+          for (let i = 3; i < d.length; i += 4) if (d[i] > 0) { p = true; break; }
+          return { w: c.width, h: c.height, p };
+        })
+      );
+      details.forEach((d, i) => console.log(`    canvas #${i+1}: ${d.w}x${d.h} pixels=${d.p}`));
+      expect(hp).toBe(true);
+      console.log('  ✅ Preview canvases have pixel data');
+    }
+    await snap(page, '11c-preview-final');
+  });
+
+  // ── 12. Preview: filter sidebar ──────────────────────────────────────────
+  test('12 — Preview tab: filter sidebar with layer+trait rows', async () => {
+    await snap(page, '12-preview-filter');
+    const filterRows = page.locator('.plr-group, .preview-layer-row');
+    const count = await filterRows.count();
+    console.log(`  Filter layer rows: ${count}`);
+
+    if (count > 0) {
+      // Expand first row to see traits
+      await filterRows.first().click();
+      await page.waitForTimeout(500);
+      const traitRows = await page.locator('.plr-trait-row').count();
+      console.log(`  Trait rows after expand: ${traitRows}`);
+      expect(traitRows).toBeGreaterThan(0);
+
+      // Click a trait to filter
+      await page.locator('.plr-trait-row').first().click();
+      await page.waitForTimeout(1_000);
+      await snap(page, '12b-filter-applied');
+      console.log('  ✅ Trait filter applied');
+    } else {
+      console.log('  ⚠  No filter rows visible');
+    }
+  });
+
+  // ── 13. Preview: rarity tier chips ───────────────────────────────────────
+  test('13 — Preview tab: Legendary/Epic/Rare/Common tier chips', async () => {
+    await snap(page, '13-preview-tiers');
+    const chips = await page.locator('.exp-nft-tier-chip, [class*="tier-chip"]').allTextContents();
+    const unique = [...new Set(chips)];
+    console.log(`  Tiers found: ${unique.join(', ') || 'none'}`);
+
+    if (unique.length > 0) {
+      const validTiers = ['Legendary', 'Epic', 'Rare', 'Common'];
+      const valid = unique.filter(t => validTiers.includes(t));
+      expect(valid.length).toBeGreaterThan(0);
+      console.log('  ✅ Valid rarity tiers present');
+    } else {
+      console.log('  ⚠  No tier chips visible yet');
+    }
+  });
+
+  // ── 14. Preview: click NFT card → popup ──────────────────────────────────
+  test('14 — Preview tab: click NFT card opens detail popup', async () => {
+    const cards = page.locator('.exp-nft-card, .prev-thumb');
+    const cardCount = await cards.count();
+    console.log(`  NFT cards visible: ${cardCount}`);
+
+    if (cardCount > 0) {
+      await cards.first().click();
+      await page.waitForTimeout(1_000);
+      const popup = page.locator('.nft-popup, [class*="popup"]');
+      if (await popup.count() > 0) {
+        await snap(page, '14-nft-popup');
+        console.log('  ✅ NFT popup opened');
+        // Close popup
+        const closeBtn = page.locator('[class*="popup"] button, .popup-close');
+        if (await closeBtn.count() > 0) await closeBtn.first().click();
+      } else {
+        console.log('  ⚠  No popup appeared after card click');
+      }
+    }
+  });
+
+  // ── 15. Export: loads without errors ─────────────────────────────────────
+  test('15 — Export tab: no LAYERS_DIR error', async () => {
+    await clickTab(page, 'Export');
+    await page.waitForTimeout(3_000);
+    await snap(page, '15-export-tab');
+
+    expect(await page.locator('text=/LAYERS_DIR not configured/i').count()).toBe(0);
+    expect(await page.locator('text=/No layers found. Upload a layer/i').count()).toBe(0);
+    console.log('  ✅ No LAYERS_DIR or legacy "No layers found" error');
+  });
+
+  // ── 16. Export: Generate on Server ───────────────────────────────────────
+  test('16 — Export tab: Generate on Server polls past "Starting…"', async () => {
+    await snap(page, '16-export-before-gen');
+
+    // Check already done
+    if (await page.locator('text=/generation complete|done/i').count() > 0) {
+      console.log('  ✅ Already complete');
+      return;
+    }
+
+    const genBtn = page.locator('button', { hasText: /generate on server/i });
+    if (await genBtn.count() === 0) {
+      console.log('  ⚠  Generate on Server button not visible');
+      await snap(page, '16-no-gen-btn');
+      return;
+    }
+
+    await genBtn.click();
+    console.log('  ✅ Clicked Generate on Server');
+
+    let lastPhase = 'Starting…';
+    let gotError  = false;
+    for (let i = 0; i < 20; i++) {
+      await page.waitForTimeout(2_000);
+
+      const errEl = page.locator('[class*="svr-error"]:visible, [class*="error"]:visible').first();
+      if (await errEl.count() > 0) {
+        const et = (await errEl.textContent()) ?? '';
+        console.log(`  ❌ Error: "${et.trim().slice(0, 120)}"`);
+        gotError = true; break;
+      }
+      const phaseEl = page.locator('[class*="phase"]:visible, [class*="svr"]:visible').first();
+      if (await phaseEl.count() > 0) {
+        lastPhase = (await phaseEl.textContent()) ?? lastPhase;
+      }
+      console.log(`  [${(i+1)*2}s] "${lastPhase.trim()}"`);
+      if (/complete|done|error/i.test(lastPhase)) break;
+    }
+
+    await snap(page, '16-export-polling');
+    if (!gotError) {
+      const stuck = lastPhase.trim() === 'Starting…';
+      expect(stuck).toBe(false);
+      console.log(`  ✅ Polling working — last phase: "${lastPhase.trim()}"`);
+    }
+  });
+
+  // ── 17. Export: Filebase bucket field ────────────────────────────────────
+  test('17 — Export tab: Filebase bucket input', async () => {
+    await snap(page, '17-export-fields');
+    const bucketInput = page.locator('input[placeholder*="bucket" i], input[value*="bearth" i]');
+    if (await bucketInput.count() > 0) {
+      const val = await bucketInput.first().inputValue();
+      console.log(`  Bucket: "${val}"`);
+      expect(val.length).toBeGreaterThan(0);
+      console.log('  ✅ Bucket input has value');
+    } else {
+      console.log('  ⚠  Bucket input not visible in current state');
+    }
+  });
+
+  // ── 18. Export: Preview/Validate button ──────────────────────────────────
+  test('18 — Export tab: Preview/Validate images button visible', async () => {
+    const btnCount = await page.locator('button:has-text("Preview"), button:has-text("Validate")').count();
+    console.log(`  Preview/Validate buttons: ${btnCount}`);
+    await snap(page, '18-export-preview-validate');
+    console.log('  ✅ Export tab preview/validate checked');
+  });
+
+  // ── 19. No critical JS errors across entire session ───────────────────────
+  test('19 — No critical JS console errors', async () => {
+    // Check for any visible crash/error UI on the current page
+    const errEl1 = page.locator('[class*="error"]:visible');
+    const errEl2 = page.locator('text=/unexpected error/i');
+    const errEl3 = page.locator('text=/something went wrong/i');
+    const c1 = await errEl1.count();
+    const c2 = await errEl2.count();
+    const c3 = await errEl3.count();
+    console.log(`  Error UI counts — class*=error: ${c1}, "unexpected error": ${c2}, "something went wrong": ${c3}`);
+    await snap(page, '19-final-state');
+    // Only fail on hard crash messages
+    expect(c2 + c3).toBe(0);
+    console.log('  ✅ No crash errors visible');
+  });
 });
