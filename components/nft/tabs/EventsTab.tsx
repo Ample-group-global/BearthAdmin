@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { ErrBanner, OkBanner } from "@/components/nft/Banner";
@@ -25,7 +25,7 @@ interface Checkin {
   notes: string | null;
 }
 
-export default function EventsPage() {
+export default function EventsTab() {
   const [events, setEvents]       = useState<NftEvent[]>([]);
   const [loading, setLoading]     = useState(true);
   const [selected, setSelected]   = useState<NftEvent | null>(null);
@@ -124,10 +124,10 @@ export default function EventsPage() {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "#24315f" }}>Physical Event Exclusives</h1>
+          <h2 className="text-lg font-bold" style={{ color: "#24315f" }}>Physical Event Exclusives</h2>
           <p className="text-sm text-gray-400 mt-0.5">Manage events, check-ins, and event-exclusive NFT tagging</p>
         </div>
         <button onClick={() => { setShowCreate(true); setForm(emptyForm); setErr(null); }}
@@ -140,7 +140,6 @@ export default function EventsPage() {
       {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Events List */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
           <div className="px-4 py-3 border-b border-gray-100">
             <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Events ({events.length})</h2>
@@ -170,7 +169,6 @@ export default function EventsPage() {
           )}
         </div>
 
-        {/* Event Detail */}
         <div className="space-y-4">
           {selected ? (
             <>
@@ -211,7 +209,6 @@ export default function EventsPage() {
                 </table>
               </div>
 
-              {/* Tag NFT Batch */}
               <div className="bg-white rounded-2xl shadow-sm p-4" style={{ border: "1px solid #e5e7eb" }}>
                 <h2 className="text-sm font-bold mb-3" style={{ color: "#24315f" }}>Tag NFT Records as Event-Exclusive</h2>
                 <label style={labelStyle}>NFT Record UUIDs (comma or newline separated)</label>
@@ -233,7 +230,6 @@ export default function EventsPage() {
         </div>
       </div>
 
-      {/* Create Event Modal */}
       {showCreate && (
         <Overlay>
           <h2 className="text-base font-bold mb-4" style={{ color: "#24315f" }}>New Physical Event</h2>
@@ -270,7 +266,6 @@ export default function EventsPage() {
         </Overlay>
       )}
 
-      {/* Check-in Modal */}
       {showCheckin && (
         <Overlay>
           <h2 className="text-base font-bold mb-4" style={{ color: "#24315f" }}>Register Check-In</h2>

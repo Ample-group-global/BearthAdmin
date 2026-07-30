@@ -4,6 +4,13 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import DataTable, { type ColumnDef } from "@/components/DataTable";
 import { ErrBanner } from "@/components/nft/Banner";
 import { inputStyle, labelStyle } from "@/components/nft/styles";
+import OtcTab from "@/components/nft/tabs/OtcTab";
+import BulkTab from "@/components/nft/tabs/BulkTab";
+import GiftsTab from "@/components/nft/tabs/GiftsTab";
+import AuctionsTab from "@/components/nft/tabs/AuctionsTab";
+import SeasonsTab from "@/components/nft/tabs/SeasonsTab";
+import EventsTab from "@/components/nft/tabs/EventsTab";
+import BurnTab from "@/components/nft/tabs/BurnTab";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -214,7 +221,7 @@ function RevealBadge({ revealed }: { revealed: boolean }) {
 
 export default function NftPage() {
   // ── Tab ──────────────────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<"records" | "sales" | "fulfillment">("records");
+  const [activeTab, setActiveTab] = useState<"records" | "sales" | "fulfillment" | "otc" | "bulk" | "gifts" | "auctions" | "seasons" | "events" | "burn">("records");
   const salesLoadedRef    = useRef(false);
   const fulfillLoadedRef  = useRef(false);
 
@@ -691,8 +698,9 @@ export default function NftPage() {
       {/* ── Tab Bar ── */}
       <div style={{ borderBottom: "1px solid #e5e7eb" }}>
         <div className="flex gap-1">
-          {(["records", "sales", "fulfillment"] as const).map(tab => {
-            const label = tab === "records" ? "Records" : tab === "sales" ? "Sales History" : "Fulfillment";
+          {(["records", "sales", "fulfillment", "otc", "bulk", "gifts", "auctions", "seasons", "events", "burn"] as const).map(tab => {
+            const LABELS: Record<string, string> = { records: "Records", sales: "Sales History", fulfillment: "Fulfillment", otc: "OTC Deals", bulk: "Bulk Ops", gifts: "Gifts", auctions: "Auctions", seasons: "Season Passes", events: "Events", burn: "Burn to Mint" };
+            const label = LABELS[tab] ?? tab;
             const isActive = activeTab === tab;
             return (
               <button
@@ -1115,6 +1123,14 @@ export default function NftPage() {
           )}
         </>
       )}
+
+      {activeTab === "otc"      && <OtcTab />}
+      {activeTab === "bulk"     && <BulkTab />}
+      {activeTab === "gifts"    && <GiftsTab />}
+      {activeTab === "auctions" && <AuctionsTab />}
+      {activeTab === "seasons"  && <SeasonsTab />}
+      {activeTab === "events"   && <EventsTab />}
+      {activeTab === "burn"     && <BurnTab />}
 
       {/* ══ Full History Modal ══════════════════════════════════════════════════ */}
       {viewRecord && (

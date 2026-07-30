@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { ErrBanner, OkBanner } from "@/components/nft/Banner";
@@ -28,7 +28,7 @@ interface WalletMembership {
 
 const RARITY_OPTIONS = ["", "legendary", "epic", "rare", "common"];
 
-export default function MembershipPage() {
+export default function MembershipTab() {
   const [tiers, setTiers]     = useState<MembershipTier[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -122,10 +122,10 @@ export default function MembershipPage() {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "#24315f" }}>Membership Tiers</h1>
+          <h2 className="text-lg font-bold" style={{ color: "#24315f" }}>Membership Tiers</h2>
           <p className="text-sm text-gray-400 mt-0.5">NFT holder membership + token-gated discounts</p>
         </div>
         <button onClick={openCreate} className="px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: "#41afeb" }}>
@@ -135,7 +135,6 @@ export default function MembershipPage() {
 
       {ok  && <OkBanner  msg={ok}  onDismiss={() => setOk(null)} />}
 
-      {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
         {[
           { label: "Total Tiers", value: tiers.length, color: "#41afeb" },
@@ -148,7 +147,6 @@ export default function MembershipPage() {
         ))}
       </div>
 
-      {/* Wallet Verify */}
       <div className="bg-white rounded-2xl shadow-sm p-5" style={{ border: "1px solid #e5e7eb" }}>
         <h2 className="text-sm font-bold mb-3" style={{ color: "#24315f" }}>Wallet Membership Lookup</h2>
         <div className="flex gap-3">
@@ -176,7 +174,6 @@ export default function MembershipPage() {
         )}
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
         {loading ? (
           <div className="p-8 text-center text-sm text-gray-400">Loading…</div>
@@ -232,7 +229,6 @@ export default function MembershipPage() {
         )}
       </div>
 
-      {/* Create/Edit Modal */}
       {showCreate && (
         <Overlay>
           <h2 className="text-base font-bold mb-4" style={{ color: "#24315f" }}>{editing ? "Edit Tier" : "New Membership Tier"}</h2>

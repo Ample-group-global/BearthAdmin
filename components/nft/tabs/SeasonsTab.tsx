@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { ErrBanner, OkBanner } from "@/components/nft/Banner";
@@ -35,7 +35,7 @@ const STATUS_COLOR: Record<string, { bg: string; color: string }> = {
   ended:    { bg: "rgba(22,163,74,0.1)",    color: "#16a34a" },
 };
 
-export default function SeasonsPage() {
+export default function SeasonsTab() {
   const [seasons, setSeasons]     = useState<Season[]>([]);
   const [selected, setSelected]   = useState<Season | null>(null);
   const [passes, setPasses]       = useState<PassHolder[]>([]);
@@ -151,10 +151,10 @@ export default function SeasonsPage() {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "#24315f" }}>Season Passes</h1>
+          <h2 className="text-lg font-bold" style={{ color: "#24315f" }}>Season Passes</h2>
           <p className="text-sm text-gray-400 mt-0.5">Multi-wave subscription passes with on-chain NFT (VeeFriends model)</p>
         </div>
         <button onClick={() => { setShowCreate(true); setForm(emptyForm); setErr(null); }}
@@ -167,7 +167,6 @@ export default function SeasonsPage() {
       {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Seasons list */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
           <div className="px-4 py-3 border-b border-gray-100">
             <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Seasons</h2>
@@ -200,7 +199,6 @@ export default function SeasonsPage() {
           )}
         </div>
 
-        {/* Pass holders */}
         <div className="space-y-4">
           {selected ? (
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
@@ -250,7 +248,6 @@ export default function SeasonsPage() {
         </div>
       </div>
 
-      {/* Create Season Modal */}
       {showCreate && (
         <Overlay>
           <h2 className="text-base font-bold mb-4" style={{ color: "#24315f" }}>New Season</h2>
@@ -315,7 +312,6 @@ export default function SeasonsPage() {
         </Overlay>
       )}
 
-      {/* Issue Pass Modal */}
       {showIssue && (
         <Overlay>
           <h2 className="text-base font-bold mb-1" style={{ color: "#24315f" }}>Issue Season Pass</h2>
@@ -351,7 +347,6 @@ export default function SeasonsPage() {
         </Overlay>
       )}
 
-      {/* Redeem Modal */}
       {showRedeem && (
         <Overlay>
           <h2 className="text-base font-bold mb-1" style={{ color: "#24315f" }}>Redeem Wave</h2>

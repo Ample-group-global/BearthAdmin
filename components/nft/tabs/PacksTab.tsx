@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { ErrBanner, OkBanner } from "@/components/nft/Banner";
@@ -30,7 +30,7 @@ interface PackOrder {
 
 const RARITIES = ["legendary", "epic", "rare", "common"];
 
-export default function PacksPage() {
+export default function PacksTab() {
   const [packs, setPacks]       = useState<PackDef[]>([]);
   const [selected, setSelected] = useState<PackDef | null>(null);
   const [orders, setOrders]     = useState<PackOrder[]>([]);
@@ -151,10 +151,10 @@ export default function PacksPage() {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "#24315f" }}>Mystery Box Packs</h1>
+          <h2 className="text-lg font-bold" style={{ color: "#24315f" }}>Mystery Box Packs</h2>
           <p className="text-sm text-gray-400 mt-0.5">Commit-reveal randomness — verifiable, fair NFT pack allocation</p>
         </div>
         <button onClick={() => { setShowCreate(true); setErr(null); }}
@@ -167,7 +167,6 @@ export default function PacksPage() {
       {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pack definitions */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
           <div className="px-4 py-3 border-b border-gray-100">
             <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Pack Definitions</h2>
@@ -217,7 +216,6 @@ export default function PacksPage() {
           )}
         </div>
 
-        {/* Pack orders */}
         <div className="space-y-4">
           {selected ? (
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
@@ -263,7 +261,6 @@ export default function PacksPage() {
         </div>
       </div>
 
-      {/* Create Pack Modal */}
       {showCreate && (
         <Overlay>
           <h2 className="text-base font-bold mb-4" style={{ color: "#24315f" }}>New Pack Definition</h2>
@@ -311,7 +308,6 @@ export default function PacksPage() {
         </Overlay>
       )}
 
-      {/* Commit Seed Modal */}
       {showCommit && (
         <Overlay>
           <h2 className="text-base font-bold mb-1" style={{ color: "#24315f" }}>Commit Randomness Seed</h2>
@@ -333,7 +329,6 @@ export default function PacksPage() {
         </Overlay>
       )}
 
-      {/* Reveal Modal */}
       {showReveal && (
         <Overlay>
           <h2 className="text-base font-bold mb-1" style={{ color: "#24315f" }}>Reveal Packs</h2>
@@ -354,7 +349,6 @@ export default function PacksPage() {
         </Overlay>
       )}
 
-      {/* New Order Modal */}
       {showNewOrder && (
         <Overlay>
           <h2 className="text-base font-bold mb-4" style={{ color: "#24315f" }}>Create Pack Order</h2>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { ErrBanner, OkBanner } from "@/components/nft/Banner";
@@ -26,7 +26,7 @@ const RARITY_COLORS: Record<string, string> = {
   legendary: "#d97706", epic: "#7c3aed", rare: "#41afeb", common: "#9ca3af",
 };
 
-export default function BurnPage() {
+export default function BurnTab() {
   const [ratios, setRatios]     = useState<BurnRatio[]>([]);
   const [history, setHistory]   = useState<BurnHistory[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -40,7 +40,7 @@ export default function BurnPage() {
 
   const [burnIds, setBurnIds]         = useState("");
   const [recipientWallet, setRecipientWallet] = useState("");
-  const [outputRarity, setOutputRarity] = useState<number>(2); // 1=Common,2=Rare,3=Epic,4=Legendary
+  const [outputRarity, setOutputRarity] = useState<number>(2);
   const [burnPreview, setBurnPreview] = useState<string | null>(null);
 
   const OUTPUT_RARITY_OPTS = [
@@ -116,16 +116,15 @@ export default function BurnPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold" style={{ color: "#24315f" }}>Burn to Mint</h1>
+        <h2 className="text-lg font-bold" style={{ color: "#24315f" }}>Burn to Mint</h2>
         <p className="text-sm text-gray-400 mt-0.5">Burn N tokens of one rarity → mint 1 upgraded token of the next rarity</p>
       </div>
 
       {ok  && <OkBanner  msg={ok}  onDismiss={() => setOk(null)} />}
       {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
-      {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
         {[
           { label: "Total Burned", value: stats.burned, color: "#dc2626" },
@@ -139,7 +138,6 @@ export default function BurnPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Burn Ratios */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
           <div className="px-4 py-3 border-b border-gray-100">
             <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Burn Ratios</h2>
@@ -185,7 +183,6 @@ export default function BurnPage() {
           )}
         </div>
 
-        {/* Execute Burn */}
         <div className="bg-white rounded-2xl shadow-sm p-5" style={{ border: "1px solid #e5e7eb" }}>
           <h2 className="text-sm font-bold mb-4" style={{ color: "#24315f" }}>Execute Burn &amp; Upgrade</h2>
           <div className="space-y-3">
@@ -227,7 +224,6 @@ export default function BurnPage() {
         </div>
       </div>
 
-      {/* History */}
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
         <div className="px-4 py-3 border-b border-gray-100">
           <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Burn History</h2>
@@ -263,7 +259,6 @@ export default function BurnPage() {
         </table>
       </div>
 
-      {/* Edit Ratio Modal */}
       {editRatio && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}>
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">

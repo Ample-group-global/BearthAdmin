@@ -27,7 +27,7 @@ const OTC_COLORS = {
   cancelled:   { bg: "rgba(156,163,175,0.12)", color: "#9ca3af" },
 };
 
-export default function OtcPage() {
+export default function OtcTab() {
   const [deals, setDeals]         = useState<OtcDeal[]>([]);
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
@@ -135,11 +135,10 @@ export default function OtcPage() {
   );
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "#24315f" }}>OTC / Private Sale</h1>
+          <h2 className="text-lg font-bold" style={{ color: "#24315f" }}>OTC / Private Sale</h2>
           <p className="text-sm text-gray-400 mt-0.5">Direct negotiated sales to specific buyers</p>
         </div>
         <button onClick={() => { setShowCreate(true); setErr(null); }}
@@ -152,7 +151,6 @@ export default function OtcPage() {
       {ok  && <OkBanner  msg={ok}  onDismiss={() => setOk(null)} />}
       {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
-      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: "Total Deals",  value: stats.total,       color: "#41afeb" },
@@ -166,7 +164,6 @@ export default function OtcPage() {
         ))}
       </div>
 
-      {/* Deals Table */}
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
         {loading ? (
           <div className="p-8 text-center text-sm text-gray-400">Loading…</div>
@@ -230,7 +227,6 @@ export default function OtcPage() {
         )}
       </div>
 
-      {/* Create Modal */}
       {showCreate && (
         <Overlay>
           <h2 className="text-base font-bold mb-4" style={{ color: "#24315f" }}>New OTC Deal</h2>
@@ -253,12 +249,8 @@ export default function OtcPage() {
               <label style={labelStyle}>NFT Record IDs (optional)</label>
               <textarea value={createForm.nft_record_ids_text}
                 onChange={e => setCreateForm(f => ({ ...f, nft_record_ids_text: e.target.value }))}
-                rows={3}
-                placeholder="Paste specific NFT record UUIDs to assign to this deal (optional)"
+                rows={3} placeholder="Paste specific NFT record UUIDs (optional). One per line or comma-separated."
                 style={{ ...inputStyle, resize: "vertical" }} />
-              <p className="text-xs mt-1" style={{ color: "#9bafc5" }}>
-                Paste specific NFT record UUIDs to assign to this deal (optional). One per line or comma-separated.
-              </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -296,9 +288,7 @@ export default function OtcPage() {
           {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
           <div className="flex gap-3 mt-5">
             <button onClick={() => setShowCreate(false)}
-              className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">
-              Cancel
-            </button>
+              className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">Cancel</button>
             <button onClick={create} disabled={saving}
               className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"
               style={{ background: "#41afeb", opacity: saving ? 0.6 : 1 }}>
@@ -308,7 +298,6 @@ export default function OtcPage() {
         </Overlay>
       )}
 
-      {/* Settle Modal */}
       {settleId && settleTarget && (
         <Overlay>
           <h2 className="text-base font-bold mb-1" style={{ color: "#24315f" }}>Settle OTC Deal</h2>
@@ -331,9 +320,7 @@ export default function OtcPage() {
           {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
           <div className="flex gap-3 mt-5">
             <button onClick={() => { setSettleId(null); setSelected(null); }}
-              className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">
-              Cancel
-            </button>
+              className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">Cancel</button>
             <button onClick={settle} disabled={saving}
               className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"
               style={{ background: "#16a34a", opacity: saving ? 0.6 : 1 }}>
