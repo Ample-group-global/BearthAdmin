@@ -104,13 +104,14 @@ export default function CustomersPage() {
     const params = new URLSearchParams({ search: q, limit: String(PAGE_SIZE), offset: String(off), sort_by: sb, sort_dir: sd });
     if (inactive) params.set("active", "false");
     fetch(`/api/customers?${params}`, { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => {
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error ?? `Error ${r.status}`);
         setCustomers(data.customers ?? []);
         setTotal(data.total ?? 0);
         setLoading(false);
       })
-      .catch(() => { setError("Failed to load customers."); setLoading(false); });
+      .catch((e: Error) => { setError(e.message || "Failed to load customers."); setLoading(false); });
   };
 
   useEffect(() => { loadCustomers(search, offset, sortKey, sortDir, showInactive); }, [offset, sortKey, sortDir, showInactive]);
