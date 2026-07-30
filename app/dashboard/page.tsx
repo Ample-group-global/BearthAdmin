@@ -5,7 +5,7 @@ import { useWallets } from "@privy-io/react-auth";
 import { ethers } from "ethers";
 import Link from "next/link";
 import { useChain } from "@/lib/ChainContext";
-import BearthNFTArtifact from "@/lib/BearthNFT.abi.json";
+import BearthNFTArtifact from "@/lib/BearthGenesisNFT.abi.json";
 
 const PHASE_LABELS = ["Whitelist Mint", "Paid Mint", "Revealed"];
 const PHASE_COLORS = [

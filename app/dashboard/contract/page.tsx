@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { ethers } from "ethers";
 import { useChain } from "@/lib/ChainContext";
-import BearthNFTArtifact from "@/lib/BearthNFT.abi.json";
+import BearthNFTArtifact from "@/lib/BearthGenesisNFT.abi.json";
 import { ipfsToGateway } from "@/lib/ipfs";
 
 type Tab = "phase" | "whitelist" | "mint" | "reveal" | "financial" | "advanced";
