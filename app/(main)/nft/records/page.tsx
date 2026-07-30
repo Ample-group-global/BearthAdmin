@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import DataTable, { type ColumnDef } from "@/components/DataTable";
 import { ErrBanner } from "@/components/nft/Banner";
 import { inputStyle, labelStyle } from "@/components/nft/styles";
@@ -90,6 +90,18 @@ const TIER_COLORS: Record<string, string> = {
   Common:     "#6b7280",
 };
 
+// ─── Types — Fulfillment tab ──────────────────────────────────────────────────
+
+interface FulfillStageRow {
+  stageId: string;
+  stageName: string;
+  stageCode: string;
+  total: number;
+  delivered: number;
+  pending: number;
+  cancelled: number;
+}
+
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
 function fmt(dt: string | null): string {
@@ -104,6 +116,10 @@ function fmtDate(d: string | null) {
 
 function shortAddr(addr: string) { return addr.slice(0, 6) + "…" + addr.slice(-4); }
 function shortHash(h: string)    { return h.slice(0, 8) + "…" + h.slice(-6); }
+
+function fulfillPct(n: number, total: number) {
+  return total > 0 ? Math.round((n / total) * 100) : 0;
+}
 
 // ─── Sub-components (Records tab) ─────────────────────────────────────────────
 
@@ -198,8 +214,9 @@ function RevealBadge({ revealed }: { revealed: boolean }) {
 
 export default function NftPage() {
   // ── Tab ──────────────────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<"records" | "sales">("records");
-  const salesLoadedRef = useRef(false);
+  const [activeTab, setActiveTab] = useState<"records" | "sales" | "fulfillment">("records");
+  const salesLoadedRef    = useRef(false);
+  const fulfillLoadedRef  = useRef(false);
 
   // ── Records tab state ─────────────────────────────────────────────────────
   const [records, setRecords]         = useState<NftRecord[]>([]);
@@ -235,10 +252,46 @@ export default function NftPage() {
 
   const SALE_LIMIT = 50;
 
+  // ── Fulfillment tab state ─────────────────────────────────────────────────
+  const [fulfillStages,   setFulfillStages]   = useState<FulfillStageRow[]>([]);
+  const [fulfillLoading,  setFulfillLoading]  = useState(false);
+  const [fulfillErr,      setFulfillErr]      = useState<string | null>(null);
+  const [fulfillStageOff, setFulfillStageOff] = useState(0);
+  const [fulfillSortKey,  setFulfillSortKey]  = useState<string | undefined>(undefined);
+  const [fulfillSortDir,  setFulfillSortDir]  = useState<"asc" | "desc">("asc");
+  // highlighted stat (for visual highlight only — no navigation)
+  const [fulfillHighlight, setFulfillHighlight] = useState<"" | "delivered" | "pending" | "cancelled">("");
+
+  const FULFILL_STAGE_PAGE = 10;
+
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Shared waves list (used by both tabs) ─────────────────────────────────
-  // waves state is already declared above and loaded below
+  // ── Fulfillment derived values ────────────────────────────────────────────
+  const fulfillSortedStages = useMemo(() => {
+    if (!fulfillSortKey) return fulfillStages;
+    return [...fulfillStages].sort((a, b) => {
+      let av: string | number, bv: string | number;
+      switch (fulfillSortKey) {
+        case "stage":     av = a.stageName;                                             bv = b.stageName;                                             break;
+        case "total":     av = Number(a.total);                                         bv = Number(b.total);                                         break;
+        case "delivered": av = Number(a.delivered);                                     bv = Number(b.delivered);                                     break;
+        case "pending":   av = Number(a.pending);                                       bv = Number(b.pending);                                       break;
+        case "cancelled": av = Number(a.cancelled);                                     bv = Number(b.cancelled);                                     break;
+        case "pct":       av = fulfillPct(Number(a.delivered), Number(a.total));        bv = fulfillPct(Number(b.delivered), Number(b.total));        break;
+        default: return 0;
+      }
+      if (av < bv) return fulfillSortDir === "asc" ? -1 : 1;
+      if (av > bv) return fulfillSortDir === "asc" ? 1  : -1;
+      return 0;
+    });
+  }, [fulfillStages, fulfillSortKey, fulfillSortDir]);
+
+  const fulfillStagePage = fulfillSortedStages.slice(fulfillStageOff, fulfillStageOff + FULFILL_STAGE_PAGE);
+
+  const grandTotal     = fulfillStages.reduce((s, r) => s + Number(r.total),     0);
+  const grandDelivered = fulfillStages.reduce((s, r) => s + Number(r.delivered), 0);
+  const grandPending   = fulfillStages.reduce((s, r) => s + Number(r.pending),   0);
+  const grandCancelled = fulfillStages.reduce((s, r) => s + Number(r.cancelled), 0);
 
   // ── Records data loading ─────────────────────────────────────────────────
   const loadRecords = useCallback((
@@ -289,6 +342,15 @@ export default function NftPage() {
     setSaleLoading(false);
   }, [saleWave, saleWallet, saleFrom, saleTo]);
 
+  // ── Fulfillment data loading ──────────────────────────────────────────────
+  const fetchFulfillData = useCallback(() => {
+    setFulfillLoading(true); setFulfillErr(null);
+    fetch("/api/reports/sales-by-stage", { credentials: "include" })
+      .then(r => r.json())
+      .then(d => { setFulfillStages(d.stages ?? []); setFulfillLoading(false); })
+      .catch(() => { setFulfillErr("Failed to load fulfillment data."); setFulfillLoading(false); });
+  }, []);
+
   // ── Initial loads ─────────────────────────────────────────────────────────
   useEffect(() => {
     fetch("/api/master", { credentials: "include" })
@@ -306,6 +368,10 @@ export default function NftPage() {
     if (activeTab === "sales" && !salesLoadedRef.current) {
       salesLoadedRef.current = true;
       fetchSalesData(0, saleWave, saleWallet, saleFrom, saleTo);
+    }
+    if (activeTab === "fulfillment" && !fulfillLoadedRef.current) {
+      fulfillLoadedRef.current = true;
+      fetchFulfillData();
     }
   }, [activeTab]);
 
@@ -369,6 +435,97 @@ export default function NftPage() {
     const w = waves.find(w => w.waveNumber === num);
     return w ? `W${num} — ${w.name}` : `Wave ${num}`;
   };
+
+  // ── Fulfillment stage table columns ───────────────────────────────────────
+  const fulfillStageColumns: ColumnDef<FulfillStageRow>[] = [
+    {
+      key: "stage",
+      header: "Stage",
+      sortKey: "stage",
+      render: r => (
+        <span className="font-semibold" style={{ color: "#24315f" }}>{r.stageName}</span>
+      ),
+    },
+    {
+      key: "total",
+      header: "Total",
+      sortKey: "total",
+      align: "right",
+      render: r => (
+        <span className="font-bold" style={{ color: "#374151" }}>{Number(r.total).toLocaleString()}</span>
+      ),
+    },
+    {
+      key: "delivered",
+      header: "Delivered",
+      sortKey: "delivered",
+      align: "right",
+      render: r => (
+        <span
+          className="tabular-nums font-semibold"
+          style={{
+            color: "#16a34a",
+            background: fulfillHighlight === "delivered" ? "rgba(22,163,74,0.08)" : "transparent",
+            borderRadius: 6, padding: "2px 6px",
+          }}
+        >
+          {Number(r.delivered).toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      key: "pending",
+      header: "Pending",
+      sortKey: "pending",
+      align: "right",
+      render: r => (
+        <span
+          className="tabular-nums font-semibold"
+          style={{
+            color: "#d97706",
+            background: fulfillHighlight === "pending" ? "rgba(217,119,6,0.08)" : "transparent",
+            borderRadius: 6, padding: "2px 6px",
+          }}
+        >
+          {Number(r.pending).toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      key: "cancelled",
+      header: "Cancelled",
+      sortKey: "cancelled",
+      align: "right",
+      render: r => (
+        <span
+          className="tabular-nums font-semibold"
+          style={{
+            color: "#dc2626",
+            background: fulfillHighlight === "cancelled" ? "rgba(220,38,38,0.08)" : "transparent",
+            borderRadius: 6, padding: "2px 6px",
+          }}
+        >
+          {Number(r.cancelled).toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      key: "pct",
+      header: "% Delivered",
+      sortKey: "pct",
+      render: r => {
+        const p = fulfillPct(Number(r.delivered), Number(r.total));
+        return (
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#f3f4f6", minWidth: 60 }}>
+              <div className="h-full rounded-full" style={{ width: `${p}%`, background: "#16a34a" }} />
+            </div>
+            <span className="text-xs font-semibold" style={{ color: "#16a34a" }}>{p}%</span>
+          </div>
+        );
+      },
+    },
+  ];
 
   // ── Records columns ───────────────────────────────────────────────────────
   const columns: ColumnDef<NftRecord>[] = [
@@ -519,7 +676,7 @@ export default function NftPage() {
             </svg>
             Export CSV
           </button>
-        ) : (
+        ) : activeTab === "sales" ? (
           <button onClick={exportSalesCsv}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white"
             style={{ border: "1px solid #e5e7eb", color: "#6b7280" }}>
@@ -528,14 +685,14 @@ export default function NftPage() {
             </svg>
             Export CSV
           </button>
-        )}
+        ) : null}
       </div>
 
       {/* ── Tab Bar ── */}
       <div style={{ borderBottom: "1px solid #e5e7eb" }}>
         <div className="flex gap-1">
-          {(["records", "sales"] as const).map(tab => {
-            const label = tab === "records" ? "Records" : "Sales History";
+          {(["records", "sales", "fulfillment"] as const).map(tab => {
+            const label = tab === "records" ? "Records" : tab === "sales" ? "Sales History" : "Fulfillment";
             const isActive = activeTab === tab;
             return (
               <button
@@ -853,6 +1010,109 @@ export default function NftPage() {
               </div>
             )}
           </div>
+        </>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* FULFILLMENT TAB                                                       */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === "fulfillment" && (
+        <>
+          {fulfillErr ? (
+            <div className="p-4 rounded-xl text-sm" style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
+              {fulfillErr}
+            </div>
+          ) : (
+            <>
+              {/* ── Stat Cards ── */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {[
+                  {
+                    label: "Total NFTs",
+                    value: grandTotal,
+                    color: "#24315f",
+                    key: "" as const,
+                  },
+                  {
+                    label: "Delivered",
+                    value: grandDelivered,
+                    color: "#16a34a",
+                    key: "delivered" as const,
+                  },
+                  {
+                    label: "Pending",
+                    value: grandPending,
+                    color: "#d97706",
+                    key: "pending" as const,
+                  },
+                  {
+                    label: "Cancelled",
+                    value: grandCancelled,
+                    color: "#dc2626",
+                    key: "cancelled" as const,
+                  },
+                ].map(card => {
+                  const isHighlighted = fulfillHighlight === card.key;
+                  return (
+                    <button
+                      key={card.label}
+                      onClick={() => setFulfillHighlight(isHighlighted ? "" : card.key)}
+                      className="text-left bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow select-none"
+                      style={{
+                        border: `1px solid ${isHighlighted ? card.color : "#e5e7eb"}`,
+                        borderLeft: `3px solid ${card.color}`,
+                        padding: "14px 16px",
+                        cursor: card.key ? "pointer" : "default",
+                        outline: "none",
+                        boxShadow: isHighlighted ? `0 0 0 2px ${card.color}22` : undefined,
+                      }}
+                      title={card.key ? `Highlight ${card.label} column` : undefined}
+                    >
+                      <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "#9bafc5" }}>{card.label}</p>
+                      <p className="text-2xl font-extrabold leading-none" style={{ color: card.color }}>
+                        {fulfillLoading ? "—" : card.value.toLocaleString()}
+                      </p>
+                      {card.key && (
+                        <p className="text-[10px] mt-1.5" style={{ color: "#9bafc5" }}>
+                          {isHighlighted ? "Click to clear highlight" : "Click to highlight column"}
+                        </p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* ── Stage Breakdown ── */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "#9bafc5" }}>Stage Breakdown</p>
+                  {fulfillHighlight && (
+                    <button
+                      onClick={() => setFulfillHighlight("")}
+                      className="text-xs px-2 py-1 rounded-lg"
+                      style={{ background: "#f3f4f6", color: "#6b7280", border: "1px solid #e5e7eb" }}
+                    >
+                      Clear highlight
+                    </button>
+                  )}
+                </div>
+                <DataTable
+                  columns={fulfillStageColumns}
+                  data={fulfillStagePage}
+                  total={fulfillSortedStages.length}
+                  offset={fulfillStageOff}
+                  pageSize={FULFILL_STAGE_PAGE}
+                  onPageChange={setFulfillStageOff}
+                  loading={fulfillLoading}
+                  emptyText="No stage data available"
+                  keyExtractor={r => r.stageId}
+                  sortKey={fulfillSortKey}
+                  sortDir={fulfillSortDir}
+                  onSort={(key, dir) => { setFulfillSortKey(key); setFulfillSortDir(dir); setFulfillStageOff(0); }}
+                />
+              </div>
+            </>
+          )}
         </>
       )}
 
