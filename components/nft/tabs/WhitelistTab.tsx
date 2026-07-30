@@ -1,13 +1,13 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
-import { useWhitelist } from "./useWhitelist";
-import { ToastContainer } from "./Toast";
-import { useToast } from "./useToast";
+import { useWhitelist } from "@/app/dashboard/whitelist/useWhitelist";
+import { ToastContainer } from "@/app/dashboard/whitelist/Toast";
+import { useToast } from "@/app/dashboard/whitelist/useToast";
 
-type Tab = "addresses" | "add" | "bulk" | "merkle" | "test" | "export";
+type WlTab = "addresses" | "add" | "bulk" | "merkle" | "test" | "export";
 
-const TABS: { id: Tab; label: string }[] = [
+const TABS: { id: WlTab; label: string }[] = [
   { id: "addresses", label: "All Addresses" },
   { id: "add", label: "Add Single" },
   { id: "bulk", label: "Bulk Import" },
@@ -20,7 +20,7 @@ function Badge({ color, children }: { color: string; children: React.ReactNode }
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>{children}</span>;
 }
 
-export default function TechWhitelistPage() {
+export default function WhitelistTab() {
   const { toasts, showToast, removeToast } = useToast();
   const {
     addresses, stats, isLoading, error,
@@ -30,7 +30,7 @@ export default function TechWhitelistPage() {
     testAddressLoading, setMerkleRootLoading, clearMerkleRootOverrideLoading,
   } = useWhitelist();
 
-  const [tab, setTab] = useState<Tab>("addresses");
+  const [wlTab, setWlTab] = useState<WlTab>("addresses");
   const [search, setSearch] = useState("");
   const [newAddr, setNewAddr] = useState("");
   const [bulkText, setBulkText] = useState("");
@@ -91,11 +91,10 @@ export default function TechWhitelistPage() {
   }, [error, showToast]);
 
   return (
-    <div className="p-6 space-y-5">
-      {/* Header */}
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Whitelist Management</h1>
+          <h2 className="text-lg font-bold text-slate-900">Whitelist Management</h2>
           <p className="text-sm text-slate-500 mt-0.5">
             {addresses.length.toLocaleString()} addresses ·{" "}
             {stats?.merkleRoot ? `Root: ${stats.merkleRoot.slice(0, 12)}...` : "No root set"}
@@ -104,7 +103,6 @@ export default function TechWhitelistPage() {
         </div>
       </div>
 
-      {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Total Addresses", value: addresses.length.toLocaleString() },
@@ -119,15 +117,14 @@ export default function TechWhitelistPage() {
         ))}
       </div>
 
-      {/* Tab bar */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="border-b border-slate-200 px-1 flex overflow-x-auto">
           {TABS.map((t) => (
             <button
               key={t.id}
-              onClick={() => setTab(t.id)}
+              onClick={() => setWlTab(t.id)}
               className={`px-4 py-3.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-                tab === t.id
+                wlTab === t.id
                   ? "border-blue-600 text-blue-700"
                   : "border-transparent text-slate-500 hover:text-slate-700"
               }`}
@@ -138,8 +135,7 @@ export default function TechWhitelistPage() {
         </div>
 
         <div className="p-5">
-          {/* All Addresses tab */}
-          {tab === "addresses" && (
+          {wlTab === "addresses" && (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="relative flex-1 max-w-sm">
@@ -216,8 +212,7 @@ export default function TechWhitelistPage() {
             </div>
           )}
 
-          {/* Add Single tab */}
-          {tab === "add" && (
+          {wlTab === "add" && (
             <div className="max-w-md space-y-4">
               <h3 className="text-sm font-semibold text-slate-800">Add Single Address</h3>
               <div>
@@ -233,8 +228,7 @@ export default function TechWhitelistPage() {
             </div>
           )}
 
-          {/* Bulk Import tab */}
-          {tab === "bulk" && (
+          {wlTab === "bulk" && (
             <div className="max-w-lg space-y-4">
               <h3 className="text-sm font-semibold text-slate-800">Bulk Import</h3>
               <div>
@@ -253,8 +247,7 @@ export default function TechWhitelistPage() {
             </div>
           )}
 
-          {/* Merkle Root tab */}
-          {tab === "merkle" && (
+          {wlTab === "merkle" && (
             <div className="max-w-lg space-y-5">
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                 <p className="text-xs font-medium text-slate-500 mb-1">Current Merkle Root</p>
@@ -282,8 +275,7 @@ export default function TechWhitelistPage() {
             </div>
           )}
 
-          {/* Test Address tab */}
-          {tab === "test" && (
+          {wlTab === "test" && (
             <div className="max-w-md space-y-4">
               <h3 className="text-sm font-semibold text-slate-800">Test Address Membership</h3>
               <div>
@@ -316,8 +308,7 @@ export default function TechWhitelistPage() {
             </div>
           )}
 
-          {/* Export tab */}
-          {tab === "export" && (
+          {wlTab === "export" && (
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-slate-800">Export Whitelist</h3>
               <p className="text-sm text-slate-500">{addresses.length} addresses available to export</p>

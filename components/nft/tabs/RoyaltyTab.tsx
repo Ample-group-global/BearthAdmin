@@ -1,11 +1,9 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { TxBanner, ErrBanner } from "@/components/nft/Banner";
 import { Toggle } from "@/components/nft/Toggle";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface RoyaltyConfig {
   royalty_pct_bps: number;
@@ -23,23 +21,19 @@ interface Marketplace {
   synced_at: string | null;
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
-export default function RoyaltyPage() {
+export default function RoyaltyTab() {
   const [royalty, setRoyalty]         = useState<RoyaltyConfig | null>(null);
   const [markets, setMarkets]         = useState<Marketplace[]>([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
 
-  // Royalty form
-  const [feePct, setFeePct]           = useState("");   // in % (0–10), converted to bps on submit
+  const [feePct, setFeePct]           = useState("");
   const [receiver, setReceiver]       = useState("");
   const [enforced, setEnforced]       = useState(true);
   const [savingRoyalty, setSavingRoyalty] = useState(false);
   const [royaltyError, setRoyaltyError]   = useState<string | null>(null);
   const [royaltyTx, setRoyaltyTx]         = useState<string | null>(null);
 
-  // Marketplace modal
   const [showAddMarket, setShowAddMarket] = useState(false);
   const [mktAddr, setMktAddr]             = useState("");
   const [mktName, setMktName]             = useState("");
@@ -149,11 +143,9 @@ export default function RoyaltyPage() {
   );
 
   return (
-    <div className="p-5 space-y-5 max-w-3xl">
-
-      {/* ── Header ── */}
+    <div className="space-y-5 max-w-3xl">
       <div>
-        <h1 className="text-lg font-bold" style={{ color: "#24315f" }}>Royalty & Marketplace Settings</h1>
+        <h2 className="text-lg font-bold" style={{ color: "#24315f" }}>Royalty & Marketplace Settings</h2>
         <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
           ERC2981 on-chain royalty — changes submit a blockchain transaction and update the DB mirror automatically
         </p>
@@ -161,7 +153,6 @@ export default function RoyaltyPage() {
 
       {error && <ErrBanner msg={error} />}
 
-      {/* ── Royalty Config ── */}
       <div className="bg-white rounded-2xl shadow-sm p-6 space-y-5" style={{ border: "1px solid #e5e7eb" }}>
         <div className="flex items-center justify-between">
           <div>
@@ -239,7 +230,6 @@ export default function RoyaltyPage() {
         </div>
       </div>
 
-      {/* ── Marketplace Allowlist ── */}
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid #e5e7eb" }}>
           <div>
@@ -318,7 +308,6 @@ export default function RoyaltyPage() {
         </div>
       </div>
 
-      {/* ══ Add Marketplace Modal ══ */}
       {showAddMarket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
           <div className="bg-white rounded-2xl shadow-xl flex flex-col"

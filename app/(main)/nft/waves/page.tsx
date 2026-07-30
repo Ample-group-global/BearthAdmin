@@ -5,6 +5,9 @@ import { useSearchParams } from "next/navigation";
 import { ErrBanner, OkBanner, TxBanner as SharedTxBanner } from "@/components/nft/Banner";
 import { StatusBadge } from "@/components/nft/StatusBadge";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
+import WhitelistTab from "@/components/nft/tabs/WhitelistTab";
+import PacksTab from "@/components/nft/tabs/PacksTab";
+import CollaborationsTab from "@/components/nft/tabs/CollaborationsTab";
 
 // ─── Types (Waves tab) ────────────────────────────────────────────────────────
 
@@ -339,7 +342,7 @@ export default function WavesPage() {
   const highlightRef      = useRef<HTMLDivElement>(null);
 
   // ── Tab state ──
-  const [activeTab, setActiveTab] = useState<"waves" | "reveal">("waves");
+  const [activeTab, setActiveTab] = useState<"waves" | "reveal" | "whitelist" | "packs" | "collaborations">("waves");
 
   // ── Waves tab state ──
   const [waves, setWaves]             = useState<Wave[]>([]);
@@ -637,7 +640,7 @@ export default function WavesPage() {
           </p>
         </div>
         <button
-          onClick={activeTab === "waves" ? loadWaves : loadRevealData}
+          onClick={activeTab === "reveal" ? loadRevealData : activeTab === "waves" ? loadWaves : undefined}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
           style={{ border: "1px solid #e5e7eb", color: "#6b7280", background: "white" }}>
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -651,8 +654,11 @@ export default function WavesPage() {
       <div style={{ borderBottom: "1px solid #e5e7eb" }}>
         <div className="flex gap-0">
           {([
-            { key: "waves",  label: "Waves" },
-            { key: "reveal", label: "Reveal", badge: readyCount > 0 ? readyCount : null },
+            { key: "waves",          label: "Waves" },
+            { key: "reveal",         label: "Reveal", badge: readyCount > 0 ? readyCount : null },
+            { key: "whitelist",      label: "Whitelist" },
+            { key: "packs",          label: "Mystery Packs" },
+            { key: "collaborations", label: "Collaborations" },
           ] as const).map(tab => (
             <button
               key={tab.key}
@@ -1137,6 +1143,10 @@ export default function WavesPage() {
           )}
         </>
       )}
+
+      {activeTab === "whitelist"      && <WhitelistTab />}
+      {activeTab === "packs"          && <PacksTab />}
+      {activeTab === "collaborations" && <CollaborationsTab />}
 
       {/* ══ Edit Modal ══════════════════════════════════════════════════════════ */}
       {editWave && (

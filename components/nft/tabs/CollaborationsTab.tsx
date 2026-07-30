@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { ErrBanner, OkBanner } from "@/components/nft/Banner";
@@ -23,7 +23,7 @@ const STATUS_COLOR: Record<string, { bg: string; color: string }> = {
   ended:    { bg: "rgba(65,175,235,0.12)",   color: "#41afeb" },
 };
 
-export default function CollaborationsPage() {
+export default function CollaborationsTab() {
   const [collabs, setCollabs]   = useState<Collaboration[]>([]);
   const [selected, setSelected] = useState<Collaboration | null>(null);
   const [wallets, setWallets]   = useState<{ wallet_address: string; is_eligible: boolean }[]>([]);
@@ -134,10 +134,10 @@ export default function CollaborationsPage() {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "#24315f" }}>Cross-Project Collaborations</h1>
+          <h2 className="text-lg font-bold" style={{ color: "#24315f" }}>Cross-Project Collaborations</h2>
           <p className="text-sm text-gray-400 mt-0.5">Partner wallet allowlists with wave-scoped Merkle roots</p>
         </div>
         <button onClick={() => { setShowCreate(true); setForm(emptyForm); setErr(null); }}
@@ -149,7 +149,6 @@ export default function CollaborationsPage() {
       {ok  && <OkBanner  msg={ok}  onDismiss={() => setOk(null)} />}
       {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
-      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: "Total", value: stats.total, color: "#41afeb" },
@@ -164,7 +163,6 @@ export default function CollaborationsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Collaborations list */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
           <div className="px-4 py-3 border-b border-gray-100">
             <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Collaborations</h2>
@@ -195,7 +193,6 @@ export default function CollaborationsPage() {
           )}
         </div>
 
-        {/* Wallet management */}
         <div className="space-y-4">
           {selected ? (
             <>
@@ -251,7 +248,6 @@ export default function CollaborationsPage() {
         </div>
       </div>
 
-      {/* Collaborations table */}
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
         <div className="px-4 py-3 border-b border-gray-100">
           <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>All Collaborations</h2>
@@ -286,7 +282,6 @@ export default function CollaborationsPage() {
         </table>
       </div>
 
-      {/* Create Collaboration Modal */}
       {showCreate && (
         <Overlay>
           <h2 className="text-base font-bold mb-4" style={{ color: "#24315f" }}>New Collaboration</h2>
@@ -325,7 +320,6 @@ export default function CollaborationsPage() {
         </Overlay>
       )}
 
-      {/* Import Wallets Modal */}
       {showImport && (
         <Overlay>
           <h2 className="text-base font-bold mb-1" style={{ color: "#24315f" }}>Import Partner Wallets</h2>
@@ -350,7 +344,6 @@ export default function CollaborationsPage() {
         </Overlay>
       )}
 
-      {/* Generate Merkle Modal */}
       {showMerkle && (
         <Overlay>
           <h2 className="text-base font-bold mb-1" style={{ color: "#24315f" }}>Generate Wave Allowlist</h2>
