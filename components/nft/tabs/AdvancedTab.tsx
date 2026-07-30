@@ -69,18 +69,15 @@ export default function AdvancedTab() {
 
   const [contract, setContract] = useState<ethers.Contract | null>(null);
 
-  const [pauseAccountAddr, setPauseAccountAddr]     = useState("");
-  const [unpauseAccountAddr, setUnpauseAccountAddr] = useState("");
-  const [emergencyTokenId, setEmergencyTokenId]     = useState("");
-  const [emergencyFrom, setEmergencyFrom]           = useState("");
-  const [emergencyTo, setEmergencyTo]               = useState("");
-  const [emergencyReason, setEmergencyReason]       = useState("");
-  const [checkTokenId, setCheckTokenId]             = useState("");
-  const [checkMeta, setCheckMeta]                   = useState<TokenMetadata | null>(null);
-  const [checkLoading, setCheckLoading]             = useState(false);
-  const [checkError, setCheckError]                 = useState("");
+  const [emergencyTokenId, setEmergencyTokenId] = useState("");
+  const [emergencyFrom, setEmergencyFrom]       = useState("");
+  const [emergencyTo, setEmergencyTo]           = useState("");
+  const [emergencyReason, setEmergencyReason]   = useState("");
+  const [checkTokenId, setCheckTokenId]         = useState("");
+  const [checkMeta, setCheckMeta]               = useState<TokenMetadata | null>(null);
+  const [checkLoading, setCheckLoading]         = useState(false);
+  const [checkError, setCheckError]             = useState("");
 
-  const [txPauseAcc, setTxPauseAcc]   = useState(TX0);
   const [txEmergency, setTxEmergency] = useState(TX0);
 
   useEffect(() => {
@@ -109,14 +106,6 @@ export default function AdvancedTab() {
     }
   };
 
-  const handlePauseAccount = () => {
-    if (!ETH_ADDR_RE.test(pauseAccountAddr.trim())) { setTxPauseAcc({ ...TX0, error: "Enter a valid Ethereum address." }); return; }
-    contract && exec(setTxPauseAcc, contract.pauseAccount(pauseAccountAddr.trim()), "Account paused");
-  };
-  const handleUnpauseAccount = () => {
-    if (!ETH_ADDR_RE.test(unpauseAccountAddr.trim())) { setTxPauseAcc({ ...TX0, error: "Enter a valid Ethereum address." }); return; }
-    contract && exec(setTxPauseAcc, contract.unpauseAccount(unpauseAccountAddr.trim()), "Account unpaused");
-  };
   const handleEmergencyTransfer = () => {
     const tid = Number(emergencyTokenId);
     if (!tid || tid < 1) { setTxEmergency({ ...TX0, error: "Valid token ID required." }); return; }
@@ -128,6 +117,7 @@ export default function AdvancedTab() {
       "Emergency transfer executed"
     );
   };
+
   const handleCheckMetadata = async () => {
     if (!contract || !checkTokenId) return;
     setCheckLoading(true); setCheckError(""); setCheckMeta(null);
@@ -156,32 +146,6 @@ export default function AdvancedTab() {
       <div className="p-3 rounded-xl text-xs flex items-center gap-2" style={{ background: "#fff7ed", border: "1px solid #fed7aa", color: "#9a3412" }}>
         These operations are potentially irreversible. Use only when necessary.
       </div>
-
-      <Card title="Pause / Unpause Account" note="Blocks or restores a specific wallet address from minting.">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Inp label="Address to Pause">
-            <div className="flex gap-2">
-              <input value={pauseAccountAddr} onChange={e => setPauseAccountAddr(e.target.value)}
-                placeholder="0x..." className={inputCls} style={{ borderColor: "#e5e7eb" }} />
-              <button onClick={handlePauseAccount} disabled={!walletConnected || txPauseAcc.pending || !pauseAccountAddr.trim()}
-                className={btnCls(true, !walletConnected || txPauseAcc.pending)}>
-                {txPauseAcc.pending ? "…" : "Pause"}
-              </button>
-            </div>
-          </Inp>
-          <Inp label="Address to Unpause">
-            <div className="flex gap-2">
-              <input value={unpauseAccountAddr} onChange={e => setUnpauseAccountAddr(e.target.value)}
-                placeholder="0x..." className={inputCls} style={{ borderColor: "#e5e7eb" }} />
-              <button onClick={handleUnpauseAccount} disabled={!walletConnected || txPauseAcc.pending || !unpauseAccountAddr.trim()}
-                className={btnCls(false, !walletConnected || txPauseAcc.pending)}>
-                {txPauseAcc.pending ? "…" : "Unpause"}
-              </button>
-            </div>
-          </Inp>
-        </div>
-        <TxStatus tx={txPauseAcc} onClear={() => setTxPauseAcc(TX0)} />
-      </Card>
 
       <Card title="Emergency Transfer" note="Force-transfer a specific NFT. Requires EMERGENCY_ROLE. Intended for lost-wallet recovery.">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
