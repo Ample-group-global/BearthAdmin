@@ -24,10 +24,9 @@ function Badge({ label, style }: { label: string; style: React.CSSProperties }) 
 }
 
 const MINT_BADGE: Record<string, React.CSSProperties> = {
-  "WL Free":       { background: "rgba(65,175,235,0.1)",  color: "#2e9fd8" },
-  "Fixed Price":   { background: "rgba(139,92,246,0.1)",  color: "#7c3aed" },
-  "Dutch Auction": { background: "rgba(217,119,6,0.1)",   color: "#d97706" },
-  "Admin":         { background: "rgba(36,49,95,0.1)",    color: "#24315f" },
+  "WL Free":     { background: "rgba(65,175,235,0.1)",  color: "#2e9fd8" },
+  "Fixed Price": { background: "rgba(139,92,246,0.1)",  color: "#7c3aed" },
+  "Admin":       { background: "rgba(36,49,95,0.1)",    color: "#24315f" },
 };
 
 type SortCol = "tokenId" | "owner" | "mintType" | "waveNum" | "gasFee" | "date";
@@ -462,7 +461,6 @@ export default function NFTOverviewPage() {
       total: events.length,
       wlFree: events.filter((e) => e.mintType === "WL Free").length,
       fixedPrice: events.filter((e) => e.mintType === "Fixed Price").length,
-      dutchAuction: events.filter((e) => e.mintType === "Dutch Auction").length,
       admin: events.filter((e) => e.mintType === "Admin").length,
       revealed: events.filter((e) => e.isRevealed).length,
       totalGasEth: enrichMap.size > 0 ? Number(totalGasWei) / 1e18 : null,
@@ -595,7 +593,6 @@ export default function NFTOverviewPage() {
           { label: "Total Minted",   value: stats.total,        color: "#24315f" },
           { label: "WL Free (Wave1)",value: stats.wlFree,       color: "#2e9fd8" },
           { label: "Fixed Price",    value: stats.fixedPrice,   color: "#7c3aed" },
-          { label: "Dutch Auction",  value: stats.dutchAuction, color: "#d97706" },
           { label: "Admin Mints",    value: stats.admin,        color: "#6b7280" },
           { label: "Revealed",       value: stats.revealed,     color: "#059669" },
         ].map((c) => (
@@ -615,13 +612,9 @@ export default function NFTOverviewPage() {
               <span className="text-gray-500">Fixed Price (Wave 2)</span>
               <span className="font-semibold text-gray-800">{stats.fixedPrice}</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Dutch Auction</span>
-              <span className="font-semibold text-gray-800">{stats.dutchAuction}</span>
-            </div>
             <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
               <span className="font-semibold text-gray-700">Total Paid</span>
-              <span className="font-bold" style={{ color: "#7c3aed" }}>{stats.fixedPrice + stats.dutchAuction}</span>
+              <span className="font-bold" style={{ color: "#7c3aed" }}>{stats.fixedPrice}</span>
             </div>
           </div>
         </div>
@@ -710,7 +703,6 @@ export default function NFTOverviewPage() {
           <option value="all">All Mint Types</option>
           <option value="WL Free">WL Free (Genesis)</option>
           <option value="Fixed Price">Fixed Price</option>
-          <option value="Dutch Auction">Dutch Auction</option>
           <option value="English Auction">English Auction</option>
           <option value="Admin">Admin Mint</option>
         </select>
