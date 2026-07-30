@@ -9,7 +9,7 @@ export interface MintedEvent {
   owner: string;
   waveNum: number;
   waveLabel: string;
-  mintType: "WL Free" | "Fixed Price" | "Dutch Auction" | "English Auction" | "Admin";
+  mintType: "WL Free" | "Fixed Price" | "Admin";
   timestamp: number;
   dateStr: string;
   isRevealed: boolean;
@@ -53,16 +53,27 @@ export async function fetchMintedEvents(chainId: number): Promise<{
     royaltyEnforced: true, purchaseLimitEnabled: false, normalMaxPerWallet: 5,
   };
   try {
-    const info = await contract.getCollectionInfo();
+    const [phase, totalMinted, maxSupply, sbtFlag, purchaseLimit, normalMax,
+           transferValidator, ...waveRevealedArr] = await Promise.all([
+      contract.currentPhase(),
+      contract.totalSupply(),
+      contract.MAX_SUPPLY(),
+      contract.sbt(),
+      contract.purchaseLimitEnabled(),
+      contract.normalMaxPerWallet(),
+      contract.getTransferValidator(),
+      ...[1,2,3,4,5,6,7].map(i => contract.waveRevealed(i).catch(() => false)),
+    ]);
+    const revealCount = (waveRevealedArr as boolean[]).filter(Boolean).length;
     contractState = {
-      phase: Number(info.phase_),
-      totalMinted: Number(info.totalMinted_),
-      maxSupply: Number(info.maxSupply_),
-      sbt: Boolean(info.sbt_),
-      revealCount: Number(info.revealCount_),
-      royaltyEnforced: Boolean(info.royaltyEnforced_),
-      purchaseLimitEnabled: Boolean(info.purchaseLimitEnabled_),
-      normalMaxPerWallet: Number(info.normalMaxPerWallet_),
+      phase: Number(phase),
+      totalMinted: Number(totalMinted),
+      maxSupply: Number(maxSupply),
+      sbt: Boolean(sbtFlag),
+      revealCount,
+      royaltyEnforced: transferValidator !== ethers.ZeroAddress,
+      purchaseLimitEnabled: Boolean(purchaseLimit),
+      normalMaxPerWallet: Number(normalMax),
     };
   } catch {
     // continue without contract state
@@ -72,7 +83,8 @@ export async function fetchMintedEvents(chainId: number): Promise<{
   let rawEvents: ethers.EventLog[] = [];
   let fetchError: string | null = null;
   try {
-    const filter = contract.filters.Minted();
+    // Transfer(from=0x0) is the standard ERC721 mint event
+    const filter = contract.filters.Transfer(ethers.ZeroAddress, null, null);
     const latest = await provider.getBlockNumber();
     const CHUNK = 2000;
     const DELAY_MS = 500;
@@ -100,33 +112,47 @@ export async function fetchMintedEvents(chainId: number): Promise<{
 
   const isRevealed = contractState.revealCount > 0;
 
-  // Determine which wave numbers appeared, then query isDutchWave for each unique paid wave.
-  const uniqueWaves = [...new Set(rawEvents.map((ev) => Number((ev.args as unknown as [string, bigint, bigint, bigint])[2])))];
-  const dutchWaves = new Set<number>();
+  // Transfer args: (from, to, tokenId)
+  const tokenIds = rawEvents.map((ev) => Number((ev.args as unknown as [string, string, bigint])[2]));
+
+  // Batch: get wave for each token via tokenWave()
+  const waveMap = new Map<number, number>();
   await Promise.allSettled(
-    uniqueWaves.filter(w => w >= 2).map(async (w) => {
+    tokenIds.map(async (tokenId) => {
       try {
-        const isDutch = await contract.isDutchWave(w);
-        if (isDutch) dutchWaves.add(w);
-      } catch { /* wave not configured — ignore */ }
+        const wave = await contract.tokenWave(tokenId);
+        waveMap.set(tokenId, Number(wave));
+      } catch { waveMap.set(tokenId, 0); }
+    })
+  );
+
+  // Batch: get timestamps from unique blocks
+  const uniqueBlocks = [...new Set(rawEvents.map((ev) => ev.blockNumber))];
+  const blockTimestamps = new Map<number, number>();
+  await Promise.allSettled(
+    uniqueBlocks.map(async (blockNum) => {
+      try {
+        const block = await provider.getBlock(blockNum);
+        if (block) blockTimestamps.set(blockNum, block.timestamp);
+      } catch { }
     })
   );
 
   function resolvedMintType(waveNum: number): MintedEvent["mintType"] {
     if (waveNum === 0) return "Admin";
     if (waveNum === 1) return "WL Free";
-    if (dutchWaves.has(waveNum)) return "Dutch Auction";
     return "Fixed Price";
   }
 
-  // Minted event: (address indexed to, uint256 indexed tokenId, uint256 indexed waveNum, uint256 timestamp)
   const events: MintedEvent[] = rawEvents.map((ev) => {
-    const args = ev.args as unknown as [string, bigint, bigint, bigint];
-    const waveNum = Number(args[2]);
-    const ts = Number(args[3]);
+    const args = ev.args as unknown as [string, string, bigint];
+    const tokenId = Number(args[2]);
+    const owner = args[1];
+    const waveNum = waveMap.get(tokenId) ?? 0;
+    const ts = blockTimestamps.get(ev.blockNumber) ?? 0;
     return {
-      tokenId: Number(args[1]),
-      owner: args[0],
+      tokenId,
+      owner,
       waveNum,
       waveLabel: waveLabel(waveNum),
       mintType: resolvedMintType(waveNum),

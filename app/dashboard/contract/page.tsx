@@ -203,23 +203,32 @@ export default function ContractPage() {
     setLiveLoading(true);
     setLiveError("");
     try {
-      const [info, root, wave1Start, wave1End, balance] = await Promise.all([
-        readContract.getCollectionInfo(),
-        readContract.merkleRoot(),
+      const [phase, totalMinted, maxSupply, sbtFlag, purchaseLimit, normalMax,
+             root, wave1Start, wave1End, balance,
+             ...waveRevealedArr] = await Promise.all([
+        readContract.currentPhase(),
+        readContract.totalSupply(),
+        readContract.MAX_SUPPLY(),
+        readContract.sbt(),
+        readContract.purchaseLimitEnabled(),
+        readContract.normalMaxPerWallet(),
+        readContract.allowlistRoot(),
         readContract.waveStartTime(1),
         readContract.waveEndTime(1),
         readProvider.getBalance(activeChain.contractAddress),
+        ...[1,2,3,4,5,6,7].map(i => readContract.waveRevealed(i).catch(() => false)),
       ]);
-      setLivePhase(Number(info.phase_));
-      setLiveSbt(Boolean(info.sbt_));
-      setLiveSupply({ minted: Number(info.totalCounter), max: Number(info.maxSupply_) });
-      setLiveRevealed(info.revealCount_ > 0n);
-      setLivePurchaseLimit({ enabled: Boolean(info.purchaseLimitEnabled_), maxPerWallet: Number(info.normalMaxPerWallet_) });
+      const anyRevealed = (waveRevealedArr as boolean[]).some(Boolean);
+      setLivePhase(Number(phase));
+      setLiveSbt(Boolean(sbtFlag));
+      setLiveSupply({ minted: Number(totalMinted), max: Number(maxSupply) });
+      setLiveRevealed(anyRevealed);
+      setLivePurchaseLimit({ enabled: Boolean(purchaseLimit), maxPerWallet: Number(normalMax) });
       setLiveRoot(root);
       setLiveWave1Start(Number(wave1Start));
       setLiveWave1End(Number(wave1End));
       setLiveBalance(parseFloat(ethers.formatEther(balance)).toFixed(4));
-      setSbtInput(Boolean(info.sbt_));
+      setSbtInput(Boolean(sbtFlag));
     } catch (e: unknown) {
       setLiveError("Could not read contract: " + (e instanceof Error ? e.message : String(e)));
     } finally {

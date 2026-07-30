@@ -1,574 +1,579 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ErrBanner, OkBanner, TxBanner } from "@/components/nft/Banner";
-import { Toggle } from "@/components/nft/Toggle";
-import { labelStyle, inputStyle } from "@/components/nft/styles";
+import { ErrBanner } from "@/components/nft/Banner";
 
-interface SchedulerStatus {
-  configured:            boolean;
-  autoPhaseEnabled:      boolean;
-  autoRevealEnabled:     boolean;
-  autoWaveRevealEnabled: boolean;
-  currentPhase:          number;
-  paidMintScheduledAt:   number;
-  paidMintReady:         boolean;
-  revealedScheduledAt:   number;
-  revealedReady:         boolean;
-  revealAt:              number;
-  revealURI:             string;
-  revealReady:           boolean;
+interface WaveSchedule {
+  wave_number:           number;
+  wave_name:             string;
+  status:                string;
+  scheduled_start:       string | null;
+  scheduled_end:         string | null;
+  reveal_scheduled_at:   string | null;
+  wave_start_triggered:  boolean;
+  wave_end_triggered:    boolean;
+  wave_reveal_triggered: boolean;
+  is_revealed:           boolean;
+  wave_revealed_at:      string | null;
+  sold_count:            number;
+  quantity:              number;
 }
 
-interface WaveRevealStatus {
-  waveNum:     number;
-  scheduledAt: number;
-  uri:         string;
-  ready:       boolean;
+const PHASE_LABELS: Record<number, string> = { 0: "Free Mint", 1: "Paid Mint", 2: "Revealed" };
+const PHASE_COLORS: Record<number, { color: string; bg: string }> = {
+  0: { color: "#7c3aed", bg: "rgba(124,58,237,0.1)" },
+  1: { color: "#41afeb", bg: "rgba(65,175,235,0.1)" },
+  2: { color: "#16a34a", bg: "rgba(22,163,74,0.1)" },
+};
+
+function fmtDate(dt: string | null): string {
+  if (!dt) return "—";
+  return new Date(dt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-const PHASE_LABELS: Record<number, string> = { 0: "Whitelist", 1: "PaidMint", 2: "Revealed" };
-const PHASE_COLORS: Record<number, string> = { 0: "#7c3aed", 1: "#41afeb", 2: "#16a34a" };
-const WAVES = [1, 2, 3, 4, 5, 6, 7];
-
-function fmtTs(ts: number): string {
-  if (!ts) return "Not scheduled";
-  return new Date(ts * 1000).toLocaleString();
+function fmtFull(dt: string | null): string {
+  if (!dt) return "—";
+  return new Date(dt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
-function nowUnix(): number { return Math.floor(Date.now() / 1000); }
+function waveState(w: WaveSchedule): "revealed" | "ready_reveal" | "reveal_scheduled" | "active" | "ended" | "upcoming" | "not_scheduled" {
+  const now = Date.now();
+  if (w.is_revealed || w.wave_reveal_triggered) return "revealed";
+  if (w.reveal_scheduled_at && new Date(w.reveal_scheduled_at).getTime() <= now) return "ready_reveal";
+  if (w.reveal_scheduled_at && new Date(w.reveal_scheduled_at).getTime() > now)  return "reveal_scheduled";
+  if (w.wave_start_triggered && !w.wave_end_triggered) return "active";
+  if (w.wave_end_triggered)   return "ended";
+  if (w.scheduled_start && new Date(w.scheduled_start).getTime() > now) return "upcoming";
+  return "not_scheduled";
+}
 
-export default function SchedulerPage() {
-  const [status, setStatus]     = useState<SchedulerStatus | null>(null);
-  const [loading, setLoading]   = useState(true);
-  const [busy, setBusy]         = useState(false);
-  const [err, setErr]           = useState<string | null>(null);
-  const [ok, setOk]             = useState<string | null>(null);
-  const [txHash, setTxHash]     = useState<string | null>(null);
+const STATE_META: Record<string, { label: string; color: string; bg: string }> = {
+  revealed:         { label: "Revealed",          color: "#16a34a", bg: "rgba(22,163,74,0.1)" },
+  ready_reveal:     { label: "Ready to Reveal",   color: "#d97706", bg: "rgba(217,119,6,0.12)" },
+  reveal_scheduled: { label: "Reveal Scheduled",  color: "#7c3aed", bg: "rgba(124,58,237,0.1)" },
+  active:           { label: "Active",             color: "#41afeb", bg: "rgba(65,175,235,0.1)" },
+  ended:            { label: "Wave Ended",         color: "#6b7280", bg: "rgba(107,114,128,0.1)" },
+  upcoming:         { label: "Upcoming",           color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
+  not_scheduled:    { label: "Not Scheduled",      color: "#9bafc5", bg: "rgba(156,163,175,0.1)" },
+};
 
-  // Wave reveal status (loaded on demand)
-  const [waveStatuses, setWaveStatuses] = useState<WaveRevealStatus[]>([]);
-  const [waveStatusLoading, setWaveStatusLoading] = useState(false);
+// ── Reveal Confirmation Modal ─────────────────────────────────────────────────
+function RevealModal({
+  wave, onClose, onSuccess,
+}: {
+  wave: WaveSchedule;
+  onClose: () => void;
+  onSuccess: (txHash: string) => void;
+}) {
+  const [uri,       setUri]       = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [busy,      setBusy]      = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
 
-  // Phase scheduling form
-  const [schedPhase, setSchedPhase]         = useState<"1" | "2">("1");
-  const [schedDateTime, setSchedDateTime]   = useState("");
-
-  // Full reveal scheduling form
-  const [revealUri, setRevealUri]           = useState("");
-  const [revealDateTime, setRevealDateTime] = useState("");
-
-  // Wave reveal scheduling form
-  const [waveRevealNum, setWaveRevealNum]   = useState<string>("1");
-  const [waveRevealUri, setWaveRevealUri]   = useState("");
-  const [waveRevealDateTime, setWaveRevealDateTime] = useState("");
-
-  // Manual forms
-  const [manualPhase, setManualPhase]               = useState<"1" | "2">("1");
-  const [manualRevealUri, setManualRevealUri]       = useState("");
-  const [manualWaveNum, setManualWaveNum]           = useState<string>("1");
-  const [manualWaveRevealUri, setManualWaveRevealUri] = useState("");
-
-  const load = useCallback(async () => {
+  async function doReveal() {
+    if (!confirmed || !uri.startsWith("ipfs://")) return;
+    setBusy(true); setError(null);
     try {
-      const r = await fetch("/api/nft-sell/scheduler/status", { credentials: "include" });
-      if (!r.ok) { const d = await r.json(); setErr(d.error ?? "Failed to load scheduler status."); return; }
-      const d = await r.json();
-      if (d.configured === false) { setLoading(false); return; }
-      setStatus(d);
-    } catch { setErr("Network error loading scheduler."); }
-    finally { setLoading(false); }
-  }, []);
-
-  const loadWaveStatuses = useCallback(async () => {
-    setWaveStatusLoading(true);
-    try {
-      const results = await Promise.all(
-        WAVES.map(async (w) => {
-          const r = await fetch(`/api/nft-sell/scheduler/wave-reveal-status/${w}`, { credentials: "include" });
-          if (!r.ok) return { waveNum: w, scheduledAt: 0, uri: "", ready: false };
-          return r.json() as Promise<WaveRevealStatus>;
-        })
-      );
-      setWaveStatuses(results);
-    } catch { /* non-critical */ }
-    finally { setWaveStatusLoading(false); }
-  }, []);
-
-  useEffect(() => { load(); loadWaveStatuses(); }, [load, loadWaveStatuses]);
-
-  async function call(path: string, method: string, body?: object): Promise<boolean> {
-    setBusy(true); setErr(null); setOk(null); setTxHash(null);
-    try {
-      const r = await fetch(`/api/nft-sell/scheduler/${path}`, {
-        method, credentials: "include",
-        headers: body ? { "Content-Type": "application/json" } : undefined,
-        body: body ? JSON.stringify(body) : undefined,
+      const res = await fetch(`/api/nft-sell/waves/${wave.wave_number}/reveal`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uri }),
       });
-      const d = await r.json();
-      if (!r.ok) { setErr(d.error ?? `Failed: ${path}`); return false; }
-      if (d.txHash) setTxHash(d.txHash);
-      return true;
-    } catch { setErr("Network error."); return false; }
-    finally { setBusy(false); }
-  }
-
-  async function toggleAutoPhase(enabled: boolean) {
-    const ok = await call("auto-phase", "POST", { enabled });
-    if (ok) { setOk(`Auto phase mode ${enabled ? "enabled" : "disabled"}.`); await load(); }
-  }
-
-  async function toggleAutoReveal(enabled: boolean) {
-    const ok = await call("auto-reveal", "POST", { enabled });
-    if (ok) { setOk(`Auto reveal mode ${enabled ? "enabled" : "disabled"}.`); await load(); }
-  }
-
-  async function toggleAutoWaveReveal(enabled: boolean) {
-    const ok = await call("auto-wave-reveal", "POST", { enabled });
-    if (ok) { setOk(`Auto wave reveal mode ${enabled ? "enabled" : "disabled"}.`); await load(); }
-  }
-
-  async function schedulePhase() {
-    if (!schedDateTime) return setErr("Select a date/time first.");
-    const ts = Math.floor(new Date(schedDateTime).getTime() / 1000);
-    if (ts <= nowUnix()) return setErr("Schedule must be in the future.");
-    const success = await call("schedule-phase", "POST", { phase: parseInt(schedPhase), timestamp: ts });
-    if (success) { setOk(`Phase ${PHASE_LABELS[parseInt(schedPhase)]} scheduled.`); await load(); }
-  }
-
-  async function cancelPhase(phase: number) {
-    if (!confirm(`Cancel scheduled phase ${PHASE_LABELS[phase]} transition?`)) return;
-    const success = await call(`schedule-phase/${phase}`, "DELETE");
-    if (success) { setOk(`Phase ${phase} schedule cancelled.`); await load(); }
-  }
-
-  async function triggerPhase(phase: number) {
-    if (!confirm(`Trigger phase ${PHASE_LABELS[phase]} now?`)) return;
-    const success = await call(`trigger-phase/${phase}`, "POST");
-    if (success) { setOk(`Phase ${PHASE_LABELS[phase]} triggered.`); await load(); }
-  }
-
-  async function scheduleReveal() {
-    if (!revealUri.startsWith("ipfs://")) return setErr("Reveal URI must start with ipfs://");
-    if (!revealDateTime) return setErr("Select a date/time first.");
-    const ts = Math.floor(new Date(revealDateTime).getTime() / 1000);
-    if (ts <= nowUnix()) return setErr("Schedule must be in the future.");
-    const success = await call("schedule-reveal", "POST", { uri: revealUri, timestamp: ts });
-    if (success) { setOk(`Reveal scheduled.`); setRevealUri(""); setRevealDateTime(""); await load(); }
-  }
-
-  async function cancelReveal() {
-    if (!confirm("Cancel the scheduled reveal?")) return;
-    const success = await call("schedule-reveal", "DELETE");
-    if (success) { setOk("Reveal schedule cancelled."); await load(); }
-  }
-
-  async function triggerReveal() {
-    if (!confirm("Trigger reveal now? Auto reveal mode must be enabled.")) return;
-    const success = await call("trigger-reveal", "POST");
-    if (success) { setOk("Reveal triggered."); await load(); }
-  }
-
-  async function scheduleWaveReveal() {
-    const waveNum = parseInt(waveRevealNum);
-    if (!waveRevealUri.startsWith("ipfs://")) return setErr("URI must start with ipfs://");
-    if (!waveRevealDateTime) return setErr("Select a date/time first.");
-    const ts = Math.floor(new Date(waveRevealDateTime).getTime() / 1000);
-    if (ts <= nowUnix()) return setErr("Schedule must be in the future.");
-    const success = await call("schedule-wave-reveal", "POST", { waveNum, uri: waveRevealUri, timestamp: ts });
-    if (success) {
-      setOk(`Wave ${waveNum} reveal scheduled.`);
-      setWaveRevealUri(""); setWaveRevealDateTime("");
-      await loadWaveStatuses();
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Reveal failed");
+      onSuccess(json.txHash);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Reveal failed");
+    } finally {
+      setBusy(false);
     }
   }
-
-  async function cancelWaveReveal(waveNum: number) {
-    if (!confirm(`Cancel scheduled reveal for Wave ${waveNum}?`)) return;
-    const success = await call(`schedule-wave-reveal/${waveNum}`, "DELETE");
-    if (success) { setOk(`Wave ${waveNum} reveal schedule cancelled.`); await loadWaveStatuses(); }
-  }
-
-  async function triggerWaveReveal(waveNum: number) {
-    if (!confirm(`Trigger Wave ${waveNum} reveal on-chain now?`)) return;
-    const success = await call(`trigger-wave-reveal/${waveNum}`, "POST");
-    if (success) { setOk(`Wave ${waveNum} reveal triggered.`); await loadWaveStatuses(); }
-  }
-
-  async function doManualPhase() {
-    const phaseName = PHASE_LABELS[parseInt(manualPhase)];
-    if (!confirm(`Manually set phase to ${phaseName}? Executes immediately on-chain.`)) return;
-    const success = await call("manual-phase", "POST", { phase: parseInt(manualPhase) });
-    if (success) { setOk(`Phase set to ${phaseName}.`); await load(); }
-  }
-
-  async function doManualReveal() {
-    if (!manualRevealUri.startsWith("ipfs://")) return setErr("Reveal URI must start with ipfs://");
-    if (!confirm("Execute full reveal NOW on-chain? This is irreversible.")) return;
-    const success = await call("manual-reveal", "POST", { uri: manualRevealUri });
-    if (success) { setOk("Full reveal executed on-chain."); setManualRevealUri(""); await load(); }
-  }
-
-  async function doManualWaveReveal() {
-    const waveNum = parseInt(manualWaveNum);
-    if (!manualWaveRevealUri.startsWith("ipfs://")) return setErr("URI must start with ipfs://");
-    if (!confirm(`Reveal Wave ${waveNum} NOW on-chain? This is irreversible.`)) return;
-    const success = await call("manual-wave-reveal", "POST", { waveNum, uri: manualWaveRevealUri });
-    if (success) {
-      setOk(`Wave ${waveNum} revealed on-chain.`);
-      setManualWaveRevealUri("");
-      await loadWaveStatuses();
-    }
-  }
-
-  async function togglePause() {
-    if (!confirm("Pause/unpause BearthScheduler?")) return;
-    const success = await call("pause", "POST");
-    if (success) { setOk("Scheduler pause state changed."); await load(); }
-  }
-
-  const phase      = status?.currentPhase ?? 0;
-  const phaseColor = PHASE_COLORS[phase] ?? "#9ca3af";
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg" style={{ border: "1px solid #e5e7eb" }}>
+        {/* Modal header */}
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid #e5e7eb" }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(217,119,6,0.1)" }}>
+              <svg className="w-5 h-5" style={{ color: "#d97706" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Reveal Wave {wave.wave_number}</h2>
+              <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>{wave.wave_name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ color: "#9bafc5" }}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {/* Warning banner */}
+          <div className="flex gap-3 p-3 rounded-xl" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
+            <svg className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "#dc2626" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p className="text-xs leading-relaxed" style={{ color: "#dc2626" }}>
+              <strong>This action is irreversible.</strong> Once revealed, all blind box NFTs in Wave {wave.wave_number} will
+              permanently show their actual artwork. Buyers will see their traits and rarity.
+            </p>
+          </div>
+
+          {/* Wave summary */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #f3f4f6" }}>
+              <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#9bafc5" }}>NFTs to Reveal</p>
+              <p className="text-xl font-extrabold mt-1" style={{ color: "#24315f" }}>{wave.quantity.toLocaleString()}</p>
+            </div>
+            <div className="p-3 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #f3f4f6" }}>
+              <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#9bafc5" }}>Reveal Date</p>
+              <p className="text-sm font-semibold mt-1" style={{ color: "#24315f" }}>{fmtFull(wave.reveal_scheduled_at)}</p>
+            </div>
+          </div>
+
+          {/* IPFS URI input */}
+          <div>
+            <label className="block text-xs font-bold mb-1.5" style={{ color: "#374151" }}>
+              Metadata Base URI <span style={{ color: "#dc2626" }}>*</span>
+            </label>
+            <input
+              value={uri}
+              onChange={e => setUri(e.target.value)}
+              placeholder="ipfs://Qm.../metadata/"
+              className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+              style={{
+                border: `1px solid ${uri && !uri.startsWith("ipfs://") ? "#fca5a5" : "#e5e7eb"}`,
+                color: "#111827",
+                fontFamily: "monospace",
+              }}
+            />
+            {uri && !uri.startsWith("ipfs://") && (
+              <p className="text-xs mt-1" style={{ color: "#dc2626" }}>URI must start with ipfs://</p>
+            )}
+            <p className="text-xs mt-1" style={{ color: "#9bafc5" }}>
+              The IPFS base URI for revealed metadata. Each token appends its ID (e.g. ipfs://Qm.../1).
+            </p>
+          </div>
+
+          {/* Confirmation checkbox */}
+          <label className="flex items-start gap-2.5 cursor-pointer select-none">
+            <input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded" style={{ accentColor: "#24315f", flexShrink: 0 }} />
+            <span className="text-xs leading-relaxed" style={{ color: "#374151" }}>
+              I understand this reveal is permanent and irreversible. I have verified the IPFS URI is correct and all
+              metadata is live on IPFS before proceeding.
+            </span>
+          </label>
+
+          {error && (
+            <div className="px-3 py-2 rounded-xl text-xs" style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.2)" }}>
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4" style={{ borderTop: "1px solid #e5e7eb" }}>
+          <button onClick={onClose} disabled={busy}
+            className="px-4 py-2 text-sm font-medium rounded-lg"
+            style={{ border: "1px solid #e5e7eb", color: "#6b7280" }}>
+            Cancel
+          </button>
+          <button
+            onClick={doReveal}
+            disabled={busy || !confirmed || !uri.startsWith("ipfs://")}
+            className="px-5 py-2 text-sm font-bold rounded-lg flex items-center gap-2"
+            style={{
+              background: confirmed && uri.startsWith("ipfs://") && !busy ? "#d97706" : "#f3f4f6",
+              color:      confirmed && uri.startsWith("ipfs://") && !busy ? "#fff"    : "#9bafc5",
+              cursor:     confirmed && uri.startsWith("ipfs://") && !busy ? "pointer" : "default",
+            }}>
+            {busy ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Revealing…
+              </>
+            ) : "Confirm Reveal"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Success Modal ─────────────────────────────────────────────────────────────
+function SuccessModal({ txHash, waveNum, onClose }: { txHash: string; waveNum: number; onClose: () => void }) {
+  const etherscan = process.env.NEXT_PUBLIC_NETWORK === "mainnet"
+    ? `https://etherscan.io/tx/${txHash}`
+    : `https://sepolia.etherscan.io/tx/${txHash}`;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md text-center" style={{ border: "1px solid #e5e7eb" }}>
+        <div className="px-8 py-8 space-y-4">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ background: "rgba(22,163,74,0.1)" }}>
+            <svg className="w-8 h-8" style={{ color: "#16a34a" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-lg font-extrabold" style={{ color: "#24315f" }}>Wave {waveNum} Revealed!</h2>
+            <p className="text-sm mt-1" style={{ color: "#6b7280" }}>
+              The reveal transaction was submitted on-chain. Buyers can now see their NFT artwork.
+            </p>
+          </div>
+          <div className="px-4 py-3 rounded-xl text-left" style={{ background: "#f9fafb", border: "1px solid #f3f4f6" }}>
+            <p className="text-xs font-bold uppercase tracking-wide mb-1" style={{ color: "#9bafc5" }}>Transaction Hash</p>
+            <p className="text-xs font-mono break-all" style={{ color: "#374151" }}>{txHash}</p>
+          </div>
+          <a href={etherscan} target="_blank" rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold"
+            style={{ color: "#41afeb" }}>
+            View on Etherscan
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
+        </div>
+        <div className="px-6 pb-6">
+          <button onClick={onClose} className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
+            style={{ background: "#24315f" }}>
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
+export default function WaveOverviewPage() {
+  const [waves,       setWaves]       = useState<WaveSchedule[]>([]);
+  const [phase,       setPhase]       = useState<number | null>(null);
+  const [loading,     setLoading]     = useState(true);
+  const [err,         setErr]         = useState<string | null>(null);
+  const [revealWave,  setRevealWave]  = useState<WaveSchedule | null>(null);
+  const [successData, setSuccessData] = useState<{ txHash: string; waveNum: number } | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true); setErr(null);
+    try {
+      const [wr, sr] = await Promise.all([
+        fetch("/api/nft-sell/waves/schedule-status", { credentials: "include" }),
+        fetch("/api/nft-sell/scheduler/status",      { credentials: "include" }),
+      ]);
+      const wd = await wr.json();
+      setWaves(wd.waves ?? []);
+      if (sr.ok) {
+        const sd = await sr.json();
+        if (sd.configured) setPhase(sd.currentPhase ?? null);
+      }
+    } catch {
+      setErr("Failed to load wave data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Count waves ready to reveal
+  const now = Date.now();
+  const readyCount = waves.filter(w => waveState(w) === "ready_reveal").length;
+
+  const nextAction = waves
+    .flatMap(w => [
+      w.scheduled_start && !w.wave_start_triggered ? { label: `W${w.wave_number} starts`, dt: new Date(w.scheduled_start).getTime() } : null,
+      w.reveal_scheduled_at && !w.wave_reveal_triggered && !w.is_revealed ? { label: `W${w.wave_number} reveal due`, dt: new Date(w.reveal_scheduled_at).getTime() } : null,
+    ])
+    .filter((x): x is { label: string; dt: number } => x !== null && x.dt > now)
+    .sort((a, b) => a.dt - b.dt)[0] ?? null;
+
+  function handleRevealSuccess(txHash: string, waveNum: number) {
+    setRevealWave(null);
+    setSuccessData({ txHash, waveNum });
+    load();
+  }
+
+  return (
+    <div className="p-5 space-y-5">
+
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "#24315f" }}>Scheduler</h1>
-          <p className="text-sm text-gray-400 mt-0.5">
-            Automated phase transitions, full reveal, and per-wave reveal for BearthGenesisNFT
+          <h1 className="text-xl font-extrabold" style={{ color: "#24315f" }}>Wave Overview</h1>
+          <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
+            Monitor wave schedule and trigger reveals when the time arrives
           </p>
         </div>
-        <button onClick={() => { load(); loadWaveStatuses(); }}
-          className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-gray-200 text-gray-600">
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {phase !== null && (
+            <span className="px-3 py-1.5 rounded-full text-xs font-bold"
+              style={{ background: PHASE_COLORS[phase]?.bg ?? "#f3f4f6", color: PHASE_COLORS[phase]?.color ?? "#6b7280" }}>
+              Contract: {PHASE_LABELS[phase] ?? `Phase ${phase}`}
+            </span>
+          )}
+          <button onClick={load} disabled={loading}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white"
+            style={{ border: "1px solid #e5e7eb", color: "#6b7280" }}>
+            {loading ? "Loading…" : "Refresh"}
+          </button>
+        </div>
       </div>
 
-      {err    && <ErrBanner msg={err}    onDismiss={() => setErr(null)} />}
-      {ok     && <OkBanner  msg={ok}     onDismiss={() => setOk(null)} />}
-      {txHash && <TxBanner  txHash={txHash} onDismiss={() => setTxHash(null)} />}
+      {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
 
-      {loading ? (
-        <div className="p-8 text-center text-sm text-gray-400">Loading scheduler status…</div>
-      ) : !status ? (
-        <div className="p-8 text-center text-sm text-gray-400">
-          Scheduler not reachable — set SCHEDULER_CONTRACT_ADDRESS env var.
+      {/* Ready to reveal alert */}
+      {readyCount > 0 && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+          style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.3)" }}>
+          <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ background: "rgba(217,119,6,0.15)" }}>
+            <svg className="w-4 h-4" style={{ color: "#d97706" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-bold" style={{ color: "#d97706" }}>
+              {readyCount} wave{readyCount > 1 ? "s" : ""} ready to reveal
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: "#92400e" }}>
+              The reveal date has passed. Review the wave below and click "Reveal Now" when you are ready.
+            </p>
+          </div>
         </div>
-      ) : (
-        <>
-          {/* Status Overview */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white rounded-2xl shadow-sm p-4" style={{ border: "1px solid #e5e7eb" }}>
-              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Current Phase</div>
-              <div className="text-2xl font-bold mt-1" style={{ color: phaseColor }}>
-                {PHASE_LABELS[phase]}
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm p-4" style={{ border: "1px solid #e5e7eb" }}>
-              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Auto Phase</div>
-              <div className="flex items-center gap-2">
-                <Toggle value={status.autoPhaseEnabled} onChange={toggleAutoPhase} disabled={busy} />
-                <span className="text-sm font-semibold" style={{ color: status.autoPhaseEnabled ? "#16a34a" : "#9ca3af" }}>
-                  {status.autoPhaseEnabled ? "On" : "Off"}
-                </span>
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm p-4" style={{ border: "1px solid #e5e7eb" }}>
-              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Auto Full Reveal</div>
-              <div className="flex items-center gap-2">
-                <Toggle value={status.autoRevealEnabled} onChange={toggleAutoReveal} disabled={busy} />
-                <span className="text-sm font-semibold" style={{ color: status.autoRevealEnabled ? "#16a34a" : "#9ca3af" }}>
-                  {status.autoRevealEnabled ? "On" : "Off"}
-                </span>
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm p-4" style={{ border: "1px solid #e5e7eb" }}>
-              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Auto Wave Reveal</div>
-              <div className="flex items-center gap-2">
-                <Toggle value={status.autoWaveRevealEnabled} onChange={toggleAutoWaveReveal} disabled={busy} />
-                <span className="text-sm font-semibold" style={{ color: status.autoWaveRevealEnabled ? "#16a34a" : "#9ca3af" }}>
-                  {status.autoWaveRevealEnabled ? "On" : "Off"}
-                </span>
-              </div>
-            </div>
+      )}
+
+      {/* Next upcoming action */}
+      {!readyCount && nextAction && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+          style={{ background: "rgba(65,175,235,0.06)", border: "1px solid rgba(65,175,235,0.2)" }}>
+          <svg className="w-4 h-4 flex-shrink-0" style={{ color: "#41afeb" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="text-sm" style={{ color: "#374151" }}>
+            <strong style={{ color: "#41afeb" }}>Next: </strong>
+            {nextAction.label} on {fmtFull(new Date(nextAction.dt).toISOString())}
+          </span>
+        </div>
+      )}
+
+      {/* Wave table */}
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid #f3f4f6" }}>
+          <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Wave Schedule</h2>
+          <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
+            Set dates on the NFT Waves page. Click "Reveal Now" when a wave's reveal date arrives.
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center h-40" style={{ color: "#9bafc5" }}>
+            <svg className="w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Loading…
           </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full" style={{ fontSize: 13, borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "#fafafa", borderBottom: "1px solid #f3f4f6" }}>
+                  {["Wave", "Start Date", "End Date", "Reveal Date", "Sold / Qty", "State", "Action"].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wide"
+                      style={{ color: "#9bafc5", whiteSpace: "nowrap" }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {waves.map((w, i) => {
+                  const state = waveState(w);
+                  const meta  = STATE_META[state];
+                  const isReady = state === "ready_reveal";
+                  return (
+                    <tr key={w.wave_number}
+                      style={{ borderTop: i === 0 ? "none" : "1px solid #f9fafb", background: isReady ? "rgba(217,119,6,0.025)" : "transparent" }}
+                      onMouseEnter={e => { if (!isReady) e.currentTarget.style.background = "#fafbff"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = isReady ? "rgba(217,119,6,0.025)" : "transparent"; }}>
 
-          {/* Scheduled Phase States */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="bg-white rounded-2xl shadow-sm p-5" style={{ border: "1px solid #e5e7eb" }}>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>PaidMint Phase</h2>
-                {status.paidMintReady && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>Ready</span>
-                )}
-              </div>
-              <p className="text-xs text-gray-500 mb-3">{fmtTs(status.paidMintScheduledAt)}</p>
-              <div className="flex gap-2">
-                {status.paidMintScheduledAt > 0 && (
-                  <>
-                    <button onClick={() => cancelPhase(1)} disabled={busy}
-                      className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 text-gray-600">
-                      Cancel
-                    </button>
-                    {status.paidMintReady && (
-                      <button onClick={() => triggerPhase(1)} disabled={busy}
-                        className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-white"
-                        style={{ background: "#41afeb" }}>
-                        Trigger
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
+                      {/* Wave name */}
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                          style={{ background: "rgba(65,175,235,0.1)", color: "#41afeb" }}>
+                          W{w.wave_number}
+                        </span>
+                        <div className="text-xs mt-1" style={{ color: "#6b7280" }}>{w.wave_name}</div>
+                      </td>
 
-            <div className="bg-white rounded-2xl shadow-sm p-5" style={{ border: "1px solid #e5e7eb" }}>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Revealed Phase</h2>
-                {status.revealedReady && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>Ready</span>
-                )}
-              </div>
-              <p className="text-xs text-gray-500 mb-3">{fmtTs(status.revealedScheduledAt)}</p>
-              <div className="flex gap-2">
-                {status.revealedScheduledAt > 0 && (
-                  <>
-                    <button onClick={() => cancelPhase(2)} disabled={busy}
-                      className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 text-gray-600">
-                      Cancel
-                    </button>
-                    {status.revealedReady && (
-                      <button onClick={() => triggerPhase(2)} disabled={busy}
-                        className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-white"
-                        style={{ background: "#16a34a" }}>
-                        Trigger
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm p-5" style={{ border: "1px solid #e5e7eb" }}>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Full Reveal (URI)</h2>
-                {status.revealReady && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>Ready</span>
-                )}
-              </div>
-              <p className="text-xs text-gray-500">{fmtTs(status.revealAt)}</p>
-              {status.revealURI && <p className="text-xs font-mono text-gray-400 mt-1 truncate">{status.revealURI}</p>}
-              <div className="flex gap-2 mt-3">
-                {status.revealAt > 0 && (
-                  <>
-                    <button onClick={cancelReveal} disabled={busy}
-                      className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 text-gray-600">
-                      Cancel
-                    </button>
-                    {status.revealReady && (
-                      <button onClick={triggerReveal} disabled={busy}
-                        className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-white"
-                        style={{ background: "#7c3aed" }}>
-                        Trigger
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Per-wave Reveal Status Grid */}
-          <div className="bg-white rounded-2xl shadow-sm p-5" style={{ border: "1px solid #e5e7eb" }}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Per-wave Reveal Status</h2>
-              <button onClick={loadWaveStatuses} disabled={waveStatusLoading}
-                className="px-2 py-1 rounded-lg text-xs font-semibold border border-gray-200 text-gray-500">
-                {waveStatusLoading ? "Loading…" : "Refresh"}
-              </button>
-            </div>
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-              {waveStatusLoading ? (
-                Array.from({ length: 7 }).map((_, i) => (
-                  <div key={i} className="rounded-xl bg-gray-100 animate-pulse h-20" />
-                ))
-              ) : (
-                waveStatuses.map((ws) => (
-                  <div key={ws.waveNum} className="rounded-xl p-3 text-center"
-                    style={{ background: ws.scheduledAt > 0 ? "rgba(65,175,235,0.08)" : "#f9fafb", border: "1px solid #e5e7eb" }}>
-                    <div className="text-xs font-bold text-gray-500 mb-1">W{ws.waveNum}</div>
-                    {ws.scheduledAt > 0 ? (
-                      <>
-                        <div className={`text-xs font-semibold ${ws.ready ? "text-green-600" : "text-blue-500"}`}>
-                          {ws.ready ? "Ready" : "Scheduled"}
+                      {/* Start date */}
+                      <td className="px-4 py-3">
+                        <div className="text-xs" style={{ color: w.wave_start_triggered ? "#16a34a" : "#374151" }}>
+                          {fmtDate(w.scheduled_start)}
                         </div>
-                        <div className="text-xs text-gray-400 mt-0.5 truncate" title={fmtTs(ws.scheduledAt)}>
-                          {new Date(ws.scheduledAt * 1000).toLocaleDateString()}
+                        {w.wave_start_triggered && (
+                          <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#16a34a" }}>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Started
+                          </div>
+                        )}
+                      </td>
+
+                      {/* End date */}
+                      <td className="px-4 py-3">
+                        <div className="text-xs" style={{ color: w.wave_end_triggered ? "#16a34a" : "#374151" }}>
+                          {fmtDate(w.scheduled_end)}
                         </div>
-                        <div className="mt-1 flex flex-col gap-1">
-                          {ws.ready && (
-                            <button onClick={() => triggerWaveReveal(ws.waveNum)} disabled={busy}
-                              className="w-full py-0.5 rounded text-xs font-semibold text-white"
-                              style={{ background: "#16a34a", fontSize: "10px" }}>
-                              Trigger
-                            </button>
-                          )}
-                          <button onClick={() => cancelWaveReveal(ws.waveNum)} disabled={busy}
-                            className="w-full py-0.5 rounded text-xs font-semibold border border-gray-200 text-gray-500"
-                            style={{ fontSize: "10px" }}>
-                            Cancel
+                        {w.wave_end_triggered && (
+                          <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#16a34a" }}>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Closed
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Reveal date */}
+                      <td className="px-4 py-3">
+                        <div className="text-xs font-semibold"
+                          style={{ color: isReady ? "#d97706" : w.reveal_scheduled_at ? "#7c3aed" : "#d1d5db" }}>
+                          {fmtDate(w.reveal_scheduled_at)}
+                        </div>
+                        {isReady && (
+                          <div className="text-xs mt-0.5 font-bold" style={{ color: "#d97706" }}>⚡ Due now</div>
+                        )}
+                        {w.is_revealed && w.wave_revealed_at && (
+                          <div className="text-xs mt-0.5" style={{ color: "#16a34a" }}>
+                            Done {fmtDate(w.wave_revealed_at)}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Sold / Qty */}
+                      <td className="px-4 py-3 text-xs" style={{ whiteSpace: "nowrap" }}>
+                        <span className="font-bold" style={{ color: "#41afeb" }}>{w.sold_count.toLocaleString()}</span>
+                        <span style={{ color: "#9bafc5" }}> / {w.quantity.toLocaleString()}</span>
+                        {w.quantity > 0 && (
+                          <div className="mt-1 h-1 rounded-full overflow-hidden" style={{ background: "#f3f4f6", width: 60 }}>
+                            <div className="h-full rounded-full" style={{
+                              width: `${Math.min(100, (w.sold_count / w.quantity) * 100)}%`,
+                              background: "#41afeb",
+                            }} />
+                          </div>
+                        )}
+                      </td>
+
+                      {/* State badge */}
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold"
+                          style={{ background: meta.bg, color: meta.color }}>
+                          {meta.label}
+                        </span>
+                      </td>
+
+                      {/* Action */}
+                      <td className="px-4 py-3">
+                        {isReady ? (
+                          <button onClick={() => setRevealWave(w)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
+                            style={{ background: "#d97706" }}>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            Reveal Now
                           </button>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-xs text-gray-400 mt-1">—</div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
+                        ) : state === "revealed" ? (
+                          <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: "#16a34a" }}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Done
+                          </span>
+                        ) : state === "not_scheduled" ? (
+                          <a href="/nft/waves" className="text-xs font-semibold" style={{ color: "#41afeb", textDecoration: "none" }}>
+                            Set Schedule →
+                          </a>
+                        ) : (
+                          <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
+        )}
+      </div>
 
-          {/* Schedule Forms Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Schedule Phase */}
-            <div className="bg-white rounded-2xl shadow-sm p-5" style={{ border: "1px solid #e5e7eb" }}>
-              <h2 className="text-sm font-bold mb-4" style={{ color: "#24315f" }}>Schedule Phase (Auto)</h2>
-              <div className="space-y-3">
-                <div>
-                  <label style={labelStyle}>Target Phase</label>
-                  <select value={schedPhase} onChange={e => setSchedPhase(e.target.value as "1" | "2")} style={inputStyle}>
-                    <option value="1">Phase 1 — PaidMint</option>
-                    <option value="2">Phase 2 — Revealed</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={labelStyle}>Trigger Date & Time</label>
-                  <input type="datetime-local" value={schedDateTime} onChange={e => setSchedDateTime(e.target.value)} style={inputStyle} />
-                </div>
-                <button onClick={schedulePhase} disabled={busy}
-                  className="w-full py-2 rounded-xl text-sm font-semibold text-white"
-                  style={{ background: "#41afeb", opacity: busy ? 0.6 : 1 }}>
-                  {busy ? "Scheduling…" : "Schedule Phase"}
-                </button>
+      {/* How reveals work */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          {
+            icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
+            color: "#41afeb",
+            title: "1. Set Reveal Date",
+            desc: "On the NFT Waves page, set a reveal date for each wave. This date is shown to the community.",
+          },
+          {
+            icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
+            color: "#d97706",
+            title: "2. Receive Alert",
+            desc: "When the reveal date arrives, this page shows a \"Ready to Reveal\" alert. No action happens automatically.",
+          },
+          {
+            icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z",
+            color: "#7c3aed",
+            title: "3. Admin Confirms",
+            desc: "Admin clicks \"Reveal Now\", enters the IPFS URI, ticks the confirmation checkbox, and submits the transaction.",
+          },
+        ].map(item => (
+          <div key={item.title} className="bg-white rounded-2xl p-4 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-xl" style={{ background: `${item.color}15`, flexShrink: 0 }}>
+                <svg className="w-4 h-4" style={{ color: item.color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+                </svg>
               </div>
+              <h3 className="text-xs font-bold" style={{ color: "#24315f" }}>{item.title}</h3>
             </div>
-
-            {/* Schedule Full Reveal */}
-            <div className="bg-white rounded-2xl shadow-sm p-5" style={{ border: "1px solid #e5e7eb" }}>
-              <h2 className="text-sm font-bold mb-4" style={{ color: "#24315f" }}>Schedule Full Reveal (Auto)</h2>
-              <div className="space-y-3">
-                <div>
-                  <label style={labelStyle}>IPFS Reveal URI</label>
-                  <input type="text" value={revealUri} onChange={e => setRevealUri(e.target.value)}
-                    placeholder="ipfs://Qm..." style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Reveal Date & Time</label>
-                  <input type="datetime-local" value={revealDateTime} onChange={e => setRevealDateTime(e.target.value)} style={inputStyle} />
-                </div>
-                <button onClick={scheduleReveal} disabled={busy}
-                  className="w-full py-2 rounded-xl text-sm font-semibold text-white"
-                  style={{ background: "#7c3aed", opacity: busy ? 0.6 : 1 }}>
-                  {busy ? "Scheduling…" : "Schedule Full Reveal"}
-                </button>
-              </div>
-            </div>
-
-            {/* Schedule Wave Reveal */}
-            <div className="bg-white rounded-2xl shadow-sm p-5" style={{ border: "1px solid #e5e7eb" }}>
-              <h2 className="text-sm font-bold mb-4" style={{ color: "#24315f" }}>Schedule Wave Reveal (Auto)</h2>
-              <div className="space-y-3">
-                <div>
-                  <label style={labelStyle}>Wave</label>
-                  <select value={waveRevealNum} onChange={e => setWaveRevealNum(e.target.value)} style={inputStyle}>
-                    {WAVES.map(w => <option key={w} value={String(w)}>Wave {w}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={labelStyle}>IPFS URI for this wave</label>
-                  <input type="text" value={waveRevealUri} onChange={e => setWaveRevealUri(e.target.value)}
-                    placeholder="ipfs://Qm..." style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Reveal Date & Time</label>
-                  <input type="datetime-local" value={waveRevealDateTime} onChange={e => setWaveRevealDateTime(e.target.value)} style={inputStyle} />
-                </div>
-                <button onClick={scheduleWaveReveal} disabled={busy}
-                  className="w-full py-2 rounded-xl text-sm font-semibold text-white"
-                  style={{ background: "#f59e0b", opacity: busy ? 0.6 : 1 }}>
-                  {busy ? "Scheduling…" : "Schedule Wave Reveal"}
-                </button>
-              </div>
-            </div>
+            <p className="text-xs leading-relaxed" style={{ color: "#6b7280" }}>{item.desc}</p>
           </div>
+        ))}
+      </div>
 
-          {/* Manual Override */}
-          <div className="bg-white rounded-2xl shadow-sm p-5" style={{ border: "1px solid #e5e7eb", borderColor: "rgba(220,38,38,0.3)" }}>
-            <h2 className="text-sm font-bold mb-1" style={{ color: "#dc2626" }}>Manual Override (Execute Immediately)</h2>
-            <p className="text-xs text-gray-400 mb-4">Bypasses auto mode and executes on-chain immediately. Use only when ready.</p>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Manual Phase */}
-              <div className="space-y-3">
-                <div>
-                  <label style={labelStyle}>Set Phase To</label>
-                  <select value={manualPhase} onChange={e => setManualPhase(e.target.value as "1" | "2")} style={inputStyle}>
-                    <option value="1">Phase 1 — PaidMint</option>
-                    <option value="2">Phase 2 — Revealed</option>
-                  </select>
-                </div>
-                <button onClick={doManualPhase} disabled={busy}
-                  className="w-full py-2 rounded-xl text-sm font-semibold text-white"
-                  style={{ background: "#dc2626", opacity: busy ? 0.6 : 1 }}>
-                  {busy ? "Executing…" : "Set Phase Now"}
-                </button>
-              </div>
-              {/* Manual Full Reveal */}
-              <div className="space-y-3">
-                <div>
-                  <label style={labelStyle}>Full Reveal URI (IPFS)</label>
-                  <input type="text" value={manualRevealUri} onChange={e => setManualRevealUri(e.target.value)}
-                    placeholder="ipfs://Qm..." style={inputStyle} />
-                </div>
-                <button onClick={doManualReveal} disabled={busy}
-                  className="w-full py-2 rounded-xl text-sm font-semibold text-white"
-                  style={{ background: "#dc2626", opacity: busy ? 0.6 : 1 }}>
-                  {busy ? "Executing…" : "Reveal All Now"}
-                </button>
-              </div>
-              {/* Manual Wave Reveal */}
-              <div className="space-y-3">
-                <div>
-                  <label style={labelStyle}>Wave Reveal</label>
-                  <select value={manualWaveNum} onChange={e => setManualWaveNum(e.target.value)} style={inputStyle}>
-                    {WAVES.map(w => <option key={w} value={String(w)}>Wave {w}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={labelStyle}>Wave URI (IPFS)</label>
-                  <input type="text" value={manualWaveRevealUri} onChange={e => setManualWaveRevealUri(e.target.value)}
-                    placeholder="ipfs://Qm..." style={inputStyle} />
-                </div>
-                <button onClick={doManualWaveReveal} disabled={busy}
-                  className="w-full py-2 rounded-xl text-sm font-semibold text-white"
-                  style={{ background: "#dc2626", opacity: busy ? 0.6 : 1 }}>
-                  {busy ? "Executing…" : "Reveal Wave Now"}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Pause / Unpause */}
-          <div className="flex items-center gap-4">
-            <button onClick={togglePause} disabled={busy}
-              className="px-4 py-2 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600">
-              Pause / Unpause Scheduler
-            </button>
-            <span className="text-xs text-gray-400">Paused state blocks public trigger functions but not admin manual calls.</span>
-          </div>
-        </>
+      {/* Modals */}
+      {revealWave && (
+        <RevealModal
+          wave={revealWave}
+          onClose={() => setRevealWave(null)}
+          onSuccess={(txHash) => handleRevealSuccess(txHash, revealWave.wave_number)}
+        />
+      )}
+      {successData && (
+        <SuccessModal
+          txHash={successData.txHash}
+          waveNum={successData.waveNum}
+          onClose={() => setSuccessData(null)}
+        />
       )}
     </div>
   );

@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
-
 export function useWhitelist() {
   const [addresses, setAddresses] = useState<string[]>([]);
   const [stats, setStats] = useState<{
@@ -25,7 +23,7 @@ export function useWhitelist() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/whitelist?limit=1000`, { credentials: "include" });
+      const res = await fetch("/api/whitelist?limit=1000");
       if (!res.ok) throw new Error(res.statusText);
       const data = await res.json();
       setAddresses(data.addresses ?? []);
@@ -48,10 +46,9 @@ export function useWhitelist() {
   const addAddress = useCallback(async (address: string) => {
     setAddAddressLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/whitelist/entry`, {
+      const res = await fetch("/api/whitelist/entry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ address }),
       });
       if (!res.ok) {
@@ -67,10 +64,9 @@ export function useWhitelist() {
   const addAddressesBulk = useCallback(async (list: string[]) => {
     setAddAddressesLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/whitelist/add`, {
+      const res = await fetch("/api/whitelist/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ addresses: list }),
       });
       if (!res.ok) {
@@ -86,9 +82,8 @@ export function useWhitelist() {
   const removeAddress = useCallback(async (address: string) => {
     setRemoveAddressLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/whitelist/${encodeURIComponent(address)}`, {
+      const res = await fetch(`/api/whitelist/${encodeURIComponent(address)}`, {
         method: "DELETE",
-        credentials: "include",
       });
       if (!res.ok) {
         const data = await res.json();
@@ -103,10 +98,9 @@ export function useWhitelist() {
   const testAddress = useCallback(async (address: string) => {
     setTestAddressLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/whitelist/test`, {
+      const res = await fetch("/api/whitelist/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ address }),
       });
       if (!res.ok) {
@@ -123,10 +117,9 @@ export function useWhitelist() {
   const setMerkleRoot = useCallback(async (root: string) => {
     setSetMerkleRootLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/whitelist/merkle-root`, {
+      const res = await fetch("/api/whitelist/merkle-root", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ root }),
       });
       if (!res.ok) {
@@ -142,9 +135,8 @@ export function useWhitelist() {
   const clearMerkleRootOverride = useCallback(async () => {
     setClearMerkleRootOverrideLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/whitelist/merkle-root`, {
+      const res = await fetch("/api/whitelist/merkle-root", {
         method: "DELETE",
-        credentials: "include",
       });
       if (!res.ok) {
         const data = await res.json();
@@ -157,9 +149,7 @@ export function useWhitelist() {
   }, [load]);
 
   const exportWhitelist = useCallback(async (fmt: "csv" | "json" | "txt") => {
-    const res = await fetch(`${API_BASE}/api/whitelist/export?format=${fmt}`, {
-      credentials: "include",
-    });
+    const res = await fetch(`/api/whitelist/export?format=${fmt}`);
     if (!res.ok) throw new Error("Export failed");
     return res.blob();
   }, []);

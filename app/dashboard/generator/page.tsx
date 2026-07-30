@@ -50,7 +50,7 @@ export default function Page() {
     setStep(newStep);
   }
 
-  const loadLayers = useCallback((localLayers?: Layer[]) => {
+  const loadLayers = useCallback((localLayers?: Layer[], cid?: string | null) => {
     const applyLayers = (data: Layer[]) => {
       setLayers(data);
       setWeights(prev => {
@@ -75,7 +75,8 @@ export default function Page() {
       return;
     }
 
-    fetch('/api/layers')
+    const url = cid ? `/api/layers?collectionId=${cid}` : '/api/layers';
+    fetch(url)
       .then(r => r.json())
       .then((data: Layer[]) => { if (data.length) applyLayers(data); })
       .catch(() => { /* layers load silently — page shows empty state */ });
@@ -92,10 +93,10 @@ export default function Page() {
         setWeights(prev => ({ ...prev, ...weightData }));
       }
     });
-    loadLayers();
-
     // Restore collection from DB if previously created
     const savedId = sessionStorage.getItem('nft_collection_id');
+    loadLayers(undefined, savedId || undefined);
+
     if (savedId) {
       setCollectionId(savedId);
       const savedSupply = sessionStorage.getItem('nft_supply');
@@ -199,9 +200,15 @@ export default function Page() {
         sessionStorage.setItem('nft_supply', String(collection.supply ?? 100));
       }
 
-      // Sync layers from BearthLayersv1 into DB
+      // Sync layers into DB. On Vercel, local disk is empty so we pass the
+      // parsed layer manifest from React state as a fallback.
       if (cid) {
-        await fetch(`/api/nft-gen/collections/${cid}/sync-from-disk`, { method: 'POST' });
+        await fetch(`/api/nft-gen/collections/${cid}/sync-from-disk`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ layers }),
+        }).catch(() => {});
+        loadLayers(undefined, cid);
       }
 
       goToStep('organize');
@@ -277,10 +284,9 @@ export default function Page() {
               {layers.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: 'var(--dim)', textAlign: 'center', padding: 40 }}>
                   <div style={{ fontSize: 40 }}>🗂️</div>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>No layers found</div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>No layers yet</div>
                   <div style={{ fontSize: 13 }}>
-                    The layer organizer requires the <strong>BearthLayersv1</strong> folder on the same machine.<br />
-                    Run the generator locally to import and organize your layers.
+                    Go to <strong>Settings</strong> and drop your layers folder into the import zone to get started.
                   </div>
                   <button className="btn btn-ghost" onClick={() => goToStep('settings')} style={{ marginTop: 8 }}>
                     ← Back to Settings

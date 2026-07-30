@@ -15,7 +15,7 @@ export function getActiveFolder(): string {
       if (folder && typeof folder === 'string') return folder;
     }
   } catch { }
-  return 'BearthLayersv1';
+  return '';
 }
 
 export function setActiveFolder(folder: string) {

@@ -144,12 +144,15 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
   const [uploading,     setUploading]     = useState(false);
   const [uploadDone,    setUploadDone]    = useState(false);
   const [uploadMsg,     setUploadMsg]     = useState('');
-  const [activeFolder,  setActiveFolder]  = useState('BearthLayersv1');
+  const [activeFolder,  setActiveFolder]  = useState('');
   const folderRef = useRef(null);
   const { storeFiles } = useLayerFiles();
 
   useEffect(() => {
-    fetch('/api/layers/root').then(r => r.json()).then(d => { if (d.folder) setActiveFolder(d.folder); }).catch(() => {});
+    fetch('/api/layers/root')
+      .then(r => r.json())
+      .then(d => { setActiveFolder(d.folder ?? ''); })
+      .catch(() => { setActiveFolder(''); });
   }, []);
 
   const set = (k, v) => onChange({ ...collection, [k]: v });
@@ -338,7 +341,10 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, padding:'6px 10px', background:'var(--bg2)', borderRadius:7, border:'1px solid var(--border)', fontSize:12 }}>
               <span style={{ color:'var(--dim)' }}>Active layers folder:</span>
-              <span style={{ color:'var(--accent)', fontWeight:600, fontFamily:'monospace' }}>{activeFolder}</span>
+              {activeFolder
+                ? <span style={{ color:'var(--accent)', fontWeight:600, fontFamily:'monospace' }}>{activeFolder}</span>
+                : <span style={{ color:'var(--dim)', fontStyle:'italic' }}>None — drop a folder below to import</span>
+              }
             </div>
             <div
               className={`setup-drop-zone${dragOver ? ' drag-over' : ''}${uploadDone ? ' done' : ''}`}

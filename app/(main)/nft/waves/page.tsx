@@ -21,10 +21,11 @@ interface Wave {
   saleMethod: string;
   scheduledStart: string | null;
   scheduledEnd: string | null;
+  revealScheduledAt: string | null;
+  tierPrices: { legendary?: number; epic?: number; rare?: number; common?: number } | null;
   status: string;
   notes: string | null;
   nftCount: number;
-  // On-chain mirror fields (from nft_waves V8 columns)
   soldCount?: number;
   priceLocked?: boolean;
   waveClosed?: boolean;
@@ -88,8 +89,18 @@ export default function WavesPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [form, setForm] = useState({
     defaultPriceEth: "", saleMethod: "", scheduledStart: "",
-    scheduledEnd: "", status: "", notes: "", clearSchedule: false,
+    scheduledEnd: "", revealScheduledAt: "", status: "", notes: "",
+    clearSchedule: false,
   });
+
+  // Tier prices form
+  const [tierLegendary, setTierLegendary] = useState("");
+  const [tierEpic, setTierEpic]           = useState("");
+  const [tierRare, setTierRare]           = useState("");
+  const [tierCommon, setTierCommon]       = useState("");
+  const [tierSaving, setTierSaving]       = useState(false);
+  const [tierOk, setTierOk]               = useState<string | null>(null);
+  const [tierErr, setTierErr]             = useState<string | null>(null);
 
   // On-chain action modal
   const [chainWave, setChainWave]         = useState<Wave | null>(null);
@@ -100,44 +111,13 @@ export default function WavesPage() {
   const [chainTx, setChainTx]             = useState<string | null>(null);
 
   // Chain form fields
-  const [chainPrice, setChainPrice]       = useState("");
-  const [chainStart, setChainStart]       = useState("");
-  const [chainEnd, setChainEnd]           = useState("");
-  const [auctionTo, setAuctionTo]         = useState("");
-  const [auctionQty, setAuctionQty]       = useState("1");
-  const [auctionListingId, setAuctionListingId] = useState("");
-  const [auctionStartPrice, setAuctionStartPrice] = useState("");
-
-  // Dutch auction form fields
-  const [dutchStartPrice, setDutchStartPrice]     = useState("");
-  const [dutchFloorPrice, setDutchFloorPrice]     = useState("");
-  const [dutchDecrement, setDutchDecrement]       = useState("");
-  const [dutchInterval, setDutchInterval]         = useState("");
-  const [dutchCurrentPrice, setDutchCurrentPrice] = useState<string | null>(null);
-
-  // Reveal wave form fields
-  const [revealWaveUri, setRevealWaveUri] = useState("");
-
-  // Strategy config form fields (separate save actions per section)
-  const [stratSaving, setStratSaving] = useState<string | null>(null);
-  const [stratOk, setStratOk]         = useState<string | null>(null);
-  const [stratErr, setStratErr]       = useState<string | null>(null);
-  const [flashEnabled, setFlashEnabled]       = useState(false);
-  const [flashDiscount, setFlashDiscount]     = useState("");
-  const [artistEnabled, setArtistEnabled]     = useState(false);
-  const [artistName, setArtistName]           = useState("");
-  const [artistWallet, setArtistWallet]       = useState("");
-  const [artistRoyaltyBps, setArtistRoyaltyBps] = useState("");
-  const [tierLegendary, setTierLegendary]     = useState("");
-  const [tierEpic, setTierEpic]               = useState("");
-  const [tierRare, setTierRare]               = useState("");
-  const [tierCommon, setTierCommon]           = useState("");
-  const [holderPriorityStart, setHolderPriorityStart] = useState("");
-  const [holderPriorityEnd, setHolderPriorityEnd]     = useState("");
-
-  // Holder snapshot / merkle (on-chain modal)
-  const [snapshotWallets, setSnapshotWallets] = useState<string[]>([]);
-  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [chainPrice, setChainPrice]   = useState("");
+  const [chainStart, setChainStart]   = useState("");
+  const [chainEnd, setChainEnd]       = useState("");
+  const [auctionTo, setAuctionTo]     = useState("");
+  const [auctionQty, setAuctionQty]   = useState("1");
+  const [auctionListingId, setAuctionListingId]     = useState("");
+  const [auctionStartPrice, setAuctionStartPrice]   = useState("");
 
   const loadWaves = () => {
     setLoading(true); setError(null);
@@ -166,35 +146,44 @@ export default function WavesPage() {
   const openEdit = (w: Wave) => {
     setEditWave(w);
     setForm({
-      defaultPriceEth: w.defaultPriceEth != null ? String(w.defaultPriceEth) : "",
-      saleMethod:      w.saleMethod ?? "fixed_price",
-      scheduledStart:  w.scheduledStart ? w.scheduledStart.slice(0, 16) : "",
-      scheduledEnd:    w.scheduledEnd   ? w.scheduledEnd.slice(0, 16)   : "",
-      status:          w.status ?? "upcoming",
-      notes:           w.notes  ?? "",
-      clearSchedule:   false,
+      defaultPriceEth:    w.defaultPriceEth != null ? String(w.defaultPriceEth) : "",
+      saleMethod:         w.saleMethod ?? "fixed_price",
+      scheduledStart:     w.scheduledStart     ? w.scheduledStart.slice(0, 16)     : "",
+      scheduledEnd:       w.scheduledEnd       ? w.scheduledEnd.slice(0, 16)       : "",
+      revealScheduledAt:  w.revealScheduledAt  ? w.revealScheduledAt.slice(0, 16)  : "",
+      status:             w.status ?? "upcoming",
+      notes:              w.notes  ?? "",
+      clearSchedule:      false,
     });
-    // Reset strategy form fields
-    setFlashEnabled(false); setFlashDiscount("");
-    setArtistEnabled(false); setArtistName(""); setArtistWallet(""); setArtistRoyaltyBps("");
-    setTierLegendary(""); setTierEpic(""); setTierRare(""); setTierCommon("");
-    setHolderPriorityStart(""); setHolderPriorityEnd("");
-    setStratOk(null); setStratErr(null);
+    // Pre-fill tier prices from existing wave data
+    setTierLegendary(w.tierPrices?.legendary != null ? String(w.tierPrices.legendary) : "");
+    setTierEpic(w.tierPrices?.epic           != null ? String(w.tierPrices.epic)       : "");
+    setTierRare(w.tierPrices?.rare           != null ? String(w.tierPrices.rare)       : "");
+    setTierCommon(w.tierPrices?.common       != null ? String(w.tierPrices.common)     : "");
+    setTierOk(null); setTierErr(null);
     setSaveError(null);
   };
 
-  const saveStratSection = async (section: string, body: Record<string, unknown>, waveNum: number) => {
-    setStratSaving(section); setStratErr(null); setStratOk(null);
+  const saveTierPrices = async () => {
+    if (!editWave) return;
+    setTierSaving(true); setTierOk(null); setTierErr(null);
     try {
-      const r = await fetch(`/api/nft-sell/waves/${waveNum}/${section}`, {
+      const tier_prices: Record<string, number> = {};
+      if (tierLegendary !== "") tier_prices.legendary = parseFloat(tierLegendary);
+      if (tierEpic      !== "") tier_prices.epic      = parseFloat(tierEpic);
+      if (tierRare      !== "") tier_prices.rare      = parseFloat(tierRare);
+      if (tierCommon    !== "") tier_prices.common    = parseFloat(tierCommon);
+
+      const r = await fetch(`/api/nft-sell/waves/${editWave.waveNumber}/tier-prices`, {
         method: "PUT", credentials: "include",
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier_prices }),
       });
       const d = await r.json();
-      if (!r.ok) { setStratErr(d.error ?? "Save failed"); return; }
-      setStratOk(`${section.replace(/-/g, " ")} saved`);
-    } catch { setStratErr("Network error"); }
-    finally { setStratSaving(null); }
+      if (!r.ok) { setTierErr(d.error ?? "Save failed"); return; }
+      setTierOk("Tier prices saved");
+    } catch { setTierErr("Network error"); }
+    finally { setTierSaving(false); }
   };
 
   const handleSave = async () => {
@@ -202,13 +191,14 @@ export default function WavesPage() {
     setSaving(true); setSaveError(null);
     try {
       const body: Record<string, unknown> = {
-        defaultPriceEth: form.defaultPriceEth !== "" ? Number(form.defaultPriceEth) : null,
-        saleMethod:      form.saleMethod   || null,
-        scheduledStart:  form.clearSchedule ? null : (form.scheduledStart ? new Date(form.scheduledStart).toISOString() : null),
-        scheduledEnd:    form.clearSchedule ? null : (form.scheduledEnd   ? new Date(form.scheduledEnd).toISOString()   : null),
-        status:          form.status       || null,
-        notes:           form.notes        || null,
-        clearSchedule:   form.clearSchedule,
+        defaultPriceEth:   form.defaultPriceEth !== "" ? Number(form.defaultPriceEth) : null,
+        saleMethod:        form.saleMethod   || null,
+        scheduledStart:    form.clearSchedule ? null : (form.scheduledStart    ? new Date(form.scheduledStart).toISOString()    : null),
+        scheduledEnd:      form.clearSchedule ? null : (form.scheduledEnd      ? new Date(form.scheduledEnd).toISOString()      : null),
+        revealScheduledAt: form.clearSchedule ? null : (form.revealScheduledAt ? new Date(form.revealScheduledAt).toISOString() : null),
+        status:            form.status       || null,
+        notes:             form.notes        || null,
+        clearSchedule:     form.clearSchedule,
       };
       const res = await fetch(`/api/waves/${editWave.id}`, {
         method: "PUT", credentials: "include",
@@ -228,17 +218,9 @@ export default function WavesPage() {
     setChainPrice(w.defaultPriceEth != null ? String(w.defaultPriceEth) : "");
     setChainStart(w.scheduledStart ? w.scheduledStart.slice(0, 16) : "");
     setChainEnd(w.scheduledEnd     ? w.scheduledEnd.slice(0, 16)   : "");
-    setDutchStartPrice(""); setDutchFloorPrice(""); setDutchDecrement(""); setDutchInterval("");
-    setDutchCurrentPrice(null); setRevealWaveUri("");
     try {
       const d = await fetch(`/api/nft-sell/waves/${w.waveNumber}`, { credentials: "include" }).then(r => r.json());
       setChainOnChain(d.onChain ?? null);
-      if (w.saleMethod === "dutch_auction") {
-        try {
-          const dp = await fetch(`/api/nft-sell/waves/${w.waveNumber}/dutch-price`, { credentials: "include" }).then(r => r.json());
-          setDutchCurrentPrice(dp.currentPriceEth ?? null);
-        } catch { /* ignore */ }
-      }
     } catch { /* show modal anyway */ }
     finally { setChainLoading(false); }
   };
@@ -250,7 +232,6 @@ export default function WavesPage() {
       const d   = await res.json();
       if (!res.ok) { setChainError(d.error ?? `${opName} failed.`); return; }
       setChainTx(d.txHash ?? null);
-      // refresh on-chain data
       const fresh = await fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}`, { credentials: "include" }).then(r => r.json());
       setChainOnChain(fresh.onChain ?? null);
       loadWaves();
@@ -302,43 +283,10 @@ export default function WavesPage() {
     }));
   };
 
-  const handleSetDutchAuction = () => {
-    if (!dutchStartPrice || !dutchFloorPrice || !dutchDecrement || !dutchInterval) {
-      setChainError("All Dutch auction fields are required."); return;
-    }
-    chainOp("dutch", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/dutch-auction`, {
-      method: "PUT", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        startPriceEth:  dutchStartPrice,
-        floorPriceEth:  dutchFloorPrice,
-        decrementEth:   dutchDecrement,
-        intervalSecs: parseInt(dutchInterval, 10),
-      }),
-    }));
-  };
-
-  const handleRevealWave = () => {
-    if (!revealWaveUri) { setChainError("Reveal URI is required."); return; }
-    chainOp("reveal-wave", async () => {
-      const res = await fetch("/api/nft-sell/collection/reveal-wave", {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ waveNum: chainWave!.waveNumber, uri: revealWaveUri }),
-      });
-      if (res.ok) {
-        setWaves(prev => prev.map(w =>
-          w.waveNumber === chainWave!.waveNumber ? { ...w, waveRevealed: true } : w
-        ));
-      }
-      return res;
-    });
-  };
-
-  const totalNfts     = waves.reduce((s, w) => s + (w.quantity ?? 0), 0);
-  const activeWave    = waves.find(w => w.status === "active");
-  const completedCount = waves.filter(w => w.status === "completed" || w.status === "closed" || w.status === "sold_out").length;
-  const totalSold     = waves.reduce((s, w) => s + (w.soldCount ?? 0), 0);
+  const totalNfts      = waves.reduce((s, w) => s + (w.quantity ?? 0), 0);
+  const activeWave     = waves.find(w => w.status === "active");
+  const completedCount = waves.filter(w => ["completed", "closed", "sold_out"].includes(w.status)).length;
+  const totalSold      = waves.reduce((s, w) => s + (w.soldCount ?? 0), 0);
 
   return (
     <div className="p-5 space-y-5">
@@ -346,9 +294,9 @@ export default function WavesPage() {
       {/* ── Header ── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-lg font-bold" style={{ color: "#24315f" }}>NFT Sell</h1>
+          <h1 className="text-lg font-bold" style={{ color: "#24315f" }}>NFT Waves</h1>
           <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
-            Primary selling control center — manage pricing, schedules, Dutch auctions, and on-chain wave actions
+            Manage wave pricing, schedules, reveal dates and on-chain wave actions
           </p>
         </div>
         <button onClick={loadWaves}
@@ -361,7 +309,7 @@ export default function WavesPage() {
         </button>
       </div>
 
-      {/* ── Strategy banner (shown when navigated from Strategies page) ── */}
+      {/* ── Strategy banner ── */}
       {strategyHighlight && (
         <div ref={highlightRef} className="flex items-start gap-3 px-4 py-3 rounded-xl text-sm"
           style={{ background: "rgba(65,175,235,0.08)", border: "1px solid rgba(65,175,235,0.3)" }}>
@@ -384,9 +332,9 @@ export default function WavesPage() {
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total Waves",  value: String(waves.length),     color: "#41afeb" },
-          { label: "Closed/Done",  value: String(completedCount),   color: "#16a34a" },
-          { label: "Active Wave",  value: activeWave?.name ?? "—",  color: "#7c3aed", small: true },
+          { label: "Total Waves",  value: String(waves.length),    color: "#41afeb" },
+          { label: "Closed/Done",  value: String(completedCount),  color: "#16a34a" },
+          { label: "Active Wave",  value: activeWave?.name ?? "—", color: "#7c3aed", small: true },
           { label: "Total Sold",   value: `${totalSold.toLocaleString()} / ${totalNfts.toLocaleString()}`, color: "#24315f", small: true },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-xl p-4 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
@@ -413,7 +361,7 @@ export default function WavesPage() {
             <table className="w-full text-sm min-w-max">
               <thead>
                 <tr>
-                  {["Wave", "Qty", "Price (ETH)", "Sold", "Sale Method", "Schedule", "Status", "Revealed", "Actions"].map(h => (
+                  {["Wave", "Qty", "Price (ETH)", "Sold", "Sale Method", "Schedule", "Reveal Date", "Status", "Revealed", "Actions"].map(h => (
                     <th key={h} style={{ ...thStyle, textAlign: ["Qty", "Sold", "Revealed"].includes(h) ? "center" : "left" }}>{h}</th>
                   ))}
                 </tr>
@@ -445,17 +393,20 @@ export default function WavesPage() {
                       </td>
 
                       <td style={{ padding: "10px 14px" }}>
-                        <div className="flex items-center gap-1">
+                        <div className="flex flex-col gap-0.5">
                           {w.defaultPriceEth != null ? (
                             <span className="font-bold text-xs" style={{ color: "#24315f" }}>{w.defaultPriceEth} ETH</span>
                           ) : (
                             <span className="text-xs font-semibold" style={{ color: "#16a34a" }}>Free</span>
                           )}
                           {isLocked && (
-                            <span className="px-1.5 py-0.5 rounded text-xs font-bold"
+                            <span className="px-1.5 py-0.5 rounded text-xs font-bold w-fit"
                               style={{ background: "rgba(220,38,38,0.1)", color: "#dc2626" }}>
                               Locked
                             </span>
+                          )}
+                          {w.tierPrices && Object.keys(w.tierPrices).length > 0 && (
+                            <span className="text-xs" style={{ color: "#7c3aed" }}>Tier-priced</span>
                           )}
                         </div>
                       </td>
@@ -490,6 +441,16 @@ export default function WavesPage() {
                         )}
                       </td>
 
+                      <td style={{ padding: "10px 14px", minWidth: 110 }}>
+                        {w.revealScheduledAt ? (
+                          <span className="text-xs font-semibold" style={{ color: "#7c3aed" }}>
+                            {new Date(w.revealScheduledAt).toLocaleDateString()}
+                          </span>
+                        ) : (
+                          <span className="text-xs" style={{ color: "#d1d5db" }}>Not set</span>
+                        )}
+                      </td>
+
                       <td style={{ padding: "10px 14px" }}>
                         <div className="space-y-1">
                           <StatusBadge status={w.status} colorMap={WAVE_COLORS} dot />
@@ -514,7 +475,7 @@ export default function WavesPage() {
                           <button onClick={() => openEdit(w)}
                             className="px-2.5 py-1.5 rounded-lg text-xs font-semibold"
                             style={{ border: "1px solid #e5e7eb", color: "#6b7280", background: "white" }}>
-                            Edit DB
+                            Edit
                           </button>
                           <button onClick={() => openChainModal(w)}
                             className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white"
@@ -540,23 +501,21 @@ export default function WavesPage() {
           <span>Totals across all 7 waves</span>
           <div className="flex items-center gap-6">
             <span>Qty: <strong>{totalNfts.toLocaleString()} / 9,999</strong></span>
-            <span>Sold: <strong style={{ color: "#41afeb" }}>{totalSold.toLocaleString()}</strong></span>
-            <span>NFTs in DB: <strong style={{ color: "#7c3aed" }}>{waves.reduce((s, w) => s + Number(w.nftCount ?? 0), 0).toLocaleString()}</strong></span>
           </div>
         </div>
       )}
 
-      {/* ══ Edit DB Modal ══════════════════════════════════════════════════════════ */}
+      {/* ══ Edit Modal ══════════════════════════════════════════════════════════ */}
       {editWave && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
           <div className="bg-white rounded-2xl shadow-xl flex flex-col"
-            style={{ width: "100%", maxWidth: 520, maxHeight: "90vh", border: "1px solid #e5e7eb" }}>
+            style={{ width: "100%", maxWidth: 540, maxHeight: "90vh", border: "1px solid #e5e7eb" }}>
             <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
               <div>
                 <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>
                   Edit Wave {editWave.waveNumber} — {editWave.name}
                 </h2>
-                <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>DB settings (display + scheduling)</p>
+                <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>DB settings — schedule, pricing, and reveal date</p>
               </div>
               <button onClick={() => setEditWave(null)} style={{ color: "#9bafc5" }}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -570,6 +529,25 @@ export default function WavesPage() {
                   {saveError}
                 </div>
               )}
+
+              {/* Wave Quantity — read-only */}
+              <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                <svg className="w-4 h-4 flex-shrink-0" style={{ color: "#9bafc5" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <div>
+                  <p className="text-xs font-bold" style={{ color: "#374151" }}>
+                    Wave Quantity: {(editWave.quantity ?? 0).toLocaleString()} NFTs
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
+                    Fixed at launch — predefined by the Fibonacci allocation plan
+                  </p>
+                </div>
+              </div>
+
+              {/* Price + Sale Method */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label style={labelStyle}>Default Price (ETH)</label>
@@ -583,12 +561,14 @@ export default function WavesPage() {
                   <select value={form.saleMethod}
                     onChange={e => setForm({ ...form, saleMethod: e.target.value })}
                     style={inputStyle}>
-                    {saleMethods.filter(s => s.is_active).map(s => (
+                    {saleMethods.filter(s => s.is_active && s.code !== "dutch_auction").map(s => (
                       <option key={s.code} value={s.code}>{s.label}</option>
                     ))}
                   </select>
                 </div>
               </div>
+
+              {/* Status */}
               <div>
                 <label style={labelStyle}>Status</label>
                 <div className="flex gap-2 flex-wrap">
@@ -605,157 +585,98 @@ export default function WavesPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Schedule */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label style={{ ...labelStyle, marginBottom: 0 }}>Schedule (DB display)</label>
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>Wave Schedule</label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={form.clearSchedule}
-                      onChange={e => setForm({ ...form, clearSchedule: e.target.checked, scheduledStart: "", scheduledEnd: "" })} />
-                    <span className="text-xs" style={{ color: "#9bafc5" }}>Clear</span>
+                      onChange={e => setForm({ ...form, clearSchedule: e.target.checked, scheduledStart: "", scheduledEnd: "", revealScheduledAt: "" })} />
+                    <span className="text-xs" style={{ color: "#9bafc5" }}>Clear all dates</span>
                   </label>
                 </div>
                 {!form.clearSchedule && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label style={labelStyle}>Start</label>
+                      <label style={labelStyle}>Start Date</label>
                       <input type="datetime-local" value={form.scheduledStart}
                         onChange={e => setForm({ ...form, scheduledStart: e.target.value })} style={inputStyle} />
                     </div>
                     <div>
-                      <label style={labelStyle}>End</label>
+                      <label style={labelStyle}>End Date</label>
                       <input type="datetime-local" value={form.scheduledEnd}
                         onChange={e => setForm({ ...form, scheduledEnd: e.target.value })} style={inputStyle} />
                     </div>
                   </div>
                 )}
               </div>
+
+              {/* Reveal Date */}
+              {!form.clearSchedule && (
+                <div className="p-3 rounded-xl" style={{ background: "rgba(124,58,237,0.04)", border: "1px solid rgba(124,58,237,0.2)" }}>
+                  <label style={{ ...labelStyle, color: "#7c3aed" }}>Reveal Date (auto-reveal on this date)</label>
+                  <input type="datetime-local" value={form.revealScheduledAt}
+                    onChange={e => setForm({ ...form, revealScheduledAt: e.target.value })} style={inputStyle} />
+                  <p className="text-xs mt-1.5" style={{ color: "#9bafc5" }}>
+                    System auto-reveals on this date. NFTs are randomly assigned to buyers at reveal time.
+                  </p>
+                </div>
+              )}
+
+              {/* Notes */}
               <div>
                 <label style={labelStyle}>Notes</label>
                 <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
                   style={{ ...inputStyle, minHeight: 56, resize: "vertical" }} />
               </div>
 
-              {/* ── Strategy Config ── */}
+              {/* Optional Tier Prices */}
               <div className="pt-2" style={{ borderTop: "1px solid #e5e7eb" }}>
-                <p className="text-xs font-bold mb-3" style={{ color: "#9bafc5", textTransform: "uppercase", letterSpacing: "0.06em" }}>Strategy Config</p>
-
-                {stratOk  && <OkBanner  msg={stratOk}  onDismiss={() => setStratOk(null)}  />}
-                {stratErr && <ErrBanner msg={stratErr} onDismiss={() => setStratErr(null)} />}
-
-                {/* Flash Sale */}
-                <div className="p-3 rounded-xl mb-3" style={{ background: "#fafafa", border: "1px solid #e5e7eb" }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold" style={{ color: "#24315f" }}>Flash Sale</span>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={flashEnabled} onChange={e => setFlashEnabled(e.target.checked)} className="w-4 h-4" />
-                      <span className="text-xs text-gray-500">Enable</span>
-                    </label>
-                  </div>
-                  {flashEnabled && (
-                    <div className="flex items-end gap-2">
-                      <div style={{ flex: 1 }}>
-                        <label style={labelStyle}>Discount %</label>
-                        <input type="number" step="0.1" min={0} max={100} value={flashDiscount} onChange={e => setFlashDiscount(e.target.value)} style={inputStyle} placeholder="e.g. 20" />
-                      </div>
-                      <button onClick={() => saveStratSection("flash-sale", { is_flash_sale: flashEnabled, flash_discount_pct: parseFloat(flashDiscount) }, editWave!.waveNumber)}
-                        disabled={stratSaving === "flash-sale"}
-                        className="px-3 py-2 rounded-lg text-xs font-semibold text-white"
-                        style={{ background: "#d97706", opacity: stratSaving === "flash-sale" ? 0.6 : 1, whiteSpace: "nowrap" }}>
-                        {stratSaving === "flash-sale" ? "Saving…" : "Save"}
-                      </button>
-                    </div>
-                  )}
-                  {!flashEnabled && (
-                    <button onClick={() => saveStratSection("flash-sale", { is_flash_sale: false, flash_discount_pct: 0 }, editWave!.waveNumber)}
-                      disabled={!!stratSaving}
-                      className="text-xs px-2 py-1 rounded-lg font-medium"
-                      style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626" }}>
-                      Disable Flash Sale
-                    </button>
-                  )}
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-bold" style={{ color: "#9bafc5", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    Tier Prices (Optional)
+                  </p>
                 </div>
+                <p className="text-xs mb-3" style={{ color: "#9bafc5" }}>
+                  Set per-rarity prices to override the default wave price. Leave blank to use the default price for all tiers.
+                </p>
 
-                {/* Tier Prices */}
-                <div className="p-3 rounded-xl mb-3" style={{ background: "#fafafa", border: "1px solid #e5e7eb" }}>
-                  <p className="text-xs font-semibold mb-2" style={{ color: "#24315f" }}>Tier Prices (ETH)</p>
+                {tierOk  && <OkBanner  msg={tierOk}  onDismiss={() => setTierOk(null)}  />}
+                {tierErr && <ErrBanner msg={tierErr} onDismiss={() => setTierErr(null)} />}
+
+                <div className="p-3 rounded-xl" style={{ background: "#fafafa", border: "1px solid #e5e7eb" }}>
                   <div className="grid grid-cols-2 gap-2">
-                    {[["Legendary", tierLegendary, setTierLegendary], ["Epic", tierEpic, setTierEpic], ["Rare", tierRare, setTierRare], ["Common", tierCommon, setTierCommon]].map(([label, val, setter]) => (
-                      <div key={label as string}>
-                        <label style={{ ...labelStyle, marginBottom: 2 }}>{label as string}</label>
-                        <input type="number" step="0.001" value={val as string} onChange={e => (setter as (v: string) => void)(e.target.value)} style={{ ...inputStyle, padding: "6px 10px" }} placeholder="0.00" />
+                    {([
+                      ["Legendary", tierLegendary, setTierLegendary],
+                      ["Epic",      tierEpic,      setTierEpic],
+                      ["Rare",      tierRare,      setTierRare],
+                      ["Common",    tierCommon,    setTierCommon],
+                    ] as [string, string, (v: string) => void][]).map(([label, val, setter]) => (
+                      <div key={label}>
+                        <label style={{ ...labelStyle, marginBottom: 2 }}>{label} (ETH)</label>
+                        <input type="number" step="0.001" min="0"
+                          value={val} onChange={e => setter(e.target.value)}
+                          style={{ ...inputStyle, padding: "6px 10px" }} placeholder="leave blank = default" />
                       </div>
                     ))}
                   </div>
-                  <button onClick={() => saveStratSection("tier-prices", { tier_prices: { legendary: tierLegendary ? parseFloat(tierLegendary) : undefined, epic: tierEpic ? parseFloat(tierEpic) : undefined, rare: tierRare ? parseFloat(tierRare) : undefined, common: tierCommon ? parseFloat(tierCommon) : undefined } }, editWave!.waveNumber)}
-                    disabled={stratSaving === "tier-prices"}
-                    className="mt-2 w-full py-1.5 rounded-lg text-xs font-semibold text-white"
-                    style={{ background: "#41afeb", opacity: stratSaving === "tier-prices" ? 0.6 : 1 }}>
-                    {stratSaving === "tier-prices" ? "Saving…" : "Save Tier Prices"}
-                  </button>
-                </div>
-
-                {/* Artist Edition */}
-                <div className="p-3 rounded-xl mb-3" style={{ background: "#fafafa", border: "1px solid #e5e7eb" }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold" style={{ color: "#24315f" }}>Artist Edition</span>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={artistEnabled} onChange={e => setArtistEnabled(e.target.checked)} className="w-4 h-4" />
-                      <span className="text-xs text-gray-500">Enable</span>
-                    </label>
-                  </div>
-                  {artistEnabled && (
-                    <div className="space-y-2">
-                      <div>
-                        <label style={labelStyle}>Artist Name</label>
-                        <input type="text" value={artistName} onChange={e => setArtistName(e.target.value)} style={inputStyle} placeholder="Artist / Creator Name" />
-                      </div>
-                      <div>
-                        <label style={labelStyle}>Artist Wallet</label>
-                        <input type="text" value={artistWallet} onChange={e => setArtistWallet(e.target.value)} style={inputStyle} placeholder="0x..." />
-                      </div>
-                      <div>
-                        <label style={labelStyle}>Royalty BPS (0–1000 = 0–10%)</label>
-                        <input type="number" min={0} max={1000} value={artistRoyaltyBps} onChange={e => setArtistRoyaltyBps(e.target.value)} style={inputStyle} placeholder="e.g. 250 = 2.5%" />
-                      </div>
-                      <button onClick={() => saveStratSection("artist-config", { artist_name: artistName, artist_wallet: artistWallet, artist_royalty_bps: parseInt(artistRoyaltyBps), is_artist_edition: true }, editWave!.waveNumber)}
-                        disabled={stratSaving === "artist-config"}
-                        className="w-full py-1.5 rounded-lg text-xs font-semibold text-white"
-                        style={{ background: "#7c3aed", opacity: stratSaving === "artist-config" ? 0.6 : 1 }}>
-                        {stratSaving === "artist-config" ? "Saving…" : "Save Artist Config"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Holder Priority Window */}
-                <div className="p-3 rounded-xl" style={{ background: "#fafafa", border: "1px solid #e5e7eb" }}>
-                  <p className="text-xs font-semibold mb-2" style={{ color: "#24315f" }}>Holder Priority Window</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label style={labelStyle}>Priority Start</label>
-                      <input type="datetime-local" value={holderPriorityStart} onChange={e => setHolderPriorityStart(e.target.value)} style={{ ...inputStyle, fontSize: "12px" }} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Priority End</label>
-                      <input type="datetime-local" value={holderPriorityEnd} onChange={e => setHolderPriorityEnd(e.target.value)} style={{ ...inputStyle, fontSize: "12px" }} />
-                    </div>
-                  </div>
-                  <button onClick={() => saveStratSection("holder-priority", { start: holderPriorityStart ? new Date(holderPriorityStart).toISOString() : undefined, end: holderPriorityEnd ? new Date(holderPriorityEnd).toISOString() : undefined }, editWave!.waveNumber)}
-                    disabled={stratSaving === "holder-priority"}
-                    className="mt-2 w-full py-1.5 rounded-lg text-xs font-semibold text-white"
-                    style={{ background: "#41afeb", opacity: stratSaving === "holder-priority" ? 0.6 : 1 }}>
-                    {stratSaving === "holder-priority" ? "Saving…" : "Save Priority Window"}
+                  <button onClick={saveTierPrices} disabled={tierSaving}
+                    className="mt-3 w-full py-1.5 rounded-lg text-xs font-semibold text-white"
+                    style={{ background: tierSaving ? "#9bafc5" : "#41afeb" }}>
+                    {tierSaving ? "Saving…" : "Save Tier Prices"}
                   </button>
                 </div>
               </div>
             </div>
+
             <div className="flex justify-end gap-3 px-6 py-4 flex-shrink-0" style={{ borderTop: "1px solid #e5e7eb" }}>
               <button onClick={() => setEditWave(null)} className="px-4 py-2 text-sm font-medium rounded-lg"
                 style={{ border: "1px solid #e5e7eb", color: "#6b7280" }}>Cancel</button>
               <button onClick={handleSave} disabled={saving}
                 className="px-4 py-2 text-sm font-bold text-white rounded-lg"
                 style={{ background: saving ? "#9bafc5" : "#41afeb" }}>
-                {saving ? "Saving…" : "Save DB"}
+                {saving ? "Saving…" : "Save Wave"}
               </button>
             </div>
           </div>
@@ -766,9 +687,8 @@ export default function WavesPage() {
       {chainWave && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
           <div className="bg-white rounded-2xl shadow-xl flex flex-col"
-            style={{ width: "100%", maxWidth: 600, maxHeight: "92vh", border: "1px solid #e5e7eb" }}>
+            style={{ width: "100%", maxWidth: 580, maxHeight: "92vh", border: "1px solid #e5e7eb" }}>
 
-            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 flex-shrink-0"
               style={{ borderBottom: "1px solid #e5e7eb", background: "rgba(65,175,235,0.04)" }}>
               <div>
@@ -788,7 +708,6 @@ export default function WavesPage() {
             </div>
 
             <div className="px-6 py-4 overflow-y-auto flex-1 space-y-5">
-
               {chainLoading && (
                 <div className="flex items-center gap-2 text-xs" style={{ color: "#9bafc5" }}>
                   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -799,13 +718,12 @@ export default function WavesPage() {
                 </div>
               )}
 
-              {/* On-chain status */}
               {chainOnChain && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   {[
-                    { label: "Sold",     value: `${chainOnChain.soldCount} / ${chainOnChain.qty}` },
-                    { label: "Price",    value: `${chainOnChain.price} ETH` },
-                    { label: "Closed",   value: chainOnChain.closed ? "Yes" : "No" },
+                    { label: "Sold",   value: `${chainOnChain.soldCount} / ${chainOnChain.qty}` },
+                    { label: "Price",  value: `${chainOnChain.price} ETH` },
+                    { label: "Closed", value: chainOnChain.closed ? "Yes" : "No" },
                   ].map(s => (
                     <div key={s.label} className="p-3 rounded-xl text-center" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
                       <p className="text-xs" style={{ color: "#9bafc5" }}>{s.label}</p>
@@ -820,7 +738,8 @@ export default function WavesPage() {
 
               {/* 1 — Set Schedule */}
               <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                <p className="text-xs font-bold" style={{ color: "#24315f" }}>1. Set Wave Schedule On-Chain</p>
+                <p className="text-xs font-bold" style={{ color: "#24315f" }}>1. Push Wave Schedule On-Chain</p>
+                <p className="text-xs" style={{ color: "#9bafc5" }}>Manually push wave start/end to the contract. The system auto-does this when the scheduled date arrives.</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label style={labelStyle}>Start Time</label>
@@ -838,7 +757,7 @@ export default function WavesPage() {
                 </button>
               </div>
 
-              {/* 2 — Set Price (only if not locked and Wave > 1) */}
+              {/* 2 — Set Price */}
               {!chainWave.priceLocked && chainWave.waveNumber > 1 && (
                 <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
                   <p className="text-xs font-bold" style={{ color: "#24315f" }}>2. Update Wave Price On-Chain</p>
@@ -863,10 +782,10 @@ export default function WavesPage() {
                 </div>
               )}
 
-              {/* 3 — Auction (Waves 3–7 only) */}
+              {/* 3 — Auction Listing (Waves 3–7) */}
               {chainWave.waveNumber >= 3 && !chainOnChain?.closed && (
                 <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                  <p className="text-xs font-bold" style={{ color: "#24315f" }}>3. Record OpenSea Auction Listing (off-chain)</p>
+                  <p className="text-xs font-bold" style={{ color: "#24315f" }}>3. Record OpenSea Auction Listing</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label style={labelStyle}>OpenSea Listing ID</label>
@@ -887,12 +806,12 @@ export default function WavesPage() {
                 </div>
               )}
 
-              {/* 4 — Mint & Transfer (Waves 3–7 after auction) */}
+              {/* 4 — Mint & Transfer (Waves 3–7) */}
               {chainWave.waveNumber >= 3 && !chainOnChain?.closed && (
                 <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
                   <p className="text-xs font-bold" style={{ color: "#24315f" }}>4. Mint & Transfer to Auction Winner</p>
                   <p className="text-xs" style={{ color: "#9bafc5" }}>After OpenSea auction settles — mints the NFT directly to the winner.</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <div className="col-span-2">
                       <label style={labelStyle}>Winner Address</label>
                       <input type="text" value={auctionTo} onChange={e => setAuctionTo(e.target.value)}
@@ -912,78 +831,18 @@ export default function WavesPage() {
                 </div>
               )}
 
-              {/* 5 — Dutch Auction Config (only when not free_mint and not already dutch_auction) */}
-              {chainWave.saleMethod !== "free_mint" && chainWave.saleMethod !== "dutch_auction" && !chainOnChain?.closed && (
-                <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                  <p className="text-xs font-bold" style={{ color: "#24315f" }}>5. Configure Dutch Auction</p>
-                  <p className="text-xs" style={{ color: "#9bafc5" }}>
-                    Price automatically decrements each interval until floor is reached or NFT is purchased.
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label style={labelStyle}>Start Price (ETH)</label>
-                      <input type="number" step="0.0001" min="0" value={dutchStartPrice}
-                        onChange={e => setDutchStartPrice(e.target.value)} style={inputStyle} placeholder="0.1" />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Floor Price (ETH)</label>
-                      <input type="number" step="0.0001" min="0" value={dutchFloorPrice}
-                        onChange={e => setDutchFloorPrice(e.target.value)} style={inputStyle} placeholder="0.01" />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Decrement per Interval (ETH)</label>
-                      <input type="number" step="0.0001" min="0" value={dutchDecrement}
-                        onChange={e => setDutchDecrement(e.target.value)} style={inputStyle} placeholder="0.005" />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Interval (seconds)</label>
-                      <input type="number" step="1" min="1" value={dutchInterval}
-                        onChange={e => setDutchInterval(e.target.value)} style={inputStyle} placeholder="300" />
-                    </div>
-                  </div>
-                  <button onClick={handleSetDutchAuction} disabled={chainSaving === "dutch"}
-                    className="px-4 py-2 text-xs font-bold text-white rounded-lg"
-                    style={{ background: chainSaving === "dutch" ? "#9bafc5" : "#d97706" }}>
-                    {chainSaving === "dutch" ? "Submitting…" : "Set Dutch Auction"}
-                  </button>
-                </div>
-              )}
-
-              {/* Dutch Auction — read-only view when already configured */}
-              {chainWave.saleMethod === "dutch_auction" && (
-                <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid rgba(217,119,6,0.3)" }}>
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold" style={{ color: "#d97706" }}>5. Dutch Auction — Active</p>
-                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold"
-                      style={{ background: "rgba(217,119,6,0.1)", color: "#d97706" }}>
-                      Dutch Auction
-                    </span>
-                  </div>
-                  {dutchCurrentPrice != null ? (
-                    <div className="p-3 rounded-xl text-center" style={{ background: "white", border: "1px solid #e5e7eb" }}>
-                      <p className="text-xs" style={{ color: "#9bafc5" }}>Current Price</p>
-                      <p className="font-bold text-lg mt-0.5" style={{ color: "#d97706" }}>{dutchCurrentPrice} ETH</p>
-                    </div>
-                  ) : (
-                    <p className="text-xs" style={{ color: "#9bafc5" }}>Current price unavailable.</p>
-                  )}
-                </div>
-              )}
-
-              {/* 6 — Close Wave */}
+              {/* 5 — Close Wave */}
               {!chainOnChain?.closed && (
                 <div className="space-y-3 p-4 rounded-xl" style={{ background: "rgba(220,38,38,0.03)", border: "1px solid #fecaca" }}>
-                  <p className="text-xs font-bold" style={{ color: "#dc2626" }}>6. Close Wave (irreversible)</p>
+                  <p className="text-xs font-bold" style={{ color: "#dc2626" }}>5. Close Wave (irreversible)</p>
                   <p className="text-xs" style={{ color: "#9bafc5" }}>
-                    Only available after wave end time. Choose what happens to unsold NFTs:
+                    Only after wave end time. Mints unsold NFTs to treasury wallet.
                   </p>
-                  <div className="flex gap-3">
-                    <button onClick={handleCloseTreasury} disabled={!!chainSaving}
-                      className="flex-1 py-2.5 text-xs font-bold rounded-xl"
-                      style={{ background: "rgba(22,163,74,0.08)", color: "#16a34a", border: "1px solid rgba(22,163,74,0.3)" }}>
-                      {chainSaving === "treasury" ? "Minting…" : "Mint Unsold → Any Wallet"}
-                    </button>
-                  </div>
+                  <button onClick={handleCloseTreasury} disabled={!!chainSaving}
+                    className="px-4 py-2 text-xs font-bold rounded-xl"
+                    style={{ background: "rgba(22,163,74,0.08)", color: "#16a34a", border: "1px solid rgba(22,163,74,0.3)" }}>
+                    {chainSaving === "treasury" ? "Minting…" : "Mint Unsold → Treasury"}
+                  </button>
                 </div>
               )}
 
@@ -994,83 +853,26 @@ export default function WavesPage() {
                 </div>
               )}
 
-              {/* 7 — Reveal Wave */}
-              {chainWave.waveClosed && !chainWave.waveRevealed ? (
-                <div className="space-y-3 p-4 rounded-xl" style={{ background: "rgba(124,58,237,0.03)", border: "1px solid rgba(124,58,237,0.25)" }}>
-                  <p className="text-xs font-bold" style={{ color: "#7c3aed" }}>7. Reveal This Wave</p>
-                  <p className="text-xs" style={{ color: "#9bafc5" }}>
-                    Wave is closed. Upload metadata to IPFS first, then set the reveal URI to expose real NFT images.
-                  </p>
-                  <div>
-                    <label style={labelStyle}>Reveal URI (IPFS)</label>
-                    <input type="text" value={revealWaveUri} onChange={e => setRevealWaveUri(e.target.value)}
-                      style={inputStyle} placeholder="ipfs://Qm..." />
-                  </div>
-                  <button onClick={handleRevealWave} disabled={chainSaving === "reveal-wave" || !revealWaveUri}
-                    className="px-4 py-2 text-xs font-bold text-white rounded-lg"
-                    style={{ background: chainSaving === "reveal-wave" || !revealWaveUri ? "#9bafc5" : "#7c3aed" }}>
-                    {chainSaving === "reveal-wave" ? "Submitting tx…" : "Reveal This Wave"}
-                  </button>
-                </div>
-              ) : chainWave.waveRevealed ? (
+              {/* Reveal status */}
+              {chainWave.waveRevealed ? (
                 <div className="px-4 py-3 rounded-xl text-xs flex items-center gap-2"
                   style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.3)", color: "#16a34a" }}>
                   <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  Revealed ✓
+                  This wave has been revealed ✓
                 </div>
-              ) : null}
-
-              {/* 8 — Holder Priority Merkle */}
-              <div className="space-y-3 p-4 rounded-xl" style={{ background: "rgba(65,175,235,0.03)", border: "1px solid rgba(65,175,235,0.2)" }}>
-                <p className="text-xs font-bold" style={{ color: "#41afeb" }}>8. Holder Priority / Merkle Root</p>
-                <p className="text-xs" style={{ color: "#9bafc5" }}>
-                  Snapshot current NFT holders, build a wave-scoped Merkle tree, and set on-chain for holder-priority / collab allowlists.
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    disabled={snapshotLoading}
-                    onClick={async () => {
-                      setSnapshotLoading(true); setChainError(null);
-                      try {
-                        const r = await fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/holder-snapshot`, { credentials: "include" });
-                        const d = await r.json();
-                        setSnapshotWallets(d.holders ?? []);
-                      } catch { setChainError("Snapshot failed"); }
-                      finally { setSnapshotLoading(false); }
-                    }}
-                    className="flex-1 py-2 text-xs font-bold rounded-xl"
-                    style={{ background: "rgba(65,175,235,0.1)", color: "#41afeb", border: "1px solid rgba(65,175,235,0.3)" }}>
-                    {snapshotLoading ? "Snapshotting…" : `Run Snapshot${snapshotWallets.length ? ` (${snapshotWallets.length} holders)` : ""}`}
-                  </button>
-                  <button
-                    disabled={!!chainSaving || snapshotWallets.length === 0}
-                    onClick={async () => {
-                      setChainSaving("holder-merkle"); setChainError(null); setChainTx(null);
-                      try {
-                        const r = await fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/holder-merkle`, {
-                          method: "POST", credentials: "include",
-                          headers: { "Content-Type": "application/json" }, body: JSON.stringify({}),
-                        });
-                        const d = await r.json();
-                        if (!r.ok) { setChainError(d.error ?? "Merkle generation failed"); return; }
-                        if (d.txHash) setChainTx(d.txHash);
-                      } catch { setChainError("Network error"); }
-                      finally { setChainSaving(null); }
-                    }}
-                    className="flex-1 py-2 text-xs font-bold text-white rounded-xl"
-                    style={{ background: snapshotWallets.length === 0 ? "#9bafc5" : "#41afeb", opacity: chainSaving === "holder-merkle" ? 0.6 : 1 }}>
-                    {chainSaving === "holder-merkle" ? "Setting on-chain…" : "Generate & Set Merkle Root"}
-                  </button>
+              ) : (
+                <div className="px-4 py-3 rounded-xl text-xs flex items-center gap-2"
+                  style={{ background: "rgba(124,58,237,0.05)", border: "1px solid rgba(124,58,237,0.2)", color: "#7c3aed" }}>
+                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {chainWave.revealScheduledAt
+                    ? `Reveal scheduled for ${new Date(chainWave.revealScheduledAt).toLocaleString()} — system will auto-reveal`
+                    : "No reveal date set — set it in Edit Wave to enable auto-reveal"}
                 </div>
-                {snapshotWallets.length > 0 && (
-                  <p className="text-xs" style={{ color: "#9bafc5" }}>
-                    {snapshotWallets.length} holder address(es) will be included in the Merkle tree.
-                  </p>
-                )}
-              </div>
-
+              )}
             </div>
 
             <div className="px-6 py-4 flex-shrink-0" style={{ borderTop: "1px solid #e5e7eb" }}>

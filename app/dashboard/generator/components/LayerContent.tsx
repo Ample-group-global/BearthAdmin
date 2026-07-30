@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import AssetGrid    from './AssetGrid';
 import SummaryPanel from './SummaryPanel';
+import { useLayerFiles } from '../LayerFilesContext';
 
 function TraitNameEditor({ asset, folder, onRenamed }) {
   const [editing, setEditing] = useState(false);
@@ -56,6 +57,7 @@ export default function LayerContent({ layer, layerWeights, allWeights, supply, 
   const [dragOver,  setDragOver]  = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
+  const { getBlobUrl } = useLayerFiles();
 
   async function uploadFiles(files) {
     const imgs = files.filter(f => f.type.startsWith('image/'));
@@ -153,7 +155,7 @@ export default function LayerContent({ layer, layerWeights, allWeights, supply, 
                   <div className="lc-file-thumb">
                     {asset.rel ? (
                       <img
-                        src={`/api/thumb/${asset.rel}`}
+                        src={getBlobUrl(asset.rel) ?? `/api/thumb/${asset.rel}`}
                         alt={asset.name}
                         loading="lazy"
                         onError={e => {
