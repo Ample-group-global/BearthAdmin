@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionToken } from "@/lib/api-proxy";
 
-const API_BASE   = process.env.BEARTH_API_URL!;
-const ADMIN_KEY  = process.env.ADMIN_SECRET ?? "";
+export const dynamic = "force-dynamic";
+
+const API_BASE = process.env.BEARTH_API_URL!;
 
 async function handler(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
-  // Must be authenticated in BearthAdmin
   const token = getSessionToken(req);
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -17,7 +17,7 @@ async function handler(
   const url = new URL(apiPath, API_BASE);
   req.nextUrl.searchParams.forEach((v, k) => url.searchParams.set(k, v));
 
-  const headers: Record<string, string> = { "x-admin-key": ADMIN_KEY };
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
 
   let body: string | undefined;
   if (req.method !== "GET" && req.method !== "DELETE") {
