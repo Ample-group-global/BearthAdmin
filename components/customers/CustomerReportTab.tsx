@@ -20,7 +20,7 @@ interface CustomerRow {
 
 const PAGE_SIZE = 20;
 
-export default function CustomerReport() {
+export default function CustomerReportTab() {
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [total,     setTotal]     = useState(0);
   const [offset,    setOffset]    = useState(0);
@@ -43,7 +43,7 @@ export default function CustomerReport() {
       .catch(() => { setError("Failed to load report."); setLoading(false); });
   }, []);
 
-  useEffect(() => { load(0, ""); }, []);
+  useEffect(() => { load(0, ""); }, [load]);
 
   const handleSearch = (v: string) => {
     setSearch(v);
@@ -62,54 +62,35 @@ export default function CustomerReport() {
 
   const columns: ColumnDef<CustomerRow>[] = [
     {
-      key: "code",
-      header: "Code",
-      sortKey: "user_code",
+      key: "code", header: "Code", sortKey: "user_code",
       render: r => <span className="font-mono text-xs font-semibold" style={{ color: "#24315f" }}>{r.userCode ?? "—"}</span>,
     },
     {
-      key: "name",
-      header: "Name",
-      sortKey: "name",
+      key: "name", header: "Name", sortKey: "name",
       render: r => <span className="font-medium" style={{ color: "#374151" }}>{r.firstName} {r.lastName}</span>,
     },
     {
-      key: "email",
-      header: "Email",
-      sortKey: "email",
+      key: "email", header: "Email", sortKey: "email",
       render: r => <span className="text-xs" style={{ color: "#6b7280" }}>{r.email}</span>,
     },
     {
-      key: "phone",
-      header: "Phone",
+      key: "phone", header: "Phone",
       render: r => <span className="text-xs" style={{ color: "#6b7280" }}>{r.phone ?? "—"}</span>,
     },
     {
-      key: "orders",
-      header: "Total Orders",
-      sortKey: "orders",
-      align: "center",
+      key: "orders", header: "Total Orders", sortKey: "orders", align: "center",
       render: r => <span className="font-bold" style={{ color: Number(r.orderCount) > 0 ? "#24315f" : "#9bafc5" }}>{Number(r.orderCount)}</span>,
     },
     {
-      key: "nfts",
-      header: "NFT Items",
-      sortKey: "nfts",
-      align: "center",
+      key: "nfts", header: "NFT Items", sortKey: "nfts", align: "center",
       render: r => <span className="font-bold" style={{ color: Number(r.nftCount) > 0 ? "#24315f" : "#9bafc5" }}>{Number(r.nftCount)}</span>,
     },
     {
-      key: "products",
-      header: "Product Items",
-      sortKey: "products",
-      align: "center",
+      key: "products", header: "Product Items", sortKey: "products", align: "center",
       render: r => <span className="font-bold" style={{ color: Number(r.productCount) > 0 ? "#24315f" : "#9bafc5" }}>{Number(r.productCount)}</span>,
     },
     {
-      key: "status",
-      header: "Status",
-      sortKey: "is_active",
-      align: "center",
+      key: "status", header: "Status", sortKey: "is_active", align: "center",
       render: r => (
         <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${r.isActive ? "text-green-700" : "text-red-600"}`}
           style={{ background: r.isActive ? "rgba(22,163,74,0.08)" : "rgba(220,38,38,0.08)" }}>
@@ -118,27 +99,13 @@ export default function CustomerReport() {
       ),
     },
     {
-      key: "joined",
-      header: "Joined",
-      sortKey: "created_at",
+      key: "joined", header: "Joined", sortKey: "created_at",
       render: r => <span className="text-xs" style={{ color: "#6b7280" }}>{fmtDate(r.createdAt)}</span>,
     },
   ];
 
   return (
-    <div className="p-6 space-y-5 max-w-6xl">
-      <div>
-        <div className="flex items-center gap-1.5 text-xs mb-1">
-          <Link href="/orders" className="hover:underline" style={{ color: "#9bafc5" }}>Overview</Link>
-          <span style={{ color: "#d1d5db" }}>›</span>
-          <span style={{ color: "#9bafc5" }}>Customer Report</span>
-        </div>
-        <div className="flex items-end justify-between">
-          <h1 className="text-lg font-extrabold" style={{ color: "#24315f" }}>Customer Report</h1>
-          <span className="text-xs" style={{ color: "#9bafc5" }}>{total.toLocaleString()} customers</span>
-        </div>
-      </div>
-
+    <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: "Total Customers",  value: total,         color: "#24315f", sub: `${convRate}% conversion` },

@@ -8,6 +8,7 @@ import { labelStyle, inputStyle } from "@/components/nft/styles";
 import { PHASE_NAMES, PHASE_COLORS, ETH_ADDRESS_RE, MERKLE_ROOT_RE } from "@/lib/nft-constants";
 import RoyaltyTab from "@/components/nft/tabs/RoyaltyTab";
 import MembershipTab from "@/components/nft/tabs/MembershipTab";
+import AdvancedTab from "@/components/nft/tabs/AdvancedTab";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ interface AdminSale {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const TABS = ["Mint Operations", "Admin Sales", "Collection & Controls", "Royalty", "Membership"] as const;
+const TABS = ["Mint Operations", "Admin Sales", "Collection & Controls", "Royalty", "Membership", "Advanced"] as const;
 type Tab = typeof TABS[number];
 
 // ─── Page-specific sub-components ─────────────────────────────────────────────
@@ -1015,6 +1016,7 @@ export default function SellingPage() {
 
         {tab === "Royalty"    && <RoyaltyTab />}
         {tab === "Membership" && <MembershipTab />}
+        {tab === "Advanced"   && <AdvancedTab />}
 
       </div>
     </div>

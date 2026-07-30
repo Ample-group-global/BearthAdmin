@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import DataTable, { type ColumnDef } from "@/components/DataTable";
+import CustomerReportTab from "@/components/customers/CustomerReportTab";
 
 interface Customer {
   id: string;
@@ -46,6 +47,8 @@ function truncateAddress(addr: string) {
 }
 
 export default function CustomersPage() {
+  const [activeTab, setActiveTab] = useState<"customers" | "report">("customers");
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -374,20 +377,39 @@ export default function CustomersPage() {
           <h1 className="text-xl font-extrabold" style={{ color: "#24315f" }}>Bearth Customers</h1>
           <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>Manage and view all registered customers</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
-          style={{ background: "#41afeb" }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "#2e9fd8")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "#41afeb")}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Customer
-        </button>
+        {activeTab === "customers" && (
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
+            style={{ background: "#41afeb" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#2e9fd8")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "#41afeb")}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Customer
+          </button>
+        )}
       </div>
 
+      {/* Tab bar */}
+      <div className="flex border-b" style={{ borderColor: "#e5e7eb" }}>
+        {(["customers", "report"] as const).map((t) => (
+          <button key={t} onClick={() => setActiveTab(t)}
+            className="px-4 py-2.5 text-sm font-medium capitalize border-b-2 -mb-px transition-colors"
+            style={{
+              borderColor: activeTab === t ? "#41afeb" : "transparent",
+              color: activeTab === t ? "#41afeb" : "#9bafc5",
+            }}>
+            {t === "customers" ? "Customers" : "Report"}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "report" && <CustomerReportTab />}
+
+      {activeTab === "customers" && (<>
       {/* Search */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
@@ -433,6 +455,7 @@ export default function CustomersPage() {
         sortDir={sortDir}
         onSort={handleSort}
       />
+      </>)}
 
       {/* ── Wallet Modal ─────────────────────────────────────────────── */}
       {walletCustomer && (
