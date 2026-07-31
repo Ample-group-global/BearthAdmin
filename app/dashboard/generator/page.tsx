@@ -83,44 +83,42 @@ export default function Page() {
   }, [activeFolder]);
 
   useEffect(() => {
-    // Load layers, conflicts, and persisted weights in parallel
+    // Load conflicts, weights, and server-side session (collectionId) in parallel
     Promise.all([
       fetch('/api/conflicts').then(r => r.json()).catch(() => []),
       fetch('/api/weights').then(r => r.json()).catch(() => ({})),
-    ]).then(([conflictData, weightData]) => {
+      fetch('/api/session/collection').then(r => r.json()).catch(() => ({})),
+    ]).then(([conflictData, weightData, sessionData]) => {
       if (Array.isArray(conflictData)) setConflicts(conflictData);
       if (weightData && typeof weightData === 'object' && !Array.isArray(weightData)) {
         setWeights(prev => ({ ...prev, ...weightData }));
       }
-    });
-    // Restore collection from DB if previously created
-    const savedId = sessionStorage.getItem('nft_collection_id');
-    loadLayers(undefined, savedId || undefined);
 
-    if (savedId) {
-      setCollectionId(savedId);
-      const savedSupply = sessionStorage.getItem('nft_supply');
-      if (savedSupply) {
-        const s = parseInt(savedSupply, 10);
-        if (s > 0) setCollection(prev => ({ ...prev, supply: s }));
+      const savedId: string | null = sessionData?.collectionId ?? null;
+      loadLayers(undefined, savedId || undefined);
+
+      if (savedId) {
+        setCollectionId(savedId);
+        const s = sessionData?.supply;
+        if (s && s > 0) setCollection(prev => ({ ...prev, supply: s }));
+        fetch(`/api/nft-gen/collections/${savedId}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            const c = data?.collection ?? data;
+            if (!c?.id) return;
+            setCollection(prev => ({
+              ...prev,
+              name:        c.name        ?? prev.name,
+              description: c.description ?? prev.description,
+              symbol:      c.symbol      ?? prev.symbol,
+              blockchain:  c.network === 'sol' ? 'solana' : 'ethereum',
+              width:       c.formatWidth  ?? prev.width,
+              height:      c.formatHeight ?? prev.height,
+            }));
+          })
+          .catch(() => {});
       }
-      fetch(`/api/nft-gen/collections/${savedId}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          const c = data?.collection ?? data;
-          if (!c?.id) return;
-          setCollection(prev => ({
-            ...prev,
-            name:        c.name        ?? prev.name,
-            description: c.description ?? prev.description,
-            symbol:      c.symbol      ?? prev.symbol,
-            blockchain:  c.network === 'sol' ? 'solana' : 'ethereum',
-            width:       c.formatWidth  ?? prev.width,
-            height:      c.formatHeight ?? prev.height,
-          }));
-        })
-        .catch(() => {});
-    }
+    });
   }, []);
 
   const handleWeightChange = useCallback((folder: string, stem: string, value: number) => {
@@ -179,9 +177,15 @@ export default function Page() {
         cid = data?.collection?.id ?? data?.id ?? null;
         if (cid) {
           setCollectionId(cid);
-          sessionStorage.setItem('nft_collection_id', cid);
-          sessionStorage.setItem('nft_collection_name', collection.name || 'Bearth NFT Collection');
-          sessionStorage.setItem('nft_supply', String(collection.supply ?? 100));
+          await fetch('/api/session/collection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              collectionId: cid,
+              name:   collection.name || 'Bearth NFT Collection',
+              supply: collection.supply ?? 100,
+            }),
+          }).catch(() => {});
         }
       } else {
         // Update existing — sync all editable fields back to DB
@@ -197,17 +201,25 @@ export default function Page() {
             formatHeight: collection.height ?? 2000,
           }),
         });
-        sessionStorage.setItem('nft_supply', String(collection.supply ?? 100));
+        await fetch('/api/session/collection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ collectionId: cid, supply: collection.supply ?? 100 }),
+        }).catch(() => {});
       }
 
       // Sync layers into DB. On Vercel, local disk is empty so we pass the
       // parsed layer manifest from React state as a fallback.
       if (cid) {
-        await fetch(`/api/nft-gen/collections/${cid}/sync-from-disk`, {
+        const syncResp = await fetch(`/api/nft-gen/collections/${cid}/sync-from-disk`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ layers }),
-        }).catch(() => {});
+        });
+        if (!syncResp.ok) {
+          const d = await syncResp.json().catch(() => ({}));
+          throw new Error(d.error ?? 'Layer sync failed — please check your connection and try again.');
+        }
         loadLayers(undefined, cid);
       }
 
@@ -222,8 +234,7 @@ export default function Page() {
   function resetCollection() {
     setCollection(DEFAULT_COLLECTION);
     setCollectionId(null);
-    sessionStorage.removeItem('nft_collection_id');
-    sessionStorage.removeItem('nft_collection_name');
+    fetch('/api/session/collection', { method: 'DELETE' }).catch(() => {});
   }
 
   const activeLayer = layers.find(l => l.folder === activeFolder) ?? null;

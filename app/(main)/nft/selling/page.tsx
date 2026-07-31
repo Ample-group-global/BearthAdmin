@@ -275,17 +275,6 @@ export default function SellingPage() {
     }));
   };
 
-  const handleSetProvenance = () => {
-    if (!/^0x[0-9a-fA-F]{64}$/.test(provHash)) {
-      setOpError("Provenance hash must be 0x + 64 hex characters."); return;
-    }
-    doOp("provenance", () => fetch("/api/nft-sell/collection/provenance", {
-      method: "POST", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hash: provHash }),
-    }));
-  };
-
   const handleSetTreasury = () => {
     if (!ETH_ADDRESS_RE.test(treasury)) { setOpError("Treasury must be a valid Ethereum address (0x + 40 hex characters)."); return; }
     doOp("treasury", () => fetch("/api/nft-sell/collection/treasury", {
@@ -917,28 +906,6 @@ export default function SellingPage() {
                   : "Not set"}
               </p>
             </div>
-          </SectionCard>
-
-          {/* Provenance hash */}
-          <SectionCard title="Provenance Hash" subtitle="SHA256 of all 9,999 metadata files — proves the order was not cherry-picked. Set before first mint.">
-            {config?.provenance_hash ? (
-              <div className="p-3 rounded-xl" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
-                <p className="text-xs font-bold" style={{ color: "#16a34a" }}>Provenance hash set (immutable)</p>
-                <p className="text-xs font-mono mt-1 break-all" style={{ color: "#6b7280" }}>{config.provenance_hash}</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <input type="text" value={provHash} onChange={e => setProvHash(e.target.value)}
-                  style={{ ...inputStyle, fontFamily: "monospace" }} placeholder="0x + 64 hex chars (SHA256 of all metadata)" />
-                <div className="flex justify-end">
-                  <button onClick={handleSetProvenance} disabled={saving === "provenance" || !provHash}
-                    className="px-4 py-2 text-xs font-bold text-white rounded-xl"
-                    style={{ background: saving === "provenance" || !provHash ? "#9bafc5" : "#24315f" }}>
-                    {saving === "provenance" ? "Saving…" : "⛓ Set Provenance On-Chain"}
-                  </button>
-                </div>
-              </div>
-            )}
           </SectionCard>
 
           {/* Emergency Controls */}

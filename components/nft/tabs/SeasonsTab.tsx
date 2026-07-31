@@ -341,7 +341,7 @@ export default function SeasonsTab() {
             <button onClick={() => setShowIssue(false)} className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">Cancel</button>
             <button onClick={issuePass} disabled={saving} className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"
               style={{ background: "#41afeb", opacity: saving ? 0.6 : 1 }}>
-              {saving ? "Minting & Issuing…" : "Issue Pass"}
+              {saving ? "Issuing…" : "Issue Pass"}
             </button>
           </div>
         </Overlay>
