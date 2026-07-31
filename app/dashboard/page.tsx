@@ -34,8 +34,8 @@ interface DbToken {
 }
 
 interface WaveMeta {
-  wave_number: number;
-  wave_name: string;
+  waveNum: number;
+  name: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -362,7 +362,7 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch("/api/nft-sell/waves", { credentials: "include" })
       .then(r => r.json())
-      .then(d => setWaves((d.waves ?? []).map((w: { wave_number: number; wave_name: string }) => ({ wave_number: w.wave_number, wave_name: w.wave_name }))))
+      .then(d => setWaves((d.waves ?? []).map((w: { waveNum: number; name: string }) => ({ waveNum: w.waveNum, name: w.name }))))
       .catch(() => {});
   }, []);
 
@@ -484,7 +484,7 @@ export default function DashboardPage() {
         <NFTModal
           token={selectedToken}
           blockExplorer={BLOCK_EXPLORER}
-          waveName={waves.find(w => w.wave_number === selectedToken.wave_number)?.wave_name}
+          waveName={waves.find(w => w.waveNum === selectedToken.wave_number)?.name}
           onClose={() => setSelectedToken(null)}
         />
       )}
@@ -708,8 +708,8 @@ export default function DashboardPage() {
               <option value="0">Admin Reserve</option>
               {waves.length > 0
                 ? waves.map(w => (
-                    <option key={w.wave_number} value={String(w.wave_number)}>
-                      Wave {w.wave_number} · {w.wave_name}
+                    <option key={w.waveNum} value={String(w.waveNum)}>
+                      Wave {w.waveNum} · {w.name}
                     </option>
                   ))
                 : [1,2,3,4,5,6,7].map(w => <option key={w} value={String(w)}>Wave {w}</option>)
