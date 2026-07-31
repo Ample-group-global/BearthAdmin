@@ -196,9 +196,9 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
           let res: Response;
           if (blobUrl) {
             res = await fetch(blobUrl);
-            if (!res.ok) res = await fetch(`/api/layer-img/${rel}?w=${THUMB}&h=${THUMB}`);
+            if (!res.ok) res = await fetch(`/api/thumb/${rel}`);
           } else {
-            res = await fetch(`/api/layer-img/${rel}?w=${THUMB}&h=${THUMB}`);
+            res = await fetch(`/api/thumb/${rel}`);
           }
           if (res.ok) {
             const blob = await res.blob();
