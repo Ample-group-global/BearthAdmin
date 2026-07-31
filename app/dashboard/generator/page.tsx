@@ -314,13 +314,19 @@ export default function Page() {
               onLayersChange={loadLayers}
               onGearClick={setGearFolder}
               onToggleOptional={handleToggleOptional}
-              onReorder={async (newFolderOrder: string[]) => {
-                await fetch('/api/layers/order', {
+              onReorder={(newFolderOrder: string[]) => {
+                // Apply the user's drag order immediately in state — no refetch.
+                // Refetching would re-sort numerically and undo the drag.
+                setLayers(prev => {
+                  const map = new Map(prev.map(l => [l.folder, l]));
+                  return newFolderOrder.map(f => map.get(f)).filter(Boolean) as Layer[];
+                });
+                // Persist to server (no-op on Vercel but works on local dev).
+                fetch('/api/layers/order', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ order: newFolderOrder }),
-                });
-                loadLayers();
+                }).catch(() => {});
               }}
             />
             <div className="org-main">
