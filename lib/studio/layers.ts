@@ -24,7 +24,9 @@ export function setActiveFolder(folder: string) {
 }
 
 export function getLayersDir(): string {
-  return path.resolve(process.cwd(), '..', getActiveFolder());
+  const folder = getActiveFolder();
+  if (!folder) return '';
+  return path.resolve(process.cwd(), '..', folder);
 }
 
 // Derive a readable display name from any filesystem stem.
@@ -272,7 +274,11 @@ export function clearLayersCache() { _cache = null; }
 export function scanLayers() {
   if (_cache) return _cache;
   const layersDir = getLayersDir();
-  if (!fs.existsSync(layersDir)) return [];
-  _cache = buildCache();
-  return _cache;
+  if (!layersDir || !fs.existsSync(layersDir)) return [];
+  try {
+    _cache = buildCache();
+    return _cache;
+  } catch {
+    return [];
+  }
 }
