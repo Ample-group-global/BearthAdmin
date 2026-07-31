@@ -107,6 +107,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => { mounted = false; };
   }, [router]);
 
+  useEffect(() => {
+    const recheck = async () => {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" });
+        if (res.status === 401) router.push("/login?reason=session_expired");
+      } catch { }
+    };
+    const onVisibility = () => { if (document.visibilityState === "visible") recheck(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    const interval = setInterval(recheck, 5 * 60 * 1000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      clearInterval(interval);
+    };
+  }, [router]);
+
   const toggleSection = (mod: string) => {
     setOpenSections(prev => {
       const next = new Set(prev);
