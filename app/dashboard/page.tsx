@@ -33,6 +33,11 @@ interface DbToken {
   synced_at: string | null;
 }
 
+interface WaveMeta {
+  wave_number: number;
+  wave_name: string;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PHASE_LABELS = ["Whitelist Mint", "Paid Mint", "Revealed"];
@@ -127,7 +132,7 @@ function NFTThumb({ tokenId }: { tokenId: number }) {
 
 // ─── NFT Detail Modal ─────────────────────────────────────────────────────────
 
-function NFTModal({ token, blockExplorer, onClose }: { token: DbToken; blockExplorer: string; onClose: () => void }) {
+function NFTModal({ token, blockExplorer, waveName, onClose }: { token: DbToken; blockExplorer: string; waveName?: string; onClose: () => void }) {
   const [meta, setMeta] = useState<NFTMetadata | null>(null);
   const [metaLoading, setMetaLoading] = useState(true);
   const [imgError, setImgError] = useState(false);
@@ -246,7 +251,11 @@ function NFTModal({ token, blockExplorer, onClose }: { token: DbToken; blockExpl
               <div className="flex justify-between">
                 <span className="text-gray-500">Wave</span>
                 <span className="font-semibold text-gray-700">
-                  {token.wave_number === 0 ? "Admin Reserve" : token.wave_number ? `Wave ${token.wave_number}` : "—"}
+                  {token.wave_number === 0 || token.wave_number === null
+                    ? "Admin Reserve"
+                    : waveName
+                      ? `Wave ${token.wave_number} · ${waveName}`
+                      : `Wave ${token.wave_number}`}
                 </span>
               </div>
               {token.rarity_price_eth != null && (
@@ -347,6 +356,15 @@ export default function DashboardPage() {
       setSyncing(false);
     }
   };
+
+  const [waves, setWaves] = useState<WaveMeta[]>([]);
+
+  useEffect(() => {
+    fetch("/api/nft-sell/waves", { credentials: "include" })
+      .then(r => r.json())
+      .then(d => setWaves((d.waves ?? []).map((w: { wave_number: number; wave_name: string }) => ({ wave_number: w.wave_number, wave_name: w.wave_name }))))
+      .catch(() => {});
+  }, []);
 
   // ── Minted NFTs state ─────────────────────────────────────────────────────
   const [tokens, setTokens]         = useState<DbToken[]>([]);
@@ -463,7 +481,12 @@ export default function DashboardPage() {
     <div className="p-6 space-y-6">
 
       {selectedToken && (
-        <NFTModal token={selectedToken} blockExplorer={BLOCK_EXPLORER} onClose={() => setSelectedToken(null)} />
+        <NFTModal
+          token={selectedToken}
+          blockExplorer={BLOCK_EXPLORER}
+          waveName={waves.find(w => w.wave_number === selectedToken.wave_number)?.wave_name}
+          onClose={() => setSelectedToken(null)}
+        />
       )}
 
       {/* Header */}
@@ -683,7 +706,14 @@ export default function DashboardPage() {
               style={{ border: "1px solid #e5e7eb", color: "#374151" }}>
               <option value="all">All Waves</option>
               <option value="0">Admin Reserve</option>
-              {[1,2,3,4,5,6,7].map(w => <option key={w} value={String(w)}>Wave {w}</option>)}
+              {waves.length > 0
+                ? waves.map(w => (
+                    <option key={w.wave_number} value={String(w.wave_number)}>
+                      Wave {w.wave_number} · {w.wave_name}
+                    </option>
+                  ))
+                : [1,2,3,4,5,6,7].map(w => <option key={w} value={String(w)}>Wave {w}</option>)
+              }
             </select>
             <select value={revealFilter} onChange={e => { setRevealFilter(e.target.value); setPage(1); }}
               className="px-3 py-2 rounded-lg text-sm outline-none"
