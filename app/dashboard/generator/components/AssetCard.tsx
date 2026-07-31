@@ -15,7 +15,7 @@ function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onC
 
         <div className="card-modal-img-wrap">
           {asset.rel ? (
-            <img src={getBlobUrl(asset.rel) ?? `/api/thumb/${asset.rel}`} alt={asset.stem} className="card-modal-img" />
+            <img src={getBlobUrl(asset.rel) ?? `/api/layer-img/${asset.rel}?w=400&h=400`} alt={asset.stem} className="card-modal-img" />
           ) : (
             <div className="card-modal-none">NONE</div>
           )}
@@ -96,7 +96,7 @@ export default function AssetCard({ asset, weight, totalWeight, supply, onChange
         <div className="thumb">
           {asset.rel ? (
             <img
-              src={getBlobUrl(asset.rel) ?? `/api/thumb/${asset.rel}`}
+              src={getBlobUrl(asset.rel) ?? `/api/layer-img/${asset.rel}?w=200&h=200`}
               alt={asset.stem}
               loading="lazy"
               onError={e => {
