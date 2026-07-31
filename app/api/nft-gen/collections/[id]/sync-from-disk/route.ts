@@ -83,7 +83,11 @@ export async function POST(
     const token = getSessionToken(req);
     if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const diskLayers = scanLayers();
+    // Wrap in try-catch: on Vercel there is no local layers dir, so scanLayers() may
+    // throw EACCES when the path resolves to a system directory. Treat any error as
+    // "no local layers" and fall through to the body.layers / API fallback.
+    let diskLayers: ReturnType<typeof scanLayers> = [];
+    try { diskLayers = scanLayers(); } catch { diskLayers = []; }
 
     if (diskLayers.length) {
       const data = await syncLayerManifest(token, collectionId, diskLayers);

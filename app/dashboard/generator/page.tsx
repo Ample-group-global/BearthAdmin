@@ -117,6 +117,31 @@ export default function Page() {
             }));
           })
           .catch(() => {});
+      } else {
+        // No session cookie (e.g. incognito) — restore from most recent collection in DB
+        fetch('/api/nft-gen/collections?limit=1')
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            const c = (data?.collections ?? data)?.[0] ?? null;
+            if (!c?.id) return;
+            setCollectionId(c.id);
+            setCollection(prev => ({
+              ...prev,
+              name:        c.name        ?? prev.name,
+              description: c.description ?? prev.description,
+              symbol:      c.symbol      ?? prev.symbol,
+              blockchain:  c.network === 'sol' ? 'solana' : 'ethereum',
+              width:       c.formatWidth  ?? prev.width,
+              height:      c.formatHeight ?? prev.height,
+            }));
+            loadLayers(undefined, c.id);
+            fetch('/api/session/collection', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ collectionId: c.id, name: c.name }),
+            }).catch(() => {});
+          })
+          .catch(() => {});
       }
     });
   }, []);
