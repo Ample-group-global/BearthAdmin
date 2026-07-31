@@ -1735,6 +1735,74 @@
   font-size: 14px;
 }
 
+/* ── Horizontal filter bar (Export tab) ──────────────────────────────────────── */
+.studio-wrap .exp-hfilter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.studio-wrap .exp-hfl-item { position: relative; }
+.studio-wrap .exp-hfl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s;
+}
+.studio-wrap .exp-hfl-btn:hover { border-color: var(--accent); color: var(--accent); }
+.studio-wrap .exp-hfl-btn-active { border-color: var(--accent); background: var(--accent); color: #fff; }
+.studio-wrap .exp-hfl-btn-active .exp-hfl-ct { background: rgba(255,255,255,0.25); }
+.studio-wrap .exp-hfl-ct {
+  background: rgba(0,0,0,0.1);
+  border-radius: 10px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.studio-wrap .exp-hfl-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 150px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  z-index: 300;
+  padding: 4px;
+}
+.studio-wrap .exp-hfl-trait {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: var(--text);
+  background: none;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.studio-wrap .exp-hfl-trait:hover { background: var(--hover); }
+.studio-wrap .exp-hfl-trait.active { background: var(--accent); color: #fff; }
+
 /* ── Responsive ──────────────────────────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .studio-wrap .rt-formula-grid { grid-template-columns: 1fr; }

@@ -140,28 +140,42 @@ function StepCard({ num, title, status, children }) {
   );
 }
 
-// ── Layer row for filter sidebar ──────────────────────────────────────────────
-function ExpandableLayerRow({ layer, activeFilter, onTraitClick }) {
+// ── Horizontal layer filter pill ─────────────────────────────────────────────
+function HLayerFilter({ layer, activeFilter, onTraitClick }) {
   const [open, setOpen] = useState(false);
+  const ref = useRef(null);
   const isActive = activeFilter?.folder === layer.folder;
+
+  useEffect(() => {
+    if (!open) return;
+    function close(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
   return (
-    <div className="plr-group">
-      <div className="preview-layer-row" onClick={() => setOpen(o => !o)}>
-        <span className="plr-chevron">{open ? '▾' : '▸'}</span>
-        <span className="plr-name">{layer.label}</span>
-        <span className="plr-count">{layer.count}</span>
-      </div>
+    <div ref={ref} className="exp-hfl-item">
+      <button
+        className={`exp-hfl-btn${isActive ? ' exp-hfl-btn-active' : ''}`}
+        onClick={() => setOpen(o => !o)}
+      >
+        {layer.label}
+        <span className="exp-hfl-ct">{layer.count}</span>
+        ▾
+      </button>
       {open && (
-        <div className="plr-traits">
-          {[...layer.assets].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(a => (
-            <div
-              key={a.stem}
-              className={`plr-trait-row${isActive && activeFilter?.stem === a.stem ? ' plr-trait-active' : ''}`}
-              onClick={() => onTraitClick(layer, a)}
-            >
-              <span className="plr-trait-name">{a.name}</span>
-            </div>
-          ))}
+        <div className="exp-hfl-dropdown">
+          {[...layer.assets]
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+            .map(a => (
+              <button
+                key={a.stem}
+                className={`exp-hfl-trait${isActive && activeFilter?.stem === a.stem ? ' active' : ''}`}
+                onClick={() => { onTraitClick(layer, a); setOpen(false); }}
+              >
+                {a.name}
+              </button>
+            ))}
         </div>
       )}
     </div>
@@ -1457,75 +1471,72 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           </div>
         )}
 
-        {/* ── Filter sidebar + content ── */}
-        <div className="exp-with-filter">
-          {layers.length > 0 && (
-            <div className="exp-filter-side preview-layer-breakdown">
-              {filter && (
-                <div className="plr-filter-badge">
-                  <span>{filter.layerLabel}: {filter.assetName}</span>
-                  <button className="plr-filter-clear" onClick={clearFilter}>✕</button>
-                </div>
-              )}
-              {layerBreakdown.map(layer => (
-                <ExpandableLayerRow
-                  key={layer.folder}
-                  layer={layer}
-                  activeFilter={filter}
-                  onTraitClick={handleTraitClick}
-                />
-              ))}
-            </div>
-          )}
-          <div className="exp-filter-main">
-            {/* Count row + pagination — always show when viewing, highlight when filtered */}
-            {visibleItems.length > 0 && (
-              <div className="exp-grid-nav">
-                <div className="preview-count-row">
-                  <span className="preview-count-num">{visibleItems.length.toLocaleString()}</span>
-                  {' '}
-                  <span className="preview-count-label">
-                    {filter ? `of ${rarityItems.length.toLocaleString()} NFTs` : 'NFTs'}
-                  </span>
-                </div>
-                {totalPages > 1 && (
-                  <div className="exp-page-group">
-                    <button className="exp-sort-btn" onClick={() => setGridPage(p => Math.max(0, p - 1))} disabled={gridPage === 0}>← Prev</button>
-                    <span className="exp-page-label">Page {gridPage + 1} / {totalPages}</span>
-                    <button className="exp-sort-btn" onClick={() => setGridPage(p => Math.min(totalPages - 1, p + 1))} disabled={gridPage >= totalPages - 1}>Next →</button>
-                  </div>
-                )}
+        {/* ── Horizontal filter bar ── */}
+        {layers.length > 0 && (
+          <div className="exp-hfilter-bar">
+            {filter && (
+              <div className="plr-filter-badge">
+                <span>{filter.layerLabel}: {filter.assetName}</span>
+                <button className="plr-filter-clear" onClick={clearFilter}>✕</button>
               </div>
             )}
-            <div className="exp-tier-legend">
-              {TIER_META.map(t => (
-                <div key={t.label} className="exp-tier-pill" style={{ borderColor: `${t.color}33` }}>
-                  <span className="exp-tier-dot" style={{ background: t.color }} />
-                  <span style={{ color: t.color, fontWeight: 700 }}>{t.label}</span>
-                  <span className="exp-tier-pill-sub">{t.sub}</span>
-                </div>
-              ))}
+            {layerBreakdown.map(layer => (
+              <HLayerFilter
+                key={layer.folder}
+                layer={layer}
+                activeFilter={filter}
+                onTraitClick={handleTraitClick}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* ── NFT grid ── */}
+        {visibleItems.length > 0 && (
+          <div className="exp-grid-nav">
+            <div className="preview-count-row">
+              <span className="preview-count-num">{visibleItems.length.toLocaleString()}</span>
+              {' '}
+              <span className="preview-count-label">
+                {filter ? `of ${rarityItems.length.toLocaleString()} NFTs` : 'NFTs'}
+              </span>
             </div>
-            {pageItems.length > 0 ? (
-              <div className="exp-nft-grid">
-                {pageItems.map(item => (
-                  <RarityCard
-                    key={item.index}
-                    item={item}
-                    jobBitmaps={jobBitmaps}
-                    layers={layers}
-                    canvasW={tW}
-                    canvasH={tH}
-                    onClick={setPopup}
-                    bitmapsVer={bitmapsVer}
-                  />
-                ))}
+            {totalPages > 1 && (
+              <div className="exp-page-group">
+                <button className="exp-sort-btn" onClick={() => setGridPage(p => Math.max(0, p - 1))} disabled={gridPage === 0}>← Prev</button>
+                <span className="exp-page-label">Page {gridPage + 1} / {totalPages}</span>
+                <button className="exp-sort-btn" onClick={() => setGridPage(p => Math.min(totalPages - 1, p + 1))} disabled={gridPage >= totalPages - 1}>Next →</button>
               </div>
-            ) : (
-              <div className="exp-empty-filter">No NFTs match this filter.</div>
             )}
           </div>
+        )}
+        <div className="exp-tier-legend">
+          {TIER_META.map(t => (
+            <div key={t.label} className="exp-tier-pill" style={{ borderColor: `${t.color}33` }}>
+              <span className="exp-tier-dot" style={{ background: t.color }} />
+              <span style={{ color: t.color, fontWeight: 700 }}>{t.label}</span>
+              <span className="exp-tier-pill-sub">{t.sub}</span>
+            </div>
+          ))}
         </div>
+        {pageItems.length > 0 ? (
+          <div className="exp-nft-grid">
+            {pageItems.map(item => (
+              <RarityCard
+                key={item.index}
+                item={item}
+                jobBitmaps={jobBitmaps}
+                layers={layers}
+                canvasW={tW}
+                canvasH={tH}
+                onClick={setPopup}
+                bitmapsVer={bitmapsVer}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="exp-empty-filter">No NFTs match this filter.</div>
+        )}
       </div>
 
       {/* ── Push to Filebase IPFS ── */}
