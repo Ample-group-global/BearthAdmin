@@ -507,6 +507,28 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     if (collectionId) await persistToDb(scored);
   }
 
+  const [syncingLayers, setSyncingLayers] = useState(false);
+  async function syncLayersNow() {
+    if (!collectionId || syncingLayers) return;
+    setSyncingLayers(true);
+    setError('');
+    try {
+      const r = await fetch(`/api/nft-gen/collections/${collectionId}/sync-from-disk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ layers: layersProp }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setError(d.error ?? 'Layer sync failed. Try again.'); return; }
+      setLayerStatus(d.layersSynced > 0 ? 'ok' : 'empty');
+      if (d.layersSynced === 0) setError('No layers were synced. Go to Settings → Continue to rebuild your layer list.');
+    } catch {
+      setError('Layer sync failed. Check your connection.');
+    } finally {
+      setSyncingLayers(false);
+    }
+  }
+
   async function generateOnServer() {
     if (!collectionId) { setError('Save collection settings before generating.'); return; }
     setSvrGenStatus('running');
@@ -1340,8 +1362,20 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           </div>
 
           {layerStatus === 'empty' && (
-            <div className="exp-error-banner">
-              No layers found for this collection. Go to <strong>Settings</strong> and click <strong>Continue</strong> to sync your layers, then return here.
+            <div className="exp-error-banner" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span>No active layers found for this collection.</span>
+              {layersProp.length > 0 ? (
+                <button
+                  className="btn btn-ghost"
+                  style={{ fontSize: 12, padding: '3px 10px' }}
+                  onClick={syncLayersNow}
+                  disabled={syncingLayers}
+                >
+                  {syncingLayers ? '⌛ Syncing…' : '⚡ Sync layers to DB'}
+                </button>
+              ) : (
+                <span>Go to <strong>Settings</strong> → <strong>Continue</strong> to sync your layers.</span>
+              )}
             </div>
           )}
           {(error || svrGenError) && <div className="exp-error-banner">{error || svrGenError}</div>}
