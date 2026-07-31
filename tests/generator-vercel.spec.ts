@@ -192,11 +192,11 @@ test.describe.serial('NFT Generator — Vercel Full E2E', () => {
   });
 
   // ── 04. Settings: Save & Continue → Organise ────────────────────────────
-  test('04 — Settings tab: Save & Continue creates collection in DB', async () => {
+  test('04 — Settings tab: Save & Continue creates collection (no sync error)', async () => {
     await snap(page, '04-before-save');
     await page.locator('button.setup-continue-btn').click();
 
-    // Wait for syncing to resolve
+    // Wait for the "Saving…" state to clear
     await page.waitForFunction(
       () => {
         const btn = document.querySelector('.setup-continue-btn');
@@ -207,15 +207,24 @@ test.describe.serial('NFT Generator — Vercel Full E2E', () => {
     await page.waitForTimeout(2_000);
     await snap(page, '04-after-save');
 
-    // Should now be on Organise step
+    // ── Assert: no sync error banner visible ─────────────────────────────
+    // If EACCES or any sync-from-disk 500 occurred, the red error banner shows.
+    const errBanner = page.locator('.setup-error, [class*="sync-error"], text=/EACCES|sync failed|Layer sync/i');
+    const errCount  = await errBanner.count();
+    if (errCount > 0) {
+      const msg = await errBanner.first().textContent();
+      console.log(`  ❌ Sync error visible: "${msg?.trim()}"`);
+      expect(errCount, `Sync error appeared: ${msg?.trim()}`).toBe(0);
+    }
+
+    // Navigate to Organise (auto or manual fallback)
     const onOrg = await page.locator('.org-layout').isVisible({ timeout: 10_000 }).catch(() => false);
     console.log(`  Navigated to Organise: ${onOrg}`);
     if (!onOrg) {
-      // Click Organize tab manually if still on settings
       await clickTab(page, 'Organize');
       await page.waitForSelector('.org-layout', { timeout: 15_000 });
     }
-    console.log('  ✅ Collection saved, now on Organise tab');
+    console.log('  ✅ Collection saved — no EACCES or sync error');
   });
 
   // ── 05. Organise: layers in sidebar ──────────────────────────────────────
