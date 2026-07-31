@@ -78,34 +78,40 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id: collectionId } = await params;
-  const token = getSessionToken(req);
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const { id: collectionId } = await params;
+    const token = getSessionToken(req);
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const diskLayers = scanLayers();
+    const diskLayers = scanLayers();
 
-  if (diskLayers.length) {
-    // Local dev — sync from BearthAdmin disk
-    const data = await syncLayerManifest(token, collectionId, diskLayers);
-    return NextResponse.json(data);
+    if (diskLayers.length) {
+      const data = await syncLayerManifest(token, collectionId, diskLayers);
+      return NextResponse.json(data);
+    }
+
+    let body: { layers?: ManifestLayer[] } = {};
+    try { body = await req.json(); } catch { /* body may be empty */ }
+
+    if (body.layers?.length) {
+      const data = await syncLayerManifest(token, collectionId, body.layers);
+      return NextResponse.json(data);
+    }
+
+    // Last resort: ask BearthApi to scan its own LAYERS_DIR
+    try {
+      const r = await fetch(`${API_BASE}/api/nft-gen/collections/${collectionId}/sync-from-api-layers`, {
+        method:  "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      });
+      const data = await r.json();
+      return NextResponse.json(data, { status: r.status });
+    } catch {
+      return NextResponse.json({ error: "API unreachable" }, { status: 503 });
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[sync-from-disk] unhandled:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
-
-  // On Vercel there is no local disk. Try the manifest passed from the client (parsed
-  // in React state) first — this is always available immediately after the user drops
-  // their folder. Fall back to BearthApi's own disk scan if no manifest was sent.
-  let body: { layers?: ManifestLayer[] } = {};
-  try { body = await req.json(); } catch { /* body may be empty */ }
-
-  if (body.layers?.length) {
-    const data = await syncLayerManifest(token, collectionId, body.layers);
-    return NextResponse.json(data);
-  }
-
-  // Last resort: ask BearthApi to scan its own LAYERS_DIR (layers uploaded to Railway disk)
-  const r = await fetch(`${API_BASE}/api/nft-gen/collections/${collectionId}/sync-from-api-layers`, {
-    method:  "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-  });
-  const data = await r.json();
-  return NextResponse.json(data, { status: r.status });
 }
