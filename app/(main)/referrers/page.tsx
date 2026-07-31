@@ -143,12 +143,12 @@ const PAGE_SIZES = [10, 20, 50];
 
 function roleBadge(code: string) {
   const map: Record<string, { bg: string; color: string; label: string }> = {
-    bearth_admin:        { bg: "rgba(124,58,237,0.1)",  color: "#7c3aed", label: "Admin" },
-    bearth_operation:    { bg: "rgba(59,130,246,0.1)",  color: "#3b82f6", label: "Operation" },
-    bearth_sales_team:   { bg: "rgba(16,185,129,0.1)",  color: "#10b981", label: "Sales Team" },
-    bearth_technical:    { bg: "rgba(245,158,11,0.1)",  color: "#f59e0b", label: "Technical" },
-    bearth_ext_referrer: { bg: "rgba(239,68,68,0.1)",   color: "#ef4444", label: "Ext. Referrer" },
-    bearth_customer:     { bg: "rgba(107,114,128,0.1)", color: "#6b7280", label: "Customer" },
+    admin:           { bg: "rgba(124,58,237,0.1)",  color: "#7c3aed", label: "Admin" },
+    operation:       { bg: "rgba(59,130,246,0.1)",  color: "#3b82f6", label: "Operation" },
+    sales_team:      { bg: "rgba(16,185,129,0.1)",  color: "#10b981", label: "Sales Team" },
+    technical_team:  { bg: "rgba(245,158,11,0.1)",  color: "#f59e0b", label: "Technical" },
+    ext_referrer:    { bg: "rgba(239,68,68,0.1)",   color: "#ef4444", label: "Ext. Referrer" },
+    customer:        { bg: "rgba(107,114,128,0.1)", color: "#6b7280", label: "Customer" },
   };
   const style = map[code] ?? { bg: "rgba(107,114,128,0.1)", color: "#6b7280", label: code };
   return (

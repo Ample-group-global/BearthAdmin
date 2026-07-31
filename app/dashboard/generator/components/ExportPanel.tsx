@@ -244,6 +244,8 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const [svrGenError,    setSvrGenError]    = useState('');
   const svrGenPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const [layerStatus,  setLayerStatus]  = useState<'loading'|'ok'|'empty'|'unknown'>('loading');
+
   const [rarityItems,  setRarityItems]  = useState<any[]>([]);
   const [allCombos,    setAllCombos]    = useState<any[]>([]);
   const [bitmapsVer,   setBitmapsVer]   = useState(0);
@@ -256,6 +258,24 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const dbJobIdRef         = useRef<string | null>(null);
   // editionNumber → itemId UUID (populated during persistToDb, used for IPFS CID writeback)
   const editionItemMapRef  = useRef<Record<number, string>>({});
+
+  // ── Check whether this collection has active layers in DB ────────────────
+  useEffect(() => {
+    if (!collectionId) { setLayerStatus('unknown'); return; }
+    // If layers are already known from props/state, no extra fetch needed
+    if ((layersProp as any[]).length > 0 || layers.length > 0) {
+      setLayerStatus('ok');
+      return;
+    }
+    setLayerStatus('loading');
+    fetch(`/api/nft-gen/collections/${collectionId}/layers`)
+      .then(r => r.ok ? r.json() : { layers: [] })
+      .then(data => {
+        const active = (data.layers ?? []).filter((l) => l.is_active !== false);
+        setLayerStatus(active.length > 0 ? 'ok' : 'empty');
+      })
+      .catch(() => setLayerStatus('unknown'));
+  }, [collectionId]);
 
   // ── Auto-restore done state from DB on mount ─────────────────────────────
   useEffect(() => {
@@ -1305,11 +1325,20 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
             </div>
           </div>
 
+          {layerStatus === 'empty' && (
+            <div className="exp-error-banner">
+              No layers found for this collection. Go to <strong>Settings</strong> and click <strong>Continue</strong> to sync your layers, then return here.
+            </div>
+          )}
           {(error || svrGenError) && <div className="exp-error-banner">{error || svrGenError}</div>}
 
           <div className="exp-idle-actions">
-            <button className="btn btn-primary btn-lg" onClick={generateOnServer} disabled={!collectionId || svrGenStatus === 'running'}>
-              ⚡ Generate {supply.toLocaleString()} NFTs
+            <button
+              className="btn btn-primary btn-lg"
+              onClick={generateOnServer}
+              disabled={!collectionId || svrGenStatus === 'running' || layerStatus === 'loading' || layerStatus === 'empty'}
+            >
+              {layerStatus === 'loading' ? '⌛ Checking layers…' : `⚡ Generate ${supply.toLocaleString()} NFTs`}
             </button>
           </div>
         </div>
