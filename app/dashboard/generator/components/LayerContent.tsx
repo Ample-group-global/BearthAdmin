@@ -53,7 +53,7 @@ function TraitNameEditor({ asset, folder, onRenamed }) {
 }
 
 export default function LayerContent({ layer, layerWeights, allWeights, supply, onWeightChange, onLayersChange, onGenerate }) {
-  const [view,      setView]      = useState(layer.assets.length > 0 ? 'advanced' : 'manage');  // 'manage' | 'advanced' | 'quickpreview'
+  const [view,      setView]      = useState(layer.assets.length > 0 ? 'advanced' : 'manage');  // 'manage' | 'advanced'
   const [dragOver,  setDragOver]  = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
@@ -99,12 +99,6 @@ export default function LayerContent({ layer, layerWeights, allWeights, supply, 
             onClick={() => toggleView('advanced')}
           >
             ● Advanced
-          </button>
-          <button
-            className={`lc-toggle-btn${view === 'quickpreview' ? ' lc-toggle-active' : ''}`}
-            onClick={() => toggleView('quickpreview')}
-          >
-            ● Quick Preview
           </button>
         </div>
       </div>
@@ -201,23 +195,6 @@ export default function LayerContent({ layer, layerWeights, allWeights, supply, 
             supply={supply}
             onGenerate={onGenerate}
           />
-        </div>
-      )}
-
-      {/* ── Quick Preview: layer flow diagram ── */}
-      {view === 'quickpreview' && (
-        <div className="lc-qp-view">
-          <div className="lc-qp-flow">
-            <div className="qp-node">Start</div>
-            <div className="qp-connector"><span className="qp-pct">100.0%</span></div>
-            <div className="qp-node qp-node-active">{layer.label}</div>
-            <div className="qp-connector"><span className="qp-pct">100.0%</span></div>
-            <div className="qp-node">End</div>
-          </div>
-          <div className="lc-qp-info">
-            <span className="lc-qp-badge">Default</span>
-            <span className="lc-qp-badge">+</span>
-          </div>
         </div>
       )}
 
