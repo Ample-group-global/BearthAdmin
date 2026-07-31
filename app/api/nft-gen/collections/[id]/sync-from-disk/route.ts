@@ -31,17 +31,22 @@ async function syncLayerManifest(
   collectionId: string,
   manifest: ManifestLayer[]
 ) {
-  const results = await Promise.all(manifest.map(async (ml) => {
+  // Process layers sequentially to preserve folder order (0-bg, 1-back, 2-body, …)
+  // Promise.all would insert in random order because requests resolve at different times.
+  const results: Array<{ layerName: string; layerId: string | null; traitsUpserted: number; traitsDeactivated: number }> = [];
+  for (let layerIdx = 0; layerIdx < manifest.length; layerIdx++) {
+    const ml = manifest[layerIdx];
     const realAssets = ml.assets.filter((a) => !!a.rel);
-    if (!realAssets.length) return { layerName: ml.folder, layerId: null, traitsUpserted: 0, traitsDeactivated: 0 };
+    if (!realAssets.length) { results.push({ layerName: ml.folder, layerId: null, traitsUpserted: 0, traitsDeactivated: 0 }); continue; }
 
     const layerData = await apiPost(token, `/api/nft-gen/collections/${collectionId}/layers`, {
       name:           ml.folder,
       displayName:    ml.label ?? ml.folder,
       layerRarityPct: ml.optional ? 80 : 100,
+      sortOrder:      layerIdx,
     });
     const layerId: string | null = layerData?.layer?.id ?? layerData?.id ?? null;
-    if (!layerId) return { layerName: ml.folder, layerId: null, traitsUpserted: 0, traitsDeactivated: 0 };
+    if (!layerId) { results.push({ layerName: ml.folder, layerId: null, traitsUpserted: 0, traitsDeactivated: 0 }); continue; }
 
     const activeFilePaths = realAssets.map((a) => a.rel as string);
     let traitsUpserted = 0;
@@ -59,8 +64,8 @@ async function syncLayerManifest(
     }
 
     const reconcileTraits = await apiPost(token, `/api/nft-gen/layers/${layerId}/traits/reconcile`, { activeFilePaths });
-    return { layerName: ml.folder, layerId, traitsUpserted, traitsDeactivated: reconcileTraits?.deactivated ?? 0 };
-  }));
+    results.push({ layerName: ml.folder, layerId, traitsUpserted, traitsDeactivated: reconcileTraits?.deactivated ?? 0 });
+  }
 
   const reconcileLayers = await apiPost(token, `/api/nft-gen/collections/${collectionId}/layers/reconcile`, {
     activeNames: manifest.map((l) => l.folder),
