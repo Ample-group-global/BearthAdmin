@@ -44,6 +44,8 @@ function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onC
 
           <div className="card-modal-slider-label">
             Weight <span style={{ color: tier.color, fontWeight: 700 }}>{weight}</span>
+            {weight > 0 && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--dim)' }}>→ {pct}% probability</span>}
+            {weight === 0 && <span style={{ marginLeft: 8, fontSize: 11, color: '#9CA3AF' }}>→ disabled (excluded from generation)</span>}
           </div>
           <input
             className="range-slider"
@@ -54,7 +56,7 @@ function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onC
             style={{ width: '100%', marginBottom: 4 }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--xdim)' }}>
-            <span>0 (disabled)</span><span>50</span><span>100 (max)</span>
+            <span>0 = disabled</span><span style={{ color: '#3B82F6' }}>Rare ≈ 10</span><span>100 = max weight</span>
           </div>
 
           {asset.rel && (
