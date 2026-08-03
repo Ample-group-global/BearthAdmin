@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useInterval } from "@/lib/useInterval";
 import DataTable, { type ColumnDef } from "@/components/DataTable";
 import { ErrBanner } from "@/components/nft/Banner";
 import { inputStyle, labelStyle } from "@/components/nft/styles";
@@ -394,6 +395,27 @@ export default function NftPage() {
     fetchSalesData(0, saleWave, saleWallet, saleFrom, saleTo);
   }, [saleWave, saleWallet, saleFrom, saleTo]);
 
+  // ── Watchdog: silent 30s poll on stats ───────────────────────────────────
+  const [recWatchAlert, setRecWatchAlert] = useState<string | null>(null);
+  const [recWatchUpdated, setRecWatchUpdated] = useState<Date | null>(null);
+  const prevRecMintedRef = useRef<number | null>(null);
+
+  const silentRecPoll = useCallback(async () => {
+    try {
+      const res = await fetch("/api/nft-sell/collection/stats", { credentials: "include" });
+      if (!res.ok) return;
+      const d = await res.json();
+      setRecWatchUpdated(new Date());
+      if (d.blindBoxImageUrl) setBlindBoxImageUrl(d.blindBoxImageUrl);
+      if (prevRecMintedRef.current !== null && d.totalMinted > prevRecMintedRef.current) {
+        setRecWatchAlert(`${d.totalMinted - prevRecMintedRef.current} new NFT${d.totalMinted - prevRecMintedRef.current > 1 ? "s" : ""} minted on-chain. Refresh records to see latest.`);
+      }
+      prevRecMintedRef.current = d.totalMinted ?? prevRecMintedRef.current;
+    } catch { /* silent */ }
+  }, []);
+
+  useInterval(silentRecPoll, 30_000);
+
   // ── Records handlers ──────────────────────────────────────────────────────
   const handleSearch = (v: string) => {
     setSearch(v);
@@ -735,6 +757,21 @@ export default function NftPage() {
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {/* RECORDS TAB                                                           */}
       {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* Watchdog alert + live indicator — shown across all tabs */}
+      {recWatchAlert && (
+        <div className="flex items-center justify-between px-4 py-2 rounded-xl text-sm"
+          style={{ background: "rgba(65,175,235,0.08)", border: "1px solid rgba(65,175,235,0.25)", color: "#2e9fd8" }}>
+          <span>⟳ {recWatchAlert}</span>
+          <button onClick={() => setRecWatchAlert(null)} className="ml-4 text-xs opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
+      {recWatchUpdated && (
+        <div className="flex items-center gap-1.5 text-xs" style={{ color: "#9bafc5" }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+          Live · last checked {recWatchUpdated.toLocaleTimeString()}
+        </div>
+      )}
+
       {activeTab === "records" && (
         <>
           {/* ── Stats ── */}

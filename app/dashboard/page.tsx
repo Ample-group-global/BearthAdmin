@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { fetchTokenMetadata, ipfsToGateway, type NFTMetadata } from "@/lib/ipfs";
+import { useInterval } from "@/lib/useInterval";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -345,6 +346,30 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
+  // ── Watchdog: silent 30s poll ─────────────────────────────────────────────
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const prevMintedRef = useRef<number | null>(null);
+  const [watchAlert, setWatchAlert] = useState<string | null>(null);
+
+  const silentPoll = useCallback(async () => {
+    try {
+      const res = await fetch("/api/nft-sell/collection/stats", { credentials: "include" });
+      if (!res.ok) return;
+      const d = await res.json();
+      setLastUpdated(new Date());
+      if (prevMintedRef.current !== null && d.totalMinted !== prevMintedRef.current) {
+        setWatchAlert(`On-chain minted count changed: ${prevMintedRef.current} → ${d.totalMinted}. Refreshing…`);
+        fetchStats();
+      }
+      prevMintedRef.current = d.totalMinted ?? prevMintedRef.current;
+      if (d.phaseName !== undefined) {
+        setStats(prev => prev ? { ...prev, ...d } : d);
+      }
+    } catch { /* silent — don't surface background poll errors */ }
+  }, [fetchStats]);
+
+  useInterval(silentPoll, 30_000);
+
   const handleSyncFromChain = async () => {
     setSyncing(true); setSyncMsg(null);
     try {
@@ -525,10 +550,27 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Watchdog alert */}
+      {watchAlert && (
+        <div className="flex items-center justify-between px-4 py-2 rounded-xl text-sm"
+          style={{ background: "rgba(65,175,235,0.08)", border: "1px solid rgba(65,175,235,0.25)", color: "#2e9fd8" }}>
+          <span>⟳ {watchAlert}</span>
+          <button onClick={() => setWatchAlert(null)} className="ml-4 text-xs opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
+
       {/* Sync message */}
       {syncMsg && (
         <div className="px-4 py-2 rounded-xl text-sm" style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.2)", color: "#16a34a" }}>
           {syncMsg}
+        </div>
+      )}
+
+      {/* Live indicator */}
+      {lastUpdated && (
+        <div className="flex items-center gap-1.5 text-xs" style={{ color: "#9bafc5" }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+          Live · last checked {lastUpdated.toLocaleTimeString()}
         </div>
       )}
 

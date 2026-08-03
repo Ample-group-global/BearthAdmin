@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { useInterval } from "@/lib/useInterval";
 import { ErrBanner, OkBanner, TxBanner as SharedTxBanner } from "@/components/nft/Banner";
 import { StatusBadge } from "@/components/nft/StatusBadge";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
@@ -408,6 +409,36 @@ export default function WavesPage() {
       .catch(() => { setError("Failed to load waves."); setLoading(false); });
   };
 
+  // ── Watchdog: silent 30s poll ─────────────────────────────────────────────
+  const [waveWatchAlert, setWaveWatchAlert] = useState<string | null>(null);
+  const [revealReadyCount, setRevealReadyCount] = useState(0);
+  const [watchUpdated, setWatchUpdated] = useState<Date | null>(null);
+
+  const silentWavePoll = useCallback(async () => {
+    try {
+      const res = await fetch("/api/nft-sell/waves", { credentials: "include" });
+      if (!res.ok) return;
+      const d = await res.json();
+      const updated: Wave[] = d.waves ?? [];
+      setWatchUpdated(new Date());
+
+      // detect waves whose reveal date has passed but are not yet revealed
+      const now = Date.now();
+      const readyToReveal = updated.filter(w =>
+        w.revealScheduledAt && new Date(w.revealScheduledAt).getTime() <= now && !w.waveRevealed
+      );
+      setRevealReadyCount(readyToReveal.length);
+      if (readyToReveal.length > 0) {
+        setWaveWatchAlert(`${readyToReveal.length} wave${readyToReveal.length > 1 ? "s" : ""} ready to reveal: ${readyToReveal.map(w => `Wave ${w.waveNumber}`).join(", ")}`);
+      }
+
+      // silently refresh wave list if data changed
+      setWaves(updated);
+    } catch { /* silent */ }
+  }, []);
+
+  useInterval(silentWavePoll, 30_000);
+
   useEffect(() => {
     loadWaves();
     fetch("/api/nft-sell/lookups/wave-sale-methods", { credentials: "include" })
@@ -611,7 +642,10 @@ export default function WavesPage() {
   const totalSold      = waves.reduce((s, w) => s + (w.soldCount ?? 0), 0);
 
   const revealNow = Date.now();
-  const readyCount = revealWaves.filter(w => waveState(w) === "ready_reveal").length;
+  const readyCount = Math.max(
+    revealWaves.filter(w => waveState(w) === "ready_reveal").length,
+    revealReadyCount
+  );
   const nextAction = revealWaves
     .flatMap(w => [
       w.scheduled_start && !w.wave_start_triggered ? { label: `W${w.wave_number} starts`, dt: new Date(w.scheduled_start).getTime() } : null,
@@ -687,6 +721,21 @@ export default function WavesPage() {
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {/* ── WAVES TAB ────────────────────────────────────────────────────── */}
       {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* Watchdog alert — shown across all tabs */}
+      {waveWatchAlert && (
+        <div className="flex items-center justify-between px-4 py-2 rounded-xl text-sm"
+          style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.25)", color: "#d97706" }}>
+          <span>⚡ {waveWatchAlert}</span>
+          <button onClick={() => setWaveWatchAlert(null)} className="ml-4 text-xs opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
+      {watchUpdated && (
+        <div className="flex items-center gap-1.5 text-xs" style={{ color: "#9bafc5" }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+          Live · last checked {watchUpdated.toLocaleTimeString()}
+        </div>
+      )}
+
       {activeTab === "waves" && (
         <>
           {/* Strategy banner */}
