@@ -349,6 +349,8 @@ export default function WavesPage() {
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
   const [saleMethods, setSaleMethods] = useState<SaleMethod[]>([]);
+  const [wavePage, setWavePage]       = useState(1);
+  const WAVES_PER_PAGE = 10;
 
   // DB edit modal
   const [editWave, setEditWave]   = useState<Wave | null>(null);
@@ -745,7 +747,7 @@ export default function WavesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {waves.map((w, i) => {
+                    {waves.slice((wavePage - 1) * WAVES_PER_PAGE, wavePage * WAVES_PER_PAGE).map((w, i) => {
                       const isClosed = w.waveClosed || w.status === "closed";
                       const isLocked = w.priceLocked;
                       return (
@@ -878,6 +880,34 @@ export default function WavesPage() {
               </div>
             )}
           </div>
+
+          {/* Pagination */}
+          {!loading && waves.length > WAVES_PER_PAGE && (
+            <div className="flex items-center justify-between px-2 py-1">
+              <span className="text-xs" style={{ color: "#9bafc5" }}>
+                Showing {(wavePage - 1) * WAVES_PER_PAGE + 1}–{Math.min(wavePage * WAVES_PER_PAGE, waves.length)} of {waves.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setWavePage(p => Math.max(1, p - 1))} disabled={wavePage === 1}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
+                  style={{ border: "1px solid #e5e7eb", color: "#374151", background: "white" }}>
+                  ← Prev
+                </button>
+                {Array.from({ length: Math.ceil(waves.length / WAVES_PER_PAGE) }, (_, i) => i + 1).map(p => (
+                  <button key={p} onClick={() => setWavePage(p)}
+                    className="w-8 h-8 rounded-lg text-xs font-semibold"
+                    style={{ border: "1px solid #e5e7eb", background: p === wavePage ? "#41afeb" : "white", color: p === wavePage ? "white" : "#374151" }}>
+                    {p}
+                  </button>
+                ))}
+                <button onClick={() => setWavePage(p => Math.min(Math.ceil(waves.length / WAVES_PER_PAGE), p + 1))} disabled={wavePage === Math.ceil(waves.length / WAVES_PER_PAGE)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
+                  style={{ border: "1px solid #e5e7eb", color: "#374151", background: "white" }}>
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Footer totals */}
           {!loading && waves.length > 0 && (
