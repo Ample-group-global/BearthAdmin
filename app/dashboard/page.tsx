@@ -380,7 +380,8 @@ export default function DashboardPage() {
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Resync failed");
-      setSyncMsg(`Synced ${d.synced} event${d.synced !== 1 ? "s" : ""} from chain${d.scannedBlocks ? ` (${d.scannedBlocks.toLocaleString()} blocks scanned)` : ""}`);
+      const skippedNote = d.skippedChunks > 0 ? ` · ${d.skippedChunks} chunk(s) skipped (RPC limit)` : "";
+      setSyncMsg(`Synced ${d.synced} event${d.synced !== 1 ? "s" : ""} from chain (${(d.scannedBlocks ?? 0).toLocaleString()} blocks scanned${skippedNote})`);
       await fetchStats();
     } catch (e: unknown) {
       setSyncMsg(e instanceof Error ? e.message : "Sync failed");
