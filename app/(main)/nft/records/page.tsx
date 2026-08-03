@@ -1168,7 +1168,7 @@ export default function NftPage() {
                   {[
                     { label: "Serial Number", val: viewRecord.serialNumber },
                     { label: "Token ID",      val: viewRecord.tokenId != null ? `#${viewRecord.tokenId}` : "Not minted" },
-                    { label: "Stage",         val: viewRecord.stageName ?? "—" },
+                    { label: "Stage",         val: viewRecord.tokenId != null ? (viewRecord.stageName ?? "—") : "—" },
                     { label: "Current Status",val: viewRecord.deliveryStatusName ?? "—" },
                     { label: "Owner Address", val: viewRecord.ownerAddress ? `${viewRecord.ownerAddress.slice(0,6)}…${viewRecord.ownerAddress.slice(-4)}` : "—" },
                   ].map(({ label, val }) => (
