@@ -744,8 +744,33 @@ export default function DashboardPage() {
                 <p className="text-sm text-gray-500">Loading from database…</p>
               </div>
             ) : paginated.length === 0 ? (
-              <div className="p-12 text-center text-gray-400 text-sm">
-                {tokens.length === 0 ? "No minted NFTs yet. Sync from chain to populate." : "No results match your filters."}
+              <div className="p-12 text-center text-sm">
+                {tokens.length === 0 && stats && stats.totalMinted > 0 ? (
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "rgba(251,191,36,0.12)" }}>
+                      <svg className="w-6 h-6" fill="none" stroke="#d97706" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700">{stats.totalMinted} NFT{stats.totalMinted !== 1 ? "s" : ""} minted on-chain but not synced to DB</p>
+                      <p className="text-xs text-slate-400 mt-1">Run Sync from Chain to load the records below</p>
+                    </div>
+                    <button onClick={handleSyncFromChain} disabled={syncing}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+                      style={{ background: "#41afeb" }}>
+                      <svg className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      {syncing ? "Syncing…" : "Sync from Chain"}
+                    </button>
+                    {syncMsg && <p className="text-xs mt-1" style={{ color: syncMsg.includes("failed") || syncMsg.includes("Sync failed") ? "#dc2626" : "#16a34a" }}>{syncMsg}</p>}
+                  </div>
+                ) : tokens.length === 0 ? (
+                  <span className="text-gray-400">No minted NFTs yet. Sync from chain to populate.</span>
+                ) : (
+                  <span className="text-gray-400">No results match your filters.</span>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">
