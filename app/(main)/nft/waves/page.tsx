@@ -414,9 +414,7 @@ export default function WavesPage() {
       .catch(() => {});
     fetch("/api/nft-sell/collection/stats", { credentials: "include" })
       .then(r => r.json())
-      .then(d => {
-        if (d.blindBoxUri) setBlindBoxUrl(d.blindBoxUri.replace("ipfs://", "https://amgbearth.myfilebase.com/ipfs/"));
-      })
+      .then(d => { if (d.blindBoxImageUrl) setBlindBoxUrl(d.blindBoxImageUrl); })
       .catch(() => {});
   }, []);
 

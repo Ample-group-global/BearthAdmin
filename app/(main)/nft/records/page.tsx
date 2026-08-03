@@ -245,6 +245,7 @@ export default function NftPage() {
   const [sortDir, setSortDir]         = useState<"asc" | "desc">("asc");
   const [viewRecord, setViewRecord]   = useState<NftRecord | null>(null);
   const [waves, setWaves]             = useState<Array<{ waveNumber: number; name: string }>>([]);
+  const [blindBoxImageUrl, setBlindBoxImageUrl] = useState<string | null>(null);
 
   // ── Sales History tab state ───────────────────────────────────────────────
   const [saleRecords,  setSaleRecords]  = useState<SaleRecord[]>([]);
@@ -364,6 +365,10 @@ export default function NftPage() {
       .then(r => r.json()).then(d => setMaster(d)).catch(() => {});
     fetch("/api/nft-sell/waves", { credentials: "include" })
       .then(r => r.json()).then(d => setWaves(d.waves ?? [])).catch(() => {});
+    fetch("/api/nft-sell/collection/stats", { credentials: "include" })
+      .then(r => r.json())
+      .then(d => { if (d.blindBoxImageUrl) setBlindBoxImageUrl(d.blindBoxImageUrl); })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -554,7 +559,7 @@ export default function NftPage() {
       header: "NFT",
       width: 90,
       align: "center",
-      render: r => <NftImage hash={r.imageIpfsHash} isRevealed={r.isRevealed} blindBoxUri={r.blindBoxUri} size={70} />,
+      render: r => <NftImage hash={r.imageIpfsHash} isRevealed={r.isRevealed} blindBoxUri={blindBoxImageUrl} size={70} />,
     },
     {
       key: "wave",
@@ -1154,7 +1159,7 @@ export default function NftPage() {
               {/* NFT Identity */}
               <div className="flex gap-5">
                 <div className="flex-shrink-0">
-                  <NftImage hash={viewRecord.imageIpfsHash} isRevealed={viewRecord.isRevealed} blindBoxUri={viewRecord.blindBoxUri} size={120} />
+                  <NftImage hash={viewRecord.imageIpfsHash} isRevealed={viewRecord.isRevealed} blindBoxUri={blindBoxImageUrl} size={120} />
                   <div className="mt-2 text-center">
                     <RevealBadge revealed={viewRecord.isRevealed} />
                   </div>
