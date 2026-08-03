@@ -14,6 +14,7 @@ interface DbStats {
   remaining: number;
   mintProgress: number;
   blindBoxUri: string | null;
+  blindBoxImageUrl?: string | null;
   whitelistMint: { soldCount: number; quantity: number; closed: boolean };
   paidMint: { soldCount: number; quantity: number; priceEth: number | null; closed: boolean };
   revealed: number;
