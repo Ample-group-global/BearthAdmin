@@ -132,15 +132,17 @@ function NFTThumb({ tokenId, blindBoxUrl }: { tokenId: number; blindBoxUrl: stri
 
 // ─── NFT Detail Modal ─────────────────────────────────────────────────────────
 
-function NFTModal({ token, blockExplorer, waveName, onClose }: { token: DbToken; blockExplorer: string; waveName?: string; onClose: () => void }) {
+function NFTModal({ token, blockExplorer, waveName, blindBoxImageUrl, onClose }: { token: DbToken; blockExplorer: string; waveName?: string; blindBoxImageUrl: string | null; onClose: () => void }) {
   const [meta, setMeta] = useState<NFTMetadata | null>(null);
   const [metaLoading, setMetaLoading] = useState(true);
   const [imgError, setImgError] = useState(false);
+  const [blindErr, setBlindErr] = useState(false);
 
   useEffect(() => {
     setMetaLoading(true);
     setMeta(null);
     setImgError(false);
+    setBlindErr(false);
     if (token.is_revealed) {
       fetchTokenMetadata(token.token_id).then(m => { setMeta(m); setMetaLoading(false); });
     } else {
@@ -176,6 +178,11 @@ function NFTModal({ token, blockExplorer, waveName, onClose }: { token: DbToken;
               className="w-full aspect-square rounded-xl object-contain"
               style={{ background: "#e9edf7" }}
               onError={() => setImgError(true)} />
+          ) : !token.is_revealed && blindBoxImageUrl && !blindErr ? (
+            <img src={blindBoxImageUrl} alt="Blind Box"
+              className="w-full aspect-square rounded-xl object-contain"
+              style={{ background: "#e9edf7" }}
+              onError={() => setBlindErr(true)} />
           ) : (
             <div className="w-full aspect-square rounded-xl flex flex-col items-center justify-center gap-2"
               style={{ background: "#e9edf7", color: "#9bafc5" }}>
@@ -197,7 +204,7 @@ function NFTModal({ token, blockExplorer, waveName, onClose }: { token: DbToken;
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="font-mono text-xs font-bold px-2 py-0.5 rounded" style={{ background: "#f4f6fb", color: "#24315f" }}>
-                #{token.token_id}
+                {token.token_id != null ? `#${token.token_id}` : "—"}
               </span>
               <Badge label={mintTypeLabel(token.wave_number)} style={mintTypeBadgeStyle(token.wave_number)} />
               {token.is_revealed
@@ -208,7 +215,7 @@ function NFTModal({ token, blockExplorer, waveName, onClose }: { token: DbToken;
               )}
             </div>
             <h2 className="text-xl font-bold text-gray-900">
-              {metaLoading ? "Loading…" : meta?.name ?? `Bearth NFT #${token.token_id}`}
+              {metaLoading ? "Loading…" : meta?.name ?? (token.token_id != null ? `Bearth NFT #${token.token_id}` : "Bearth NFT — Blind Box")}
             </h2>
             {meta?.description && <p className="text-sm mt-1.5 leading-relaxed" style={{ color: "#6b7280" }}>{meta.description}</p>}
           </div>
@@ -483,6 +490,7 @@ export default function DashboardPage() {
           token={selectedToken}
           blockExplorer={BLOCK_EXPLORER}
           waveName={waves.find(w => w.waveNum === selectedToken.wave_number)?.name}
+          blindBoxImageUrl={stats?.blindBoxImageUrl ?? null}
           onClose={() => setSelectedToken(null)}
         />
       )}
