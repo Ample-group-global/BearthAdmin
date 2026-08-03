@@ -773,7 +773,7 @@ export default function DashboardPage() {
                           style={{ background: isEven ? "#fff" : "#fafbff", borderBottom: "1px solid #f3f4f6" }}
                           onMouseEnter={e => (e.currentTarget.style.background = "#eff8fe")}
                           onMouseLeave={e => (e.currentTarget.style.background = isEven ? "#fff" : "#fafbff")}>
-                          <td className="px-3 py-2"><NFTThumb tokenId={t.token_id} blindBoxUrl={stats?.blindBoxUri ? ipfsToGateway(stats.blindBoxUri) : null} /></td>
+                          <td className="px-3 py-2"><NFTThumb tokenId={t.token_id} blindBoxUrl={stats?.blindBoxImageUrl ?? (stats?.blindBoxUri ? ipfsToGateway(stats.blindBoxUri) : null)} /></td>
                           <td className="px-4 py-3 font-mono font-bold" style={{ color: "#24315f" }}>#{t.token_id}</td>
                           <td className="px-4 py-3">
                             <button onClick={e => { e.stopPropagation(); copyToClipboard(t.owner_address ?? ""); }}
