@@ -3,9 +3,9 @@
 import React from 'react';
 
 const STEPS = [
-  { id: 'rarity',   label: 'Rarity',   icon: '💎' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
   { id: 'organize', label: 'Organize', icon: '🗂️' },
+  { id: 'rarity',   label: 'Rarity',   icon: '💎' },
   { id: 'preview',  label: 'Preview',  icon: '👁️' },
   { id: 'export',   label: 'Export',   icon: '📦' },
 ];

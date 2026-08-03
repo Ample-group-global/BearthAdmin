@@ -7,6 +7,14 @@ export const dynamic = 'force-dynamic';
 
 const API_BASE = process.env.BEARTH_API_URL ?? 'http://localhost:4000';
 
+async function toThumbnail(input: string | Buffer, w: number, h: number): Promise<Buffer> {
+  return sharp(input, { failOn: 'none' })
+    .trim({ threshold: 10 })
+    .resize(w, h, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer();
+}
+
 export async function GET(req: Request, { params }: { params: Promise<{ rel: string[] }> }) {
   const rel       = (await params).rel.join('/');
   const layersDir = getLayersDir();
@@ -15,16 +23,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ rel: str
   const w   = parseInt(url.searchParams.get('w') ?? '512') || 512;
   const h   = parseInt(url.searchParams.get('h') ?? '512') || 512;
 
-  // Try local disk first (works in local dev), resize with Sharp
+  // Try local disk first (works in local dev), trim transparent borders then resize
   if (layersDir) {
     const file     = path.join(layersDir, rel);
     const relCheck = path.relative(layersDir, file);
     if (!relCheck.startsWith('..') && !path.isAbsolute(relCheck) && fs.existsSync(file)) {
       try {
-        const buf = await sharp(file)
-          .resize(w, h, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-          .png()
-          .toBuffer();
+        const buf = await toThumbnail(file, w, h);
         return new Response(new Uint8Array(buf), {
           headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' },
         });
@@ -38,7 +43,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ rel: str
   try {
     const upstream = await fetch(`${API_BASE}/api/nft-gen/layers/image?rel=${encodeURIComponent(rel)}`);
     if (!upstream.ok) return new Response(null, { status: 404 });
-    const buf = Buffer.from(await upstream.arrayBuffer());
+    const raw = Buffer.from(await upstream.arrayBuffer());
+    const buf = await toThumbnail(raw, w, h).catch(() => raw);
     return new Response(new Uint8Array(buf), {
       headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' },
     });

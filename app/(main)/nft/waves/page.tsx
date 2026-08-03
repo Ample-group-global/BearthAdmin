@@ -72,7 +72,7 @@ interface WaveSchedule {
 
 // ─── Reveal tab helpers ───────────────────────────────────────────────────────
 
-const PHASE_LABELS: Record<number, string> = { 0: "Free Mint", 1: "Paid Mint", 2: "Revealed" };
+const PHASE_LABELS: Record<number, string> = { 0: "Whitelist", 1: "PaidMint", 2: "Revealed" };
 const PHASE_COLORS: Record<number, { color: string; bg: string }> = {
   0: { color: "#7c3aed", bg: "rgba(124,58,237,0.1)" },
   1: { color: "#41afeb", bg: "rgba(65,175,235,0.1)" },
@@ -91,7 +91,7 @@ function fmtFull(dt: string | null): string {
 
 function waveState(w: WaveSchedule): "revealed" | "ready_reveal" | "reveal_scheduled" | "active" | "ended" | "upcoming" | "not_scheduled" {
   const now = Date.now();
-  if (w.is_revealed || w.wave_reveal_triggered) return "revealed";
+  if (w.is_revealed) return "revealed"; // authoritative flag — wave_reveal_triggered alone may be set on a failed tx
   if (w.reveal_scheduled_at && new Date(w.reveal_scheduled_at).getTime() <= now) return "ready_reveal";
   if (w.reveal_scheduled_at && new Date(w.reveal_scheduled_at).getTime() > now)  return "reveal_scheduled";
   if (w.wave_start_triggered && !w.wave_end_triggered) return "active";
@@ -394,6 +394,7 @@ export default function WavesPage() {
   const [revealWave,        setRevealWave]        = useState<WaveSchedule | null>(null);
   const [revealSuccessData, setRevealSuccessData] = useState<{ txHash: string; waveNum: number } | null>(null);
   const revealLoadedRef = useRef(false);
+  const [blindBoxUrl, setBlindBoxUrl] = useState<string | null>(null);
 
   // ── Waves tab data loading ──
 
@@ -410,6 +411,12 @@ export default function WavesPage() {
     fetch("/api/nft-sell/lookups/wave-sale-methods", { credentials: "include" })
       .then(r => r.json())
       .then(d => setSaleMethods(d.saleMethods ?? []))
+      .catch(() => {});
+    fetch("/api/nft-sell/collection/stats", { credentials: "include" })
+      .then(r => r.json())
+      .then(d => {
+        if (d.blindBoxUri) setBlindBoxUrl(d.blindBoxUri.replace("ipfs://", "https://amgbearth.myfilebase.com/ipfs/"));
+      })
       .catch(() => {});
   }, []);
 
@@ -751,12 +758,19 @@ export default function WavesPage() {
 
                           <td style={{ padding: "10px 14px" }}>
                             <div className="flex items-center gap-2">
-                              <img
-                                src="https://amgbearth.myfilebase.com/ipfs/QmbJJezw9jgxN1P4eWD58XU6rSPokENE4MmD2i4qfBwfrF"
-                                alt="NFT"
-                                className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
-                                style={{ border: isClosed ? "2px solid #16a34a" : w.status === "active" ? "2px solid #41afeb" : "2px solid #e5e7eb" }}
-                              />
+                              {blindBoxUrl ? (
+                                <img
+                                  src={blindBoxUrl}
+                                  alt="NFT"
+                                  className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+                                  style={{ border: isClosed ? "2px solid #16a34a" : w.status === "active" ? "2px solid #41afeb" : "2px solid #e5e7eb" }}
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0"
+                                  style={{ background: "#f4f6fb", border: isClosed ? "2px solid #16a34a" : w.status === "active" ? "2px solid #41afeb" : "2px solid #e5e7eb" }}>
+                                  🐻
+                                </div>
+                              )}
                               <div className="font-semibold text-xs" style={{ color: "#111827" }}>{w.name}</div>
                             </div>
                           </td>

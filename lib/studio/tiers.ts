@@ -13,6 +13,9 @@ export const TIER_PRESET_WEIGHTS: Record<string, number> = {
   Common:    30,
 };
 
+export const DISABLED_TIER = { max: 0, label: 'Disabled', color: '#9CA3AF', bg: 'rgba(156,163,175,.15)' };
+
 export function getTier(prob: any) {
+  if (prob <= 0) return DISABLED_TIER;
   return TIERS.find(t => prob <= t.max) ?? TIERS[TIERS.length - 1];
 }
