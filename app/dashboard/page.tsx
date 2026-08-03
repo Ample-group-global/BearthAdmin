@@ -85,9 +85,13 @@ function fmtDate(dt: string | null | undefined): string {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function StatCard({ label, value, sub, accent }: { label: string; value: React.ReactNode; sub?: string; accent?: string }) {
+function StatCard({ label, value, sub, accent, onClick }: { label: string; value: React.ReactNode; sub?: string; accent?: string; onClick?: () => void }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+    <div
+      className={`bg-white rounded-xl border p-5 shadow-sm transition-all ${onClick ? "cursor-pointer hover:border-blue-400 hover:shadow-md" : "border-slate-200"}`}
+      onClick={onClick}
+      title={onClick ? "Click to filter Minted NFTs" : undefined}
+    >
       <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">{label}</p>
       <p className={`text-2xl font-bold ${accent ?? "text-slate-900"}`}>{value}</p>
       {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
@@ -410,10 +414,24 @@ export default function DashboardPage() {
   const [search, setSearch]           = useState("");
   const [waveFilter, setWaveFilter]   = useState("all");
   const [revealFilter, setRevealFilter] = useState("all");
+  const [rarityFilter, setRarityFilter] = useState("all");
   const [sortCol, setSortCol]         = useState<SortCol>("tokenId");
   const [sortDir, setSortDir]         = useState<"asc" | "desc">("asc");
   const [page, setPage]               = useState(1);
   const PER_PAGE = 50;
+
+  // Jump to Minted tab with pre-applied filters (from Overview card clicks)
+  const jumpToMinted = useCallback((opts: { wave?: string; reveal?: string; rarity?: string }) => {
+    setWaveFilter(opts.wave ?? "all");
+    setRevealFilter(opts.reveal ?? "all");
+    setRarityFilter(opts.rarity ?? "all");
+    setSearch("");
+    setPage(1);
+    switchTab("minted");
+  }, []);
+
+  const clearFilters = () => { setWaveFilter("all"); setRevealFilter("all"); setRarityFilter("all"); setSearch(""); setPage(1); };
+  const hasActiveFilter = waveFilter !== "all" || revealFilter !== "all" || rarityFilter !== "all" || search !== "";
 
   const loadTokens = useCallback(async () => {
     setNftLoading(true); setNftError(null);
@@ -456,12 +474,15 @@ export default function DashboardPage() {
       (t.owner_address?.toLowerCase().includes(q)) ||
       (t.mint_tx_hash?.toLowerCase().includes(q))
     );
-    if (waveFilter !== "all") {
+    if (waveFilter === "paid") {
+      list = list.filter(t => (t.wave_number ?? 0) > 1);
+    } else if (waveFilter !== "all") {
       const wn = parseInt(waveFilter);
       list = list.filter(t => (t.wave_number ?? 0) === wn);
     }
     if (revealFilter === "revealed") list = list.filter(t => t.is_revealed);
     if (revealFilter === "blind")    list = list.filter(t => !t.is_revealed);
+    if (rarityFilter !== "all")      list = list.filter(t => t.rarity_tier === rarityFilter);
 
     list.sort((a, b) => {
       let cmp = 0;
@@ -473,7 +494,7 @@ export default function DashboardPage() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return list;
-  }, [tokens, search, waveFilter, revealFilter, sortCol, sortDir]);
+  }, [tokens, search, waveFilter, revealFilter, rarityFilter, sortCol, sortDir]);
 
   const totalPages = Math.ceil(filtered.length / PER_PAGE);
   const paginated  = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
@@ -616,11 +637,13 @@ export default function DashboardPage() {
                   label="Total Minted"
                   value={`${stats.totalMinted} / ${stats.maxSupply}`}
                   sub={`${stats.mintProgress}% of supply · ${stats.remaining} remaining`}
+                  onClick={() => jumpToMinted({})}
                 />
                 <StatCard
                   label="Whitelist Mint (Wave 1)"
                   value={stats.whitelistMint.soldCount}
                   sub={`of ${stats.whitelistMint.quantity} allocated${stats.whitelistMint.closed ? " · Closed" : ""}`}
+                  onClick={() => jumpToMinted({ wave: "1" })}
                 />
                 <StatCard
                   label="Whitelist Size"
@@ -631,12 +654,14 @@ export default function DashboardPage() {
                   label="Paid Mint (Waves 2–7)"
                   value={stats.paidMint.soldCount}
                   sub={`of ${stats.paidMint.quantity} allocated${stats.paidMint.priceEth ? ` · ${stats.paidMint.priceEth} ETH` : ""}`}
+                  onClick={() => jumpToMinted({ wave: "paid" })}
                 />
                 <StatCard
                   label="Reveal Status"
                   value={stats.isRevealed ? "Revealed" : `${stats.revealed} Waves`}
                   accent={stats.isRevealed || stats.revealed > 0 ? "text-emerald-700" : "text-slate-500"}
                   sub={stats.isRevealed ? "All NFTs revealed" : stats.revealed > 0 ? "Partial reveal" : "Blind box — awaiting reveal"}
+                  onClick={stats.isRevealed || stats.revealed > 0 ? () => jumpToMinted({ reveal: "revealed" }) : undefined}
                 />
                 <StatCard
                   label="SBT Mode"
@@ -714,24 +739,33 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Summary cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-            {[
-              { label: "Total",     value: tokenStats.total,    color: "#24315f" },
-              { label: "WL Free",   value: tokenStats.wave1,    color: "#2e9fd8" },
-              { label: "Paid",      value: tokenStats.paid,     color: "#7c3aed" },
-              { label: "Admin",     value: tokenStats.admin,    color: "#6b7280" },
-              { label: "Revealed",  value: tokenStats.revealed, color: "#059669" },
-              { label: "Legendary", value: tokenStats.legendary, color: "#d97706" },
-              { label: "Epic",      value: tokenStats.epic,     color: "#7c3aed" },
-              { label: "Rare",      value: tokenStats.rare,     color: "#3b82f6" },
-            ].map(c => (
-              <div key={c.label} className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
-                <p className="text-xs text-gray-400 mb-1 font-medium">{c.label}</p>
-                <p className="text-xl font-bold" style={{ color: c.color }}>{c.value}</p>
+          {/* Summary filter cards — click to filter */}
+          {(() => {
+            const isNoFilter = !hasActiveFilter;
+            const cards: { label: string; value: number; color: string; active: boolean; onClick: () => void }[] = [
+              { label: "Total",     value: tokenStats.total,     color: "#24315f", active: isNoFilter,                         onClick: clearFilters },
+              { label: "WL Free",   value: tokenStats.wave1,     color: "#2e9fd8", active: waveFilter === "1",                 onClick: () => { setWaveFilter("1");     setRevealFilter("all"); setRarityFilter("all"); setSearch(""); setPage(1); } },
+              { label: "Paid",      value: tokenStats.paid,      color: "#7c3aed", active: waveFilter === "paid",              onClick: () => { setWaveFilter("paid");  setRevealFilter("all"); setRarityFilter("all"); setSearch(""); setPage(1); } },
+              { label: "Admin",     value: tokenStats.admin,     color: "#6b7280", active: waveFilter === "0",                 onClick: () => { setWaveFilter("0");     setRevealFilter("all"); setRarityFilter("all"); setSearch(""); setPage(1); } },
+              { label: "Revealed",  value: tokenStats.revealed,  color: "#059669", active: revealFilter === "revealed",        onClick: () => { setRevealFilter("revealed"); setWaveFilter("all"); setRarityFilter("all"); setSearch(""); setPage(1); } },
+              { label: "Legendary", value: tokenStats.legendary, color: "#d97706", active: rarityFilter === "Legendary",      onClick: () => { setRarityFilter("Legendary"); setWaveFilter("all"); setRevealFilter("all"); setSearch(""); setPage(1); } },
+              { label: "Epic",      value: tokenStats.epic,      color: "#7c3aed", active: rarityFilter === "Epic",           onClick: () => { setRarityFilter("Epic");      setWaveFilter("all"); setRevealFilter("all"); setSearch(""); setPage(1); } },
+              { label: "Rare",      value: tokenStats.rare,      color: "#3b82f6", active: rarityFilter === "Rare",           onClick: () => { setRarityFilter("Rare");      setWaveFilter("all"); setRevealFilter("all"); setSearch(""); setPage(1); } },
+            ];
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+                {cards.map(c => (
+                  <button key={c.label} onClick={c.onClick}
+                    className="bg-white rounded-xl p-3 shadow-sm text-left transition-all"
+                    style={{ border: c.active ? `2px solid ${c.color}` : "1px solid #e5e7eb", outline: "none" }}
+                    title={`Filter by ${c.label}`}>
+                    <p className="text-xs mb-1 font-medium" style={{ color: c.active ? c.color : "#9bafc5" }}>{c.label}</p>
+                    <p className="text-xl font-bold" style={{ color: c.color }}>{c.value}</p>
+                  </button>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()}
 
           {nftError && (
             <div className="p-4 rounded-xl text-sm" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>
@@ -754,6 +788,7 @@ export default function DashboardPage() {
               className="px-3 py-2 rounded-lg text-sm outline-none"
               style={{ border: "1px solid #e5e7eb", color: "#374151" }}>
               <option value="all">All Waves</option>
+              <option value="paid">Paid (Waves 2–7)</option>
               <option value="0">Admin Reserve</option>
               {waves.length > 0
                 ? waves.map(w => (
@@ -771,6 +806,22 @@ export default function DashboardPage() {
               <option value="revealed">Revealed</option>
               <option value="blind">Blind Box</option>
             </select>
+            <select value={rarityFilter} onChange={e => { setRarityFilter(e.target.value); setPage(1); }}
+              className="px-3 py-2 rounded-lg text-sm outline-none"
+              style={{ border: "1px solid #e5e7eb", color: "#374151" }}>
+              <option value="all">All Rarities</option>
+              <option value="Legendary">Legendary</option>
+              <option value="Epic">Epic</option>
+              <option value="Rare">Rare</option>
+              <option value="Common">Common</option>
+            </select>
+            {hasActiveFilter && (
+              <button onClick={clearFilters}
+                className="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{ background: "rgba(220,38,38,0.07)", border: "1px solid rgba(220,38,38,0.2)", color: "#dc2626" }}>
+                ✕ Clear
+              </button>
+            )}
             <span className="ml-auto text-xs" style={{ color: "#9bafc5" }}>
               {filtered.length} results · click row to preview
             </span>
