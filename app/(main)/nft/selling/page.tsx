@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { useInterval } from "@/lib/useInterval";
 import { TxBanner, ErrBanner, OkBanner } from "@/components/nft/Banner";
 import { Toggle } from "@/components/nft/Toggle";
 import { SectionCard } from "@/components/nft/SectionCard";
@@ -198,6 +199,37 @@ export default function SellingPage() {
 
   useEffect(() => { load(); }, []);
   useEffect(() => { if (tab === "Admin Sales") loadSales(0, salesStatus); }, [tab]);
+
+  // ── Watchdog: silent 60s poll ─────────────────────────────────────────────
+  const [sellWatchAlert, setSellWatchAlert] = useState<string | null>(null);
+  const [sellWatchUpdated, setSellWatchUpdated] = useState<Date | null>(null);
+  const prevPhaseRef = useRef<number | null>(null);
+  const prevMintedRef = useRef<number | null>(null);
+
+  const silentSellPoll = useCallback(async () => {
+    try {
+      const res = await fetch("/api/nft-sell/collection", { credentials: "include" });
+      if (!res.ok) return;
+      const d = await res.json();
+      setSellWatchUpdated(new Date());
+      const oc: OnChainInfo | null = d.onChain ?? null;
+      if (!oc) return;
+
+      if (prevPhaseRef.current !== null && oc.currentPhase !== prevPhaseRef.current) {
+        const names = ["Whitelist", "PaidMint", "Revealed"];
+        setSellWatchAlert(`Phase changed on-chain: ${names[prevPhaseRef.current] ?? prevPhaseRef.current} → ${names[oc.currentPhase] ?? oc.currentPhase}`);
+        setOnChain(oc);
+      }
+      if (prevMintedRef.current !== null && oc.totalMinted !== prevMintedRef.current) {
+        setSellWatchAlert(`New mints detected on-chain: ${prevMintedRef.current} → ${oc.totalMinted}`);
+        setOnChain(oc);
+      }
+      prevPhaseRef.current = oc.currentPhase;
+      prevMintedRef.current = oc.totalMinted;
+    } catch { /* silent */ }
+  }, []);
+
+  useInterval(silentSellPoll, 60_000);
 
   // ── Op helper ──
 
@@ -410,6 +442,21 @@ export default function SellingPage() {
               <div className="h-1.5 rounded-full transition-all"
                 style={{ width: `${mintProgress}%`, background: mintProgress === 100 ? "#16a34a" : "#41afeb" }} />
             </div>
+          </div>
+        )}
+
+        {/* Watchdog alert */}
+        {sellWatchAlert && (
+          <div className="flex items-center justify-between px-4 py-2 rounded-xl text-sm"
+            style={{ background: "rgba(65,175,235,0.08)", border: "1px solid rgba(65,175,235,0.25)", color: "#2e9fd8" }}>
+            <span>⟳ {sellWatchAlert}</span>
+            <button onClick={() => setSellWatchAlert(null)} className="ml-4 text-xs opacity-60 hover:opacity-100">✕</button>
+          </div>
+        )}
+        {sellWatchUpdated && (
+          <div className="flex items-center gap-1.5 text-xs" style={{ color: "#9bafc5" }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+            Live · last checked {sellWatchUpdated.toLocaleTimeString()}
           </div>
         )}
 

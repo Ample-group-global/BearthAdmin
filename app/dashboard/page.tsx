@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { fetchTokenMetadata, ipfsToGateway, type NFTMetadata } from "@/lib/ipfs";
+import { useInterval } from "@/lib/useInterval";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ interface DbStats {
   remaining: number;
   mintProgress: number;
   blindBoxUri: string | null;
+  blindBoxImageUrl?: string | null;
   whitelistMint: { soldCount: number; quantity: number; closed: boolean };
   paidMint: { soldCount: number; quantity: number; priceEth: number | null; closed: boolean };
   revealed: number;
@@ -131,15 +133,17 @@ function NFTThumb({ tokenId, blindBoxUrl }: { tokenId: number; blindBoxUrl: stri
 
 // ─── NFT Detail Modal ─────────────────────────────────────────────────────────
 
-function NFTModal({ token, blockExplorer, waveName, onClose }: { token: DbToken; blockExplorer: string; waveName?: string; onClose: () => void }) {
+function NFTModal({ token, blockExplorer, waveName, blindBoxImageUrl, onClose }: { token: DbToken; blockExplorer: string; waveName?: string; blindBoxImageUrl: string | null; onClose: () => void }) {
   const [meta, setMeta] = useState<NFTMetadata | null>(null);
   const [metaLoading, setMetaLoading] = useState(true);
   const [imgError, setImgError] = useState(false);
+  const [blindErr, setBlindErr] = useState(false);
 
   useEffect(() => {
     setMetaLoading(true);
     setMeta(null);
     setImgError(false);
+    setBlindErr(false);
     if (token.is_revealed) {
       fetchTokenMetadata(token.token_id).then(m => { setMeta(m); setMetaLoading(false); });
     } else {
@@ -175,6 +179,11 @@ function NFTModal({ token, blockExplorer, waveName, onClose }: { token: DbToken;
               className="w-full aspect-square rounded-xl object-contain"
               style={{ background: "#e9edf7" }}
               onError={() => setImgError(true)} />
+          ) : !token.is_revealed && blindBoxImageUrl && !blindErr ? (
+            <img src={blindBoxImageUrl} alt="Blind Box"
+              className="w-full aspect-square rounded-xl object-contain"
+              style={{ background: "#e9edf7" }}
+              onError={() => setBlindErr(true)} />
           ) : (
             <div className="w-full aspect-square rounded-xl flex flex-col items-center justify-center gap-2"
               style={{ background: "#e9edf7", color: "#9bafc5" }}>
@@ -196,7 +205,7 @@ function NFTModal({ token, blockExplorer, waveName, onClose }: { token: DbToken;
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="font-mono text-xs font-bold px-2 py-0.5 rounded" style={{ background: "#f4f6fb", color: "#24315f" }}>
-                #{token.token_id}
+                {token.token_id != null ? `#${token.token_id}` : "—"}
               </span>
               <Badge label={mintTypeLabel(token.wave_number)} style={mintTypeBadgeStyle(token.wave_number)} />
               {token.is_revealed
@@ -207,7 +216,7 @@ function NFTModal({ token, blockExplorer, waveName, onClose }: { token: DbToken;
               )}
             </div>
             <h2 className="text-xl font-bold text-gray-900">
-              {metaLoading ? "Loading…" : meta?.name ?? `Bearth NFT #${token.token_id}`}
+              {metaLoading ? "Loading…" : meta?.name ?? (token.token_id != null ? `Bearth NFT #${token.token_id}` : "Bearth NFT — Blind Box")}
             </h2>
             {meta?.description && <p className="text-sm mt-1.5 leading-relaxed" style={{ color: "#6b7280" }}>{meta.description}</p>}
           </div>
@@ -337,6 +346,30 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
+  // ── Watchdog: silent 30s poll ─────────────────────────────────────────────
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const prevMintedRef = useRef<number | null>(null);
+  const [watchAlert, setWatchAlert] = useState<string | null>(null);
+
+  const silentPoll = useCallback(async () => {
+    try {
+      const res = await fetch("/api/nft-sell/collection/stats", { credentials: "include" });
+      if (!res.ok) return;
+      const d = await res.json();
+      setLastUpdated(new Date());
+      if (prevMintedRef.current !== null && d.totalMinted !== prevMintedRef.current) {
+        setWatchAlert(`On-chain minted count changed: ${prevMintedRef.current} → ${d.totalMinted}. Refreshing…`);
+        fetchStats();
+      }
+      prevMintedRef.current = d.totalMinted ?? prevMintedRef.current;
+      if (d.phaseName !== undefined) {
+        setStats(prev => prev ? { ...prev, ...d } : d);
+      }
+    } catch { /* silent — don't surface background poll errors */ }
+  }, [fetchStats]);
+
+  useInterval(silentPoll, 30_000);
+
   const handleSyncFromChain = async () => {
     setSyncing(true); setSyncMsg(null);
     try {
@@ -347,7 +380,8 @@ export default function DashboardPage() {
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Resync failed");
-      setSyncMsg(`Synced ${d.synced} events from chain`);
+      const skippedNote = d.skippedChunks > 0 ? ` · ${d.skippedChunks} chunk(s) skipped (RPC limit)` : "";
+      setSyncMsg(`Synced ${d.synced} event${d.synced !== 1 ? "s" : ""} from chain (${(d.scannedBlocks ?? 0).toLocaleString()} blocks scanned${skippedNote})`);
       await fetchStats();
     } catch (e: unknown) {
       setSyncMsg(e instanceof Error ? e.message : "Sync failed");
@@ -482,6 +516,7 @@ export default function DashboardPage() {
           token={selectedToken}
           blockExplorer={BLOCK_EXPLORER}
           waveName={waves.find(w => w.waveNum === selectedToken.wave_number)?.name}
+          blindBoxImageUrl={stats?.blindBoxImageUrl ?? null}
           onClose={() => setSelectedToken(null)}
         />
       )}
@@ -516,10 +551,27 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Watchdog alert */}
+      {watchAlert && (
+        <div className="flex items-center justify-between px-4 py-2 rounded-xl text-sm"
+          style={{ background: "rgba(65,175,235,0.08)", border: "1px solid rgba(65,175,235,0.25)", color: "#2e9fd8" }}>
+          <span>⟳ {watchAlert}</span>
+          <button onClick={() => setWatchAlert(null)} className="ml-4 text-xs opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
+
       {/* Sync message */}
       {syncMsg && (
         <div className="px-4 py-2 rounded-xl text-sm" style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.2)", color: "#16a34a" }}>
           {syncMsg}
+        </div>
+      )}
+
+      {/* Live indicator */}
+      {lastUpdated && (
+        <div className="flex items-center gap-1.5 text-xs" style={{ color: "#9bafc5" }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+          Live · last checked {lastUpdated.toLocaleTimeString()}
         </div>
       )}
 
@@ -641,7 +693,7 @@ export default function DashboardPage() {
           {/* Header */}
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <p className="text-sm" style={{ color: "#9bafc5" }}>
-              {tokens.length} loaded from DB · {totalTokens} total on-chain
+              {tokens.length} loaded · {totalTokens} minted in DB
             </p>
             <div className="flex items-center gap-2 flex-wrap">
               {tokens.length > 0 && (
@@ -735,8 +787,33 @@ export default function DashboardPage() {
                 <p className="text-sm text-gray-500">Loading from database…</p>
               </div>
             ) : paginated.length === 0 ? (
-              <div className="p-12 text-center text-gray-400 text-sm">
-                {tokens.length === 0 ? "No minted NFTs yet. Sync from chain to populate." : "No results match your filters."}
+              <div className="p-12 text-center text-sm">
+                {tokens.length === 0 && stats && stats.totalMinted > 0 ? (
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "rgba(251,191,36,0.12)" }}>
+                      <svg className="w-6 h-6" fill="none" stroke="#d97706" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700">{stats.totalMinted} NFT{stats.totalMinted !== 1 ? "s" : ""} minted on-chain but not synced to DB</p>
+                      <p className="text-xs text-slate-400 mt-1">Run Sync from Chain to load the records below</p>
+                    </div>
+                    <button onClick={handleSyncFromChain} disabled={syncing}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+                      style={{ background: "#41afeb" }}>
+                      <svg className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      {syncing ? "Syncing…" : "Sync from Chain"}
+                    </button>
+                    {syncMsg && <p className="text-xs mt-1" style={{ color: syncMsg.includes("failed") || syncMsg.includes("Sync failed") ? "#dc2626" : "#16a34a" }}>{syncMsg}</p>}
+                  </div>
+                ) : tokens.length === 0 ? (
+                  <span className="text-gray-400">No minted NFTs yet. Sync from chain to populate.</span>
+                ) : (
+                  <span className="text-gray-400">No results match your filters.</span>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">

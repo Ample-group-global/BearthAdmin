@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { useInterval } from "@/lib/useInterval";
 import { ErrBanner, OkBanner, TxBanner as SharedTxBanner } from "@/components/nft/Banner";
 import { StatusBadge } from "@/components/nft/StatusBadge";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
@@ -349,6 +350,8 @@ export default function WavesPage() {
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
   const [saleMethods, setSaleMethods] = useState<SaleMethod[]>([]);
+  const [wavePage, setWavePage]       = useState(1);
+  const WAVES_PER_PAGE = 10;
 
   // DB edit modal
   const [editWave, setEditWave]   = useState<Wave | null>(null);
@@ -405,6 +408,36 @@ export default function WavesPage() {
       .then(d => { setWaves(d.waves ?? []); setLoading(false); })
       .catch(() => { setError("Failed to load waves."); setLoading(false); });
   };
+
+  // ── Watchdog: silent 30s poll ─────────────────────────────────────────────
+  const [waveWatchAlert, setWaveWatchAlert] = useState<string | null>(null);
+  const [revealReadyCount, setRevealReadyCount] = useState(0);
+  const [watchUpdated, setWatchUpdated] = useState<Date | null>(null);
+
+  const silentWavePoll = useCallback(async () => {
+    try {
+      const res = await fetch("/api/nft-sell/waves", { credentials: "include" });
+      if (!res.ok) return;
+      const d = await res.json();
+      const updated: Wave[] = d.waves ?? [];
+      setWatchUpdated(new Date());
+
+      // detect waves whose reveal date has passed but are not yet revealed
+      const now = Date.now();
+      const readyToReveal = updated.filter(w =>
+        w.revealScheduledAt && new Date(w.revealScheduledAt).getTime() <= now && !w.waveRevealed
+      );
+      setRevealReadyCount(readyToReveal.length);
+      if (readyToReveal.length > 0) {
+        setWaveWatchAlert(`${readyToReveal.length} wave${readyToReveal.length > 1 ? "s" : ""} ready to reveal: ${readyToReveal.map(w => `Wave ${w.waveNumber}`).join(", ")}`);
+      }
+
+      // silently refresh wave list if data changed
+      setWaves(updated);
+    } catch { /* silent */ }
+  }, []);
+
+  useInterval(silentWavePoll, 30_000);
 
   useEffect(() => {
     loadWaves();
@@ -609,7 +642,10 @@ export default function WavesPage() {
   const totalSold      = waves.reduce((s, w) => s + (w.soldCount ?? 0), 0);
 
   const revealNow = Date.now();
-  const readyCount = revealWaves.filter(w => waveState(w) === "ready_reveal").length;
+  const readyCount = Math.max(
+    revealWaves.filter(w => waveState(w) === "ready_reveal").length,
+    revealReadyCount
+  );
   const nextAction = revealWaves
     .flatMap(w => [
       w.scheduled_start && !w.wave_start_triggered ? { label: `W${w.wave_number} starts`, dt: new Date(w.scheduled_start).getTime() } : null,
@@ -685,6 +721,21 @@ export default function WavesPage() {
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {/* ── WAVES TAB ────────────────────────────────────────────────────── */}
       {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* Watchdog alert — shown across all tabs */}
+      {waveWatchAlert && (
+        <div className="flex items-center justify-between px-4 py-2 rounded-xl text-sm"
+          style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.25)", color: "#d97706" }}>
+          <span>⚡ {waveWatchAlert}</span>
+          <button onClick={() => setWaveWatchAlert(null)} className="ml-4 text-xs opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
+      {watchUpdated && (
+        <div className="flex items-center gap-1.5 text-xs" style={{ color: "#9bafc5" }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+          Live · last checked {watchUpdated.toLocaleTimeString()}
+        </div>
+      )}
+
       {activeTab === "waves" && (
         <>
           {/* Strategy banner */}
@@ -745,7 +796,7 @@ export default function WavesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {waves.map((w, i) => {
+                    {waves.slice((wavePage - 1) * WAVES_PER_PAGE, wavePage * WAVES_PER_PAGE).map((w, i) => {
                       const isClosed = w.waveClosed || w.status === "closed";
                       const isLocked = w.priceLocked;
                       return (
@@ -878,6 +929,34 @@ export default function WavesPage() {
               </div>
             )}
           </div>
+
+          {/* Pagination */}
+          {!loading && waves.length > WAVES_PER_PAGE && (
+            <div className="flex items-center justify-between px-2 py-1">
+              <span className="text-xs" style={{ color: "#9bafc5" }}>
+                Showing {(wavePage - 1) * WAVES_PER_PAGE + 1}–{Math.min(wavePage * WAVES_PER_PAGE, waves.length)} of {waves.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setWavePage(p => Math.max(1, p - 1))} disabled={wavePage === 1}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
+                  style={{ border: "1px solid #e5e7eb", color: "#374151", background: "white" }}>
+                  ← Prev
+                </button>
+                {Array.from({ length: Math.ceil(waves.length / WAVES_PER_PAGE) }, (_, i) => i + 1).map(p => (
+                  <button key={p} onClick={() => setWavePage(p)}
+                    className="w-8 h-8 rounded-lg text-xs font-semibold"
+                    style={{ border: "1px solid #e5e7eb", background: p === wavePage ? "#41afeb" : "white", color: p === wavePage ? "white" : "#374151" }}>
+                    {p}
+                  </button>
+                ))}
+                <button onClick={() => setWavePage(p => Math.min(Math.ceil(waves.length / WAVES_PER_PAGE), p + 1))} disabled={wavePage === Math.ceil(waves.length / WAVES_PER_PAGE)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
+                  style={{ border: "1px solid #e5e7eb", color: "#374151", background: "white" }}>
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Footer totals */}
           {!loading && waves.length > 0 && (
