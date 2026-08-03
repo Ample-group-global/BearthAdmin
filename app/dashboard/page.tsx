@@ -642,7 +642,7 @@ export default function DashboardPage() {
           {/* Header */}
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <p className="text-sm" style={{ color: "#9bafc5" }}>
-              {tokens.length} loaded from DB · {totalTokens} total on-chain
+              {tokens.length} loaded · {totalTokens} minted in DB
             </p>
             <div className="flex items-center gap-2 flex-wrap">
               {tokens.length > 0 && (
