@@ -380,7 +380,7 @@ export default function DashboardPage() {
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Resync failed");
-      setSyncMsg(`Synced ${d.synced} events from chain`);
+      setSyncMsg(`Synced ${d.synced} event${d.synced !== 1 ? "s" : ""} from chain${d.scannedBlocks ? ` (${d.scannedBlocks.toLocaleString()} blocks scanned)` : ""}`);
       await fetchStats();
     } catch (e: unknown) {
       setSyncMsg(e instanceof Error ? e.message : "Sync failed");
