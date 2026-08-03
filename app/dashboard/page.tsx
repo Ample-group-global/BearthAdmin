@@ -13,6 +13,7 @@ interface DbStats {
   maxSupply: number;
   remaining: number;
   mintProgress: number;
+  blindBoxUri: string | null;
   whitelistMint: { soldCount: number; quantity: number; closed: boolean };
   paidMint: { soldCount: number; quantity: number; priceEth: number | null; closed: boolean };
   revealed: number;
@@ -53,8 +54,6 @@ const RARITY_STYLE: Record<string, React.CSSProperties> = {
   Rare:      { background: "rgba(59,130,246,0.1)", color: "#3b82f6" },
   Common:    { background: "rgba(107,114,128,0.1)", color: "#6b7280" },
 };
-
-const BLIND_BOX_IMG = "https://amgbearth.myfilebase.com/ipfs/QmbJJezw9jgxN1P4eWD58XU6rSPokENE4MmD2i4qfBwfrF";
 
 function mintTypeLabel(waveNum: number | null): string {
   if (waveNum === null || waveNum === 0) return "Admin Reserve";
@@ -117,13 +116,13 @@ function Badge({ label, style }: { label: string; style: React.CSSProperties }) 
   );
 }
 
-function NFTThumb({ tokenId }: { tokenId: number }) {
+function NFTThumb({ tokenId, blindBoxUrl }: { tokenId: number; blindBoxUrl: string | null }) {
   const [err, setErr] = useState(false);
-  if (err) {
+  if (err || !blindBoxUrl) {
     return <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-base" style={{ background: "#f4f6fb" }}>🐻</div>;
   }
   return (
-    <img src={BLIND_BOX_IMG} alt={`#${tokenId}`} loading="lazy"
+    <img src={blindBoxUrl} alt={`#${tokenId}`} loading="lazy"
       onError={() => setErr(true)}
       className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
       style={{ background: "#f4f6fb", border: "1px solid #e5e7eb" }} />
@@ -385,9 +384,7 @@ export default function DashboardPage() {
   const loadTokens = useCallback(async () => {
     setNftLoading(true); setNftError(null);
     try {
-      const limit = 200;
-      const offset = 0;
-      const res = await fetch(`/api/nft-sell/collection/tokens?limit=${limit}&offset=${offset}`, { credentials: "include" });
+      const res = await fetch(`/api/nft-sell/collection/tokens?limit=9999&offset=0`, { credentials: "include" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const d = await res.json();
       setTokens(d.tokens ?? []);
@@ -776,7 +773,7 @@ export default function DashboardPage() {
                           style={{ background: isEven ? "#fff" : "#fafbff", borderBottom: "1px solid #f3f4f6" }}
                           onMouseEnter={e => (e.currentTarget.style.background = "#eff8fe")}
                           onMouseLeave={e => (e.currentTarget.style.background = isEven ? "#fff" : "#fafbff")}>
-                          <td className="px-3 py-2"><NFTThumb tokenId={t.token_id} /></td>
+                          <td className="px-3 py-2"><NFTThumb tokenId={t.token_id} blindBoxUrl={stats?.blindBoxUri ? ipfsToGateway(stats.blindBoxUri) : null} /></td>
                           <td className="px-4 py-3 font-mono font-bold" style={{ color: "#24315f" }}>#{t.token_id}</td>
                           <td className="px-4 py-3">
                             <button onClick={e => { e.stopPropagation(); copyToClipboard(t.owner_address ?? ""); }}

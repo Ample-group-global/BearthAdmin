@@ -404,7 +404,7 @@ export default function SellingPage() {
           <div className="bg-white rounded-xl px-4 py-3 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#9bafc5" }}>Mint Progress</span>
-              <span className="text-xs font-bold" style={{ color: "#24315f" }}>{onChain.totalMinted.toLocaleString()} / 9,999</span>
+              <span className="text-xs font-bold" style={{ color: "#24315f" }}>{onChain.totalMinted.toLocaleString()} / {onChain.maxSupply.toLocaleString()}</span>
             </div>
             <div className="h-1.5 rounded-full" style={{ background: "#e5e7eb" }}>
               <div className="h-1.5 rounded-full transition-all"
@@ -491,7 +491,7 @@ export default function SellingPage() {
           </SectionCard>
 
           {/* VIP Customer Management */}
-          <SectionCard title="VIP Customer Management" subtitle="VIP wallets bypass the per-wallet purchase limit — they can mint any quantity.">
+          <SectionCard title="VIP Customer Management" subtitle="Mark wallets as VIP on-chain. Purchase limits apply equally to all wallets — VIP status is informational only.">
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                 <div className="sm:col-span-2">
