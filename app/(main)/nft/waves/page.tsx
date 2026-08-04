@@ -893,22 +893,33 @@ export default function WavesPage() {
                             <SaleMethodBadge method={w.saleMethod} saleMethods={saleMethods} />
                           </td>
 
-                          <td style={{ padding: "10px 14px", minWidth: 140 }}>
+                          <td style={{ padding: "10px 14px", minWidth: 155 }}>
                             {w.scheduledStart || w.scheduledEnd ? (
                               <div className="text-xs" style={{ color: "#6b7280" }}>
-                                {w.scheduledStart && <div>From: <strong style={{ color: "#374151" }}>{new Date(w.scheduledStart).toLocaleDateString()}</strong></div>}
-                                {w.scheduledEnd   && <div>To: <strong style={{ color: "#374151" }}>{new Date(w.scheduledEnd).toLocaleDateString()}</strong></div>}
+                                {w.scheduledStart && (
+                                  <div>From: <strong style={{ color: "#374151" }}>
+                                    {new Date(w.scheduledStart).toLocaleDateString()}{" "}
+                                    <span style={{ color: "#7c3aed" }}>{new Date(w.scheduledStart).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>
+                                  </strong></div>
+                                )}
+                                {w.scheduledEnd && (
+                                  <div>To: <strong style={{ color: "#374151" }}>
+                                    {new Date(w.scheduledEnd).toLocaleDateString()}{" "}
+                                    <span style={{ color: "#7c3aed" }}>{new Date(w.scheduledEnd).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>
+                                  </strong></div>
+                                )}
                               </div>
                             ) : (
                               <span className="text-xs" style={{ color: "#d1d5db" }}>Not scheduled</span>
                             )}
                           </td>
 
-                          <td style={{ padding: "10px 14px", minWidth: 110 }}>
+                          <td style={{ padding: "10px 14px", minWidth: 130 }}>
                             {w.revealScheduledAt ? (
-                              <span className="text-xs font-semibold" style={{ color: "#7c3aed" }}>
-                                {new Date(w.revealScheduledAt).toLocaleDateString()}
-                              </span>
+                              <div className="text-xs font-semibold" style={{ color: "#7c3aed" }}>
+                                <div>{new Date(w.revealScheduledAt).toLocaleDateString()}</div>
+                                <div style={{ color: "#9bafc5", fontWeight: 400 }}>{new Date(w.revealScheduledAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</div>
+                              </div>
                             ) : (
                               <span className="text-xs" style={{ color: "#d1d5db" }}>Not set</span>
                             )}
