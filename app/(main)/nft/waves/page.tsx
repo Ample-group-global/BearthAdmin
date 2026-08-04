@@ -38,6 +38,16 @@ interface Wave {
   syncedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  onChain?: {
+    priceEth: number;
+    qty: number;
+    soldCount: number;
+    startTime: number;
+    endTime: number;
+    closed: boolean;
+    active: boolean;
+    revealed: boolean;
+  } | null;
 }
 
 interface OnChainWaveInfo {
@@ -648,8 +658,8 @@ export default function WavesPage() {
 
   const totalNfts      = waves.reduce((s, w) => s + (w.quantity ?? 0), 0);
   const activeWave     = waves.find(w => deriveWaveDisplayStatus(w) === "active");
-  const completedCount = waves.filter(w => ["revealed", "completed", "closed", "ended", "sold_out"].includes(deriveWaveDisplayStatus(w))).length;
-  const totalSold      = waves.reduce((s, w) => s + (w.soldCount ?? 0), 0);
+  const completedCount = waves.filter(w => ["revealed", "completed", "sold_out", "closed"].includes(deriveWaveDisplayStatus(w))).length;
+  const totalSold      = waves.reduce((s, w) => s + (w.onChain?.soldCount ?? w.soldCount ?? 0), 0);
 
   const revealNow = Date.now();
   const readyCount = Math.max(
@@ -858,18 +868,25 @@ export default function WavesPage() {
                           </td>
 
                           <td style={{ padding: "10px 14px", textAlign: "center" }}>
-                            <div className="text-xs">
-                              <span className="font-bold" style={{ color: "#41afeb" }}>{(w.soldCount ?? 0).toLocaleString()}</span>
-                              <span style={{ color: "#9bafc5" }}> / {(w.quantity ?? 0).toLocaleString()}</span>
-                            </div>
-                            {(w.soldCount ?? 0) > 0 && (
-                              <div className="h-1 rounded-full mt-1" style={{ background: "#e5e7eb", width: 60, margin: "4px auto 0" }}>
-                                <div className="h-1 rounded-full" style={{
-                                  width: `${Math.min(100, Math.round((w.soldCount ?? 0) / (w.quantity || 1) * 100))}%`,
-                                  background: "#41afeb",
-                                }} />
-                              </div>
-                            )}
+                            {(() => {
+                              const minted = w.onChain?.soldCount ?? w.soldCount ?? 0;
+                              return (
+                                <>
+                                  <div className="text-xs">
+                                    <span className="font-bold" style={{ color: "#41afeb" }}>{minted.toLocaleString()}</span>
+                                    <span style={{ color: "#9bafc5" }}> / {(w.quantity ?? 0).toLocaleString()}</span>
+                                  </div>
+                                  {minted > 0 && (
+                                    <div className="h-1 rounded-full mt-1" style={{ background: "#e5e7eb", width: 60, margin: "4px auto 0" }}>
+                                      <div className="h-1 rounded-full" style={{
+                                        width: `${Math.min(100, Math.round(minted / (w.quantity || 1) * 100))}%`,
+                                        background: "#41afeb",
+                                      }} />
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </td>
 
                           <td style={{ padding: "10px 14px" }}>
