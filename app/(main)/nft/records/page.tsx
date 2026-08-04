@@ -251,7 +251,7 @@ export default function NftPage() {
   const [sortKey, setSortKey]         = useState<string | undefined>(undefined);
   const [sortDir, setSortDir]         = useState<"asc" | "desc">("asc");
   const [viewRecord, setViewRecord]   = useState<NftRecord | null>(null);
-  const [modalZoom, setModalZoom]     = useState(1);
+  const [modalMaximized, setModalMaximized] = useState(false);
   const [waves, setWaves]             = useState<Array<{ waveNumber: number; name: string }>>([]);
   const [blindBoxImageUrl, setBlindBoxImageUrl] = useState<string | null>(null);
 
@@ -703,7 +703,7 @@ export default function NftPage() {
       header: "",
       align: "center",
       render: r => (
-        <button onClick={() => { setViewRecord(r); setModalZoom(0.75); }} title="View full history"
+        <button onClick={() => { setViewRecord(r); setModalMaximized(false); }} title="View full history"
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors"
           style={{ color: "#41afeb", border: "1px solid rgba(65,175,235,0.3)", background: "rgba(65,175,235,0.05)" }}
           onMouseEnter={e => { e.currentTarget.style.background = "rgba(65,175,235,0.12)"; e.currentTarget.style.borderColor = "rgba(65,175,235,0.5)"; }}
@@ -1221,62 +1221,50 @@ export default function NftPage() {
       {/* ══ Full History Modal ══════════════════════════════════════════════════ */}
       {viewRecord && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
-          <div className="bg-white rounded-2xl shadow-xl flex flex-col"
+          <div className="bg-white shadow-xl flex flex-col"
             style={{
-              width: "100%", maxWidth: 720, maxHeight: "92vh", border: "1px solid #e5e7eb",
-              transform: `scale(${modalZoom})`, transformOrigin: "center center", transition: "transform 0.15s ease",
+              width: "100%",
+              maxWidth:    modalMaximized ? "100vw" : 720,
+              height:      modalMaximized ? "100vh" : "auto",
+              maxHeight:   modalMaximized ? "100vh" : "92vh",
+              borderRadius: modalMaximized ? 0 : 16,
+              border: "1px solid #e5e7eb",
+              transition: "max-width 0.2s ease, height 0.2s ease, border-radius 0.2s ease",
             }}>
             <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
               <div>
                 <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>NFT {viewRecord.serialNumber} — Full History</h2>
                 <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>Complete lifecycle from generation to delivery</p>
               </div>
-              {/* Zoom controls + close */}
               <div className="flex items-center gap-2">
-                {/* Zoom Out */}
-                <button
-                  onClick={() => setModalZoom(z => Math.max(0.5, +(z - 0.1).toFixed(1)))}
-                  disabled={modalZoom <= 0.5}
-                  title="Zoom out"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-                  style={{
-                    background: modalZoom <= 0.5 ? "#f9fafb" : "#f3f4f6",
-                    color: modalZoom <= 0.5 ? "#d1d5db" : "#374151",
-                    border: "1px solid #e5e7eb",
-                    cursor: modalZoom <= 0.5 ? "default" : "pointer",
-                  }}>
-                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0zM8 11h6" />
-                  </svg>
-                  Zoom Out
-                </button>
-                {/* Current zoom level — click to reset */}
-                <button
-                  onClick={() => setModalZoom(0.75)}
-                  title="Reset zoom"
-                  className="text-xs font-bold px-2 py-1.5 rounded-lg"
-                  style={{ background: "#eff6ff", color: "#3b82f6", border: "1px solid #bfdbfe", minWidth: 44, textAlign: "center", cursor: "pointer" }}>
-                  {Math.round(modalZoom * 100)}%
-                </button>
-                {/* Zoom In */}
-                <button
-                  onClick={() => setModalZoom(z => Math.min(1.5, +(z + 0.1).toFixed(1)))}
-                  disabled={modalZoom >= 1.5}
-                  title="Zoom in"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-                  style={{
-                    background: modalZoom >= 1.5 ? "#f9fafb" : "#f0fdf4",
-                    color: modalZoom >= 1.5 ? "#d1d5db" : "#16a34a",
-                    border: `1px solid ${modalZoom >= 1.5 ? "#e5e7eb" : "#bbf7d0"}`,
-                    cursor: modalZoom >= 1.5 ? "default" : "pointer",
-                  }}>
-                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0zM11 8v6M8 11h6" />
-                  </svg>
-                  Zoom In
-                </button>
+                {/* Minimize */}
+                {modalMaximized && (
+                  <button
+                    onClick={() => setModalMaximized(false)}
+                    title="Minimize"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                    style={{ background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb" }}>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3" />
+                    </svg>
+                    Minimize
+                  </button>
+                )}
+                {/* Maximize */}
+                {!modalMaximized && (
+                  <button
+                    onClick={() => setModalMaximized(true)}
+                    title="Maximize"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                    style={{ background: "#eff6ff", color: "#3b82f6", border: "1px solid #bfdbfe" }}>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                    Maximize
+                  </button>
+                )}
                 {/* Close */}
-                <button onClick={() => setViewRecord(null)} className="ml-1" style={{ color: "#9bafc5" }}>
+                <button onClick={() => setViewRecord(null)} title="Close" style={{ color: "#9bafc5" }}>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
