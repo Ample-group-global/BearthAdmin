@@ -251,6 +251,7 @@ export default function NftPage() {
   const [sortKey, setSortKey]         = useState<string | undefined>(undefined);
   const [sortDir, setSortDir]         = useState<"asc" | "desc">("asc");
   const [viewRecord, setViewRecord]   = useState<NftRecord | null>(null);
+  const [modalZoom, setModalZoom]     = useState(1);
   const [waves, setWaves]             = useState<Array<{ waveNumber: number; name: string }>>([]);
   const [blindBoxImageUrl, setBlindBoxImageUrl] = useState<string | null>(null);
 
@@ -702,7 +703,7 @@ export default function NftPage() {
       header: "",
       align: "center",
       render: r => (
-        <button onClick={() => setViewRecord(r)} title="View full history"
+        <button onClick={() => { setViewRecord(r); setModalZoom(1); }} title="View full history"
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors"
           style={{ color: "#41afeb", border: "1px solid rgba(65,175,235,0.3)", background: "rgba(65,175,235,0.05)" }}
           onMouseEnter={e => { e.currentTarget.style.background = "rgba(65,175,235,0.12)"; e.currentTarget.style.borderColor = "rgba(65,175,235,0.5)"; }}
@@ -1238,11 +1239,38 @@ export default function NftPage() {
 
               {/* NFT Identity */}
               <div className="flex gap-5">
-                <div className="flex-shrink-0">
-                  <NftImage hash={viewRecord.imageIpfsHash} isRevealed={viewRecord.isRevealed} blindBoxUri={blindBoxImageUrl} size={120} />
-                  <div className="mt-2 text-center">
-                    <RevealBadge revealed={viewRecord.isRevealed} />
+                <div className="flex-shrink-0 flex flex-col items-center gap-2">
+                  {/* Zoomable image container */}
+                  <div style={{ width: 120 * modalZoom, height: 120 * modalZoom, transition: "width 0.2s, height 0.2s", overflow: "hidden", borderRadius: 12 }}>
+                    <NftImage hash={viewRecord.imageIpfsHash} isRevealed={viewRecord.isRevealed} blindBoxUri={blindBoxImageUrl} size={120 * modalZoom} />
                   </div>
+                  {/* Zoom controls */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setModalZoom(z => Math.max(0.5, +(z - 0.25).toFixed(2)))}
+                      disabled={modalZoom <= 0.5}
+                      title="Zoom out"
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold transition-colors"
+                      style={{ background: "#f3f4f6", color: modalZoom <= 0.5 ? "#d1d5db" : "#374151", border: "1px solid #e5e7eb", cursor: modalZoom <= 0.5 ? "default" : "pointer" }}>
+                      −
+                    </button>
+                    <button
+                      onClick={() => setModalZoom(1)}
+                      title="Reset zoom"
+                      className="text-xs font-semibold px-2 py-0.5 rounded-lg transition-colors"
+                      style={{ background: "#f3f4f6", color: "#6b7280", border: "1px solid #e5e7eb", minWidth: 36, textAlign: "center" }}>
+                      {Math.round(modalZoom * 100)}%
+                    </button>
+                    <button
+                      onClick={() => setModalZoom(z => Math.min(3, +(z + 0.25).toFixed(2)))}
+                      disabled={modalZoom >= 3}
+                      title="Zoom in"
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold transition-colors"
+                      style={{ background: "#f3f4f6", color: modalZoom >= 3 ? "#d1d5db" : "#374151", border: "1px solid #e5e7eb", cursor: modalZoom >= 3 ? "default" : "pointer" }}>
+                      +
+                    </button>
+                  </div>
+                  <RevealBadge revealed={viewRecord.isRevealed} />
                 </div>
                 <div className="flex-1 grid grid-cols-2 gap-x-6 gap-y-3">
                   {[
