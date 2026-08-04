@@ -1438,30 +1438,30 @@ export default function NftPage() {
                     <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#10b981" }}>Lifecycle Timeline</span>
                   </div>
                   {[
-                    { label: "Generated", date: viewRecord.createdAt,   color: "#6366f1", desc: "NFT created in DB from generator",       txHash: null },
-                    { label: "Minted",    date: viewRecord.mintedAt,    color: "#7c3aed", desc: "Minted on-chain to buyer wallet",         txHash: viewRecord.mintTxHash },
-                    { label: "Revealed",  date: viewRecord.revealedAt,  color: "#8b5cf6", desc: "Artwork revealed, blind box opened",      txHash: null },
-                    { label: "Sold",      date: viewRecord.soldAt,      color: "#f59e0b", desc: "Ownership transferred on-chain",          txHash: viewRecord.lastTxHash },
-                    { label: "Delivered", date: viewRecord.deliveredAt, color: "#10b981", desc: "Delivered to customer wallet",             txHash: null },
-                  ].map((step, i, arr) => (
+                    { label: "Generated", date: viewRecord.createdAt,   color: "#6366f1", desc: "NFT created in DB from generator",  txHash: null },
+                    { label: "Minted",    date: viewRecord.mintedAt,    color: "#7c3aed", desc: "Minted on-chain to buyer wallet",    txHash: viewRecord.mintTxHash },
+                    { label: "Revealed",  date: viewRecord.revealedAt,  color: "#8b5cf6", desc: "Artwork revealed, blind box opened", txHash: null },
+                    { label: "Sold",      date: viewRecord.soldAt,      color: "#f59e0b", desc: "Ownership transferred on-chain",     txHash: viewRecord.lastTxHash },
+                    { label: "Delivered", date: viewRecord.deliveredAt, color: "#10b981", desc: "Delivered to customer wallet",        txHash: null },
+                  ].filter(step => step.date).map((step, i, arr) => (
                     <div key={step.label} className="flex gap-4 px-5 py-3.5" style={{ borderTop: i > 0 ? "1px solid #f8fafc" : undefined }}>
                       {/* Step indicator */}
                       <div className="flex flex-col items-center flex-shrink-0 pt-0.5" style={{ width: 32 }}>
                         <div className="w-7 h-7 rounded-full flex items-center justify-center"
-                          style={{ background: step.date ? `${step.color}18` : "#f1f5f9", border: `2px solid ${step.date ? step.color : "#e2e8f0"}` }}>
-                          {step.date
-                            ? <svg className="w-3 h-3" style={{ color: step.color }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                            : <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#cbd5e1" }} />}
+                          style={{ background: `${step.color}18`, border: `2px solid ${step.color}` }}>
+                          <svg className="w-3 h-3" style={{ color: step.color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
                         </div>
                         {i < arr.length - 1 && (
-                          <div className="w-px flex-1 mt-1" style={{ background: step.date ? "#e2e8f0" : "#f1f5f9", minHeight: 12 }} />
+                          <div className="w-px flex-1 mt-1" style={{ background: "#e2e8f0", minHeight: 12 }} />
                         )}
                       </div>
                       {/* Content */}
                       <div className="flex-1 min-w-0 pb-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-bold" style={{ color: step.date ? "#0f172a" : "#94a3b8" }}>{step.label}</span>
-                          {step.date && <span className="text-xs" style={{ color: "#64748b" }}>{fmt(step.date)}</span>}
+                          <span className="text-sm font-bold" style={{ color: "#0f172a" }}>{step.label}</span>
+                          <span className="text-xs" style={{ color: "#64748b" }}>{fmt(step.date)}</span>
                           {step.txHash && (
                             <a href={`${ETHERSCAN}${step.txHash}`} target="_blank" rel="noreferrer"
                               className="inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded-md"
@@ -1475,10 +1475,8 @@ export default function NftPage() {
                       {/* Badge */}
                       <div className="flex-shrink-0 pt-0.5">
                         <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                          style={step.date
-                            ? { background: `${step.color}12`, color: step.color }
-                            : { background: "#f1f5f9", color: "#94a3b8" }}>
-                          {step.date ? "Done" : "Pending"}
+                          style={{ background: `${step.color}12`, color: step.color }}>
+                          Done
                         </span>
                       </div>
                     </div>
