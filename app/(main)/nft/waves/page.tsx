@@ -417,6 +417,10 @@ export default function WavesPage() {
   const [revealWave,        setRevealWave]        = useState<WaveSchedule | null>(null);
   const [revealSuccessData, setRevealSuccessData] = useState<{ txHash: string; waveNum: number } | null>(null);
   const revealLoadedRef = useRef(false);
+  const [scheduleEditWave,   setScheduleEditWave]   = useState<WaveSchedule | null>(null);
+  const [scheduleEditDate,   setScheduleEditDate]   = useState("");
+  const [scheduleEditSaving, setScheduleEditSaving] = useState(false);
+  const [scheduleEditErr,    setScheduleEditErr]    = useState<string | null>(null);
   const [blindBoxUrl, setBlindBoxUrl] = useState<string | null>(null);
 
   // ── Waves tab data loading ──
@@ -498,6 +502,25 @@ export default function WavesPage() {
       setRevealLoading(false);
     }
   }, []);
+
+  const saveRevealDate = async () => {
+    if (!scheduleEditWave) return;
+    const matched = waves.find(w => w.waveNumber === scheduleEditWave.wave_number);
+    if (!matched) { setScheduleEditErr("Wave not found."); return; }
+    setScheduleEditSaving(true); setScheduleEditErr(null);
+    try {
+      const res = await fetch(`/api/waves/${matched.id}`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ revealScheduledAt: scheduleEditDate ? new Date(scheduleEditDate).toISOString() : null }),
+      });
+      if (!res.ok) { const d = await res.json(); setScheduleEditErr(d.error ?? "Save failed"); return; }
+      setScheduleEditWave(null);
+      loadRevealData();
+      loadWaves();
+    } catch { setScheduleEditErr("Network error."); }
+    finally { setScheduleEditSaving(false); }
+  };
 
   // Load reveal data only when Reveal tab becomes active (lazy)
   useEffect(() => {
@@ -1026,6 +1049,53 @@ export default function WavesPage() {
 
           {revealErr && <ErrBanner msg={revealErr} onDismiss={() => setRevealErr(null)} />}
 
+          {/* ── Wave Reveal Timeline ── */}
+          {revealWaves.length > 0 && (
+            <div className="bg-white rounded-2xl p-5 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
+              <p className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: "#9bafc5" }}>
+                Collection Reveal Progress
+              </p>
+              <div className="flex items-center">
+                {revealWaves.map((w, i) => {
+                  const st   = waveState(w);
+                  const meta = STATE_META[st];
+                  const isLast = i === revealWaves.length - 1;
+                  return (
+                    <div key={w.wave_number} className="flex items-center" style={{ flex: 1, minWidth: 0 }}>
+                      <div className="flex flex-col items-center" style={{ flexShrink: 0 }}>
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold"
+                          style={{ background: meta.bg, color: meta.color, border: `2px solid ${meta.color}` }}>
+                          {w.is_revealed ? (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : st === "ready_reveal" ? (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                          ) : (
+                            <span>{w.wave_number}</span>
+                          )}
+                        </div>
+                        <div className="text-[10px] font-bold mt-1.5" style={{ color: meta.color }}>W{w.wave_number}</div>
+                        <div className="text-[9px] mt-0.5 text-center leading-tight" style={{ color: "#9bafc5", maxWidth: 56 }}>
+                          {meta.label}
+                        </div>
+                      </div>
+                      {!isLast && (
+                        <div style={{
+                          flex: 1, height: 2, minWidth: 4,
+                          background: w.is_revealed ? "#16a34a" : "#e5e7eb",
+                          margin: "0 4px", marginBottom: 28,
+                        }} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Ready to reveal alert */}
           {readyCount > 0 && (
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
@@ -1115,7 +1185,7 @@ export default function WavesPage() {
                           {/* Start date */}
                           <td className="px-4 py-3">
                             <div className="text-xs" style={{ color: w.wave_start_triggered ? "#16a34a" : "#374151" }}>
-                              {fmtDate(w.scheduled_start)}
+                              {fmtFull(w.scheduled_start)}
                             </div>
                             {w.wave_start_triggered && (
                               <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#16a34a" }}>
@@ -1130,7 +1200,7 @@ export default function WavesPage() {
                           {/* End date */}
                           <td className="px-4 py-3">
                             <div className="text-xs" style={{ color: w.wave_end_triggered ? "#16a34a" : "#374151" }}>
-                              {fmtDate(w.scheduled_end)}
+                              {fmtFull(w.scheduled_end)}
                             </div>
                             {w.wave_end_triggered && (
                               <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#16a34a" }}>
@@ -1146,14 +1216,23 @@ export default function WavesPage() {
                           <td className="px-4 py-3">
                             <div className="text-xs font-semibold"
                               style={{ color: isReady ? "#d97706" : w.reveal_scheduled_at ? "#7c3aed" : "#d1d5db" }}>
-                              {fmtDate(w.reveal_scheduled_at)}
+                              {fmtFull(w.reveal_scheduled_at)}
                             </div>
                             {isReady && (
                               <div className="text-xs mt-0.5 font-bold" style={{ color: "#d97706" }}>⚡ Due now</div>
                             )}
+                            {w.wave_reveal_triggered && !w.is_revealed && (
+                              <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#7c3aed" }}>
+                                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                Tx pending
+                              </div>
+                            )}
                             {w.is_revealed && w.wave_revealed_at && (
                               <div className="text-xs mt-0.5" style={{ color: "#16a34a" }}>
-                                Done {fmtDate(w.wave_revealed_at)}
+                                Done {fmtFull(w.wave_revealed_at)}
                               </div>
                             )}
                           </td>
@@ -1199,12 +1278,19 @@ export default function WavesPage() {
                                 </svg>
                                 Done
                               </span>
-                            ) : state === "not_scheduled" ? (
+                            ) : state === "not_scheduled" || state === "upcoming" || state === "reveal_scheduled" ? (
                               <button
-                                onClick={() => setActiveTab("waves")}
-                                className="text-xs font-semibold"
-                                style={{ color: "#41afeb", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                                Set Schedule →
+                                onClick={() => {
+                                  setScheduleEditWave(w);
+                                  setScheduleEditDate(w.reveal_scheduled_at ? new Date(w.reveal_scheduled_at).toISOString().slice(0, 16) : "");
+                                  setScheduleEditErr(null);
+                                }}
+                                className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg"
+                                style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed", border: "1px solid rgba(124,58,237,0.2)" }}>
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                {w.reveal_scheduled_at ? "Edit Date" : "Set Date"}
                               </button>
                             ) : (
                               <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>
@@ -1254,6 +1340,62 @@ export default function WavesPage() {
               </div>
             ))}
           </div>
+
+          {/* Inline reveal-date editor modal */}
+          {scheduleEditWave && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
+              <div className="bg-white rounded-2xl shadow-xl" style={{ width: "100%", maxWidth: 420, border: "1px solid #e5e7eb" }}>
+                <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid #e5e7eb" }}>
+                  <div>
+                    <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>
+                      Set Reveal Date — W{scheduleEditWave.wave_number} {scheduleEditWave.wave_name}
+                    </h2>
+                    <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
+                      Choose when this wave will be revealed to holders
+                    </p>
+                  </div>
+                  <button onClick={() => setScheduleEditWave(null)} style={{ color: "#9bafc5" }}>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="px-6 py-5 space-y-4">
+                  {scheduleEditErr && <ErrBanner msg={scheduleEditErr} onDismiss={() => setScheduleEditErr(null)} />}
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5" style={{ color: "#374151" }}>
+                      Reveal Date &amp; Time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={scheduleEditDate}
+                      onChange={e => setScheduleEditDate(e.target.value)}
+                      className="w-full rounded-lg px-3 py-2 text-sm"
+                      style={{ border: "1px solid #d1d5db", outline: "none" }}
+                    />
+                    <p className="text-xs mt-1.5" style={{ color: "#9bafc5" }}>
+                      This date is shown to your community. The actual on-chain reveal tx runs when you click &quot;Reveal Now&quot;.
+                    </p>
+                  </div>
+                  <div className="flex gap-3 pt-1">
+                    <button
+                      onClick={() => setScheduleEditWave(null)}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+                      style={{ border: "1px solid #e5e7eb", color: "#6b7280", background: "white" }}>
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveRevealDate}
+                      disabled={scheduleEditSaving || !scheduleEditDate}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white"
+                      style={{ background: scheduleEditSaving || !scheduleEditDate ? "#9bafc5" : "#7c3aed", cursor: scheduleEditSaving || !scheduleEditDate ? "not-allowed" : "pointer" }}>
+                      {scheduleEditSaving ? "Saving…" : "Save Reveal Date"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Reveal modals */}
           {revealWave && (
