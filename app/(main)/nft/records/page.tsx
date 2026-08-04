@@ -1470,21 +1470,6 @@ export default function NftPage() {
                   </div>
                 )}
 
-                {/* Metadata URI */}
-                {viewRecord.metadataUri && (
-                  <div className="rounded-2xl overflow-hidden bg-white" style={{ border: "1px solid #e2e8f0" }}>
-                    <div className="flex items-center gap-2 px-5 py-3" style={{ borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
-                      <svg className="w-4 h-4" style={{ color: "#64748b" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                      <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#64748b" }}>Metadata URI</span>
-                    </div>
-                    <div className="px-5 py-3">
-                      <p className="text-xs font-mono break-all leading-relaxed" style={{ color: "#475569" }}>{viewRecord.metadataUri}</p>
-                    </div>
-                  </div>
-                )}
-
               </div>
             </div>
 
