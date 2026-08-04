@@ -596,7 +596,7 @@ export default function NftPage() {
       header: "Wave & Schedule",
       sortKey: "wave",
       render: r => r.waveNumber != null ? (
-        <div style={{ minWidth: 150 }}>
+        <div style={{ minWidth: 140 }}>
           <div className="flex items-center gap-1.5 mb-1">
             <span className="text-xs font-bold px-2 py-0.5 rounded-full"
               style={{ background: "rgba(65,175,235,0.1)", color: "#41afeb" }}>
@@ -616,12 +616,44 @@ export default function NftPage() {
             {r.waveScheduledEnd && (
               <div>End: <strong style={{ color: "#374151" }}>{fmt(r.waveScheduledEnd)}</strong></div>
             )}
-            {r.waveRevealScheduledAt && (
-              <div style={{ color: "#7c3aed" }}>Reveal: <strong>{fmt(r.waveRevealScheduledAt)}</strong></div>
-            )}
           </div>
         </div>
       ) : <span style={{ color: "#d1d5db" }}>—</span>,
+    },
+    {
+      key: "reveal_date",
+      header: "Reveal Date",
+      render: r => {
+        if (r.waveNumber == null) return <span style={{ color: "#d1d5db" }}>—</span>;
+        const schedAt = r.waveRevealScheduledAt;
+        const isRevealed = r.isRevealed;
+        if (isRevealed) {
+          return (
+            <div style={{ minWidth: 120 }}>
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold mb-1"
+                style={{ background: "rgba(124,58,237,0.1)", color: "#7c3aed" }}>
+                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#7c3aed" }} />
+                Revealed
+              </div>
+              {r.revealedAt && (
+                <div className="text-xs mt-0.5" style={{ color: "#374151" }}>{fmt(r.revealedAt)}</div>
+              )}
+            </div>
+          );
+        }
+        if (schedAt) {
+          const isPast = new Date(schedAt) < new Date();
+          return (
+            <div style={{ minWidth: 120 }}>
+              <div className="text-xs font-semibold mb-0.5" style={{ color: isPast ? "#dc2626" : "#7c3aed" }}>
+                {isPast ? "Overdue" : "Scheduled"}
+              </div>
+              <div className="text-xs" style={{ color: "#374151" }}>{fmt(schedAt)}</div>
+            </div>
+          );
+        }
+        return <span className="text-xs" style={{ color: "#d1d5db" }}>Not scheduled</span>;
+      },
     },
     {
       key: "status",
