@@ -703,7 +703,7 @@ export default function NftPage() {
       header: "",
       align: "center",
       render: r => (
-        <button onClick={() => { setViewRecord(r); setModalZoom(1); }} title="View full history"
+        <button onClick={() => { setViewRecord(r); setModalZoom(0.75); }} title="View full history"
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors"
           style={{ color: "#41afeb", border: "1px solid rgba(65,175,235,0.3)", background: "rgba(65,175,235,0.05)" }}
           onMouseEnter={e => { e.currentTarget.style.background = "rgba(65,175,235,0.12)"; e.currentTarget.style.borderColor = "rgba(65,175,235,0.5)"; }}
@@ -1233,32 +1233,50 @@ export default function NftPage() {
               </div>
               {/* Zoom controls + close */}
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 px-2 py-1 rounded-lg" style={{ background: "#f3f4f6", border: "1px solid #e5e7eb" }}>
-                  <button
-                    onClick={() => setModalZoom(z => Math.max(0.6, +(z - 0.1).toFixed(1)))}
-                    disabled={modalZoom <= 0.6}
-                    title="Zoom out"
-                    className="w-6 h-6 flex items-center justify-center rounded text-base font-bold leading-none"
-                    style={{ color: modalZoom <= 0.6 ? "#d1d5db" : "#374151", background: "transparent", border: "none", cursor: modalZoom <= 0.6 ? "default" : "pointer" }}>
-                    −
-                  </button>
-                  <button
-                    onClick={() => setModalZoom(1)}
-                    title="Reset to 100%"
-                    className="text-xs font-semibold"
-                    style={{ color: "#6b7280", background: "transparent", border: "none", cursor: "pointer", minWidth: 32, textAlign: "center" }}>
-                    {Math.round(modalZoom * 100)}%
-                  </button>
-                  <button
-                    onClick={() => setModalZoom(z => Math.min(1.5, +(z + 0.1).toFixed(1)))}
-                    disabled={modalZoom >= 1.5}
-                    title="Zoom in"
-                    className="w-6 h-6 flex items-center justify-center rounded text-base font-bold leading-none"
-                    style={{ color: modalZoom >= 1.5 ? "#d1d5db" : "#374151", background: "transparent", border: "none", cursor: modalZoom >= 1.5 ? "default" : "pointer" }}>
-                    +
-                  </button>
-                </div>
-                <button onClick={() => setViewRecord(null)} style={{ color: "#9bafc5" }}>
+                {/* Zoom Out */}
+                <button
+                  onClick={() => setModalZoom(z => Math.max(0.5, +(z - 0.1).toFixed(1)))}
+                  disabled={modalZoom <= 0.5}
+                  title="Zoom out"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                  style={{
+                    background: modalZoom <= 0.5 ? "#f9fafb" : "#f3f4f6",
+                    color: modalZoom <= 0.5 ? "#d1d5db" : "#374151",
+                    border: "1px solid #e5e7eb",
+                    cursor: modalZoom <= 0.5 ? "default" : "pointer",
+                  }}>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0zM8 11h6" />
+                  </svg>
+                  Zoom Out
+                </button>
+                {/* Current zoom level — click to reset */}
+                <button
+                  onClick={() => setModalZoom(0.75)}
+                  title="Reset zoom"
+                  className="text-xs font-bold px-2 py-1.5 rounded-lg"
+                  style={{ background: "#eff6ff", color: "#3b82f6", border: "1px solid #bfdbfe", minWidth: 44, textAlign: "center", cursor: "pointer" }}>
+                  {Math.round(modalZoom * 100)}%
+                </button>
+                {/* Zoom In */}
+                <button
+                  onClick={() => setModalZoom(z => Math.min(1.5, +(z + 0.1).toFixed(1)))}
+                  disabled={modalZoom >= 1.5}
+                  title="Zoom in"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                  style={{
+                    background: modalZoom >= 1.5 ? "#f9fafb" : "#f0fdf4",
+                    color: modalZoom >= 1.5 ? "#d1d5db" : "#16a34a",
+                    border: `1px solid ${modalZoom >= 1.5 ? "#e5e7eb" : "#bbf7d0"}`,
+                    cursor: modalZoom >= 1.5 ? "default" : "pointer",
+                  }}>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0zM11 8v6M8 11h6" />
+                  </svg>
+                  Zoom In
+                </button>
+                {/* Close */}
+                <button onClick={() => setViewRecord(null)} className="ml-1" style={{ color: "#9bafc5" }}>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
