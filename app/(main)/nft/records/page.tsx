@@ -856,23 +856,25 @@ export default function NftPage() {
               ))}
             </select>
 
-            {master && (
-              <select value={statusFilter}
-                onChange={e => { setStatusFilter(e.target.value); applyFilter(e.target.value, stageFilter, revealFilter, waveFilter); }}
-                className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
-                style={{ border: "1px solid #e5e7eb", color: statusFilter ? "#111827" : "#9bafc5" }}>
-                <option value="">All Statuses</option>
-                {master.deliveryStatuses.map(s => <option key={s.id} value={s.code}>{s.name}</option>)}
-              </select>
-            )}
+            {/* NFT Status — curated lifecycle options, not raw DB delivery codes */}
+            <select value={statusFilter}
+              onChange={e => { setStatusFilter(e.target.value); applyFilter(e.target.value, stageFilter, revealFilter, waveFilter); }}
+              className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
+              style={{ border: "1px solid #e5e7eb", color: statusFilter ? "#111827" : "#9bafc5" }}>
+              <option value="">All NFT Status</option>
+              <option value="sold">💰 Sold</option>
+              <option value="delivered">✓ Delivered</option>
+              <option value="cancelled">✕ Cancelled</option>
+            </select>
 
+            {/* Artwork state — matches badge language */}
             <select value={revealFilter}
               onChange={e => { setRevealFilter(e.target.value); applyFilter(statusFilter, stageFilter, e.target.value, waveFilter); }}
               className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
               style={{ border: "1px solid #e5e7eb", color: revealFilter ? "#111827" : "#9bafc5" }}>
-              <option value="">All Reveal States</option>
-              <option value="false">Blind Box</option>
-              <option value="true">Revealed</option>
+              <option value="">All Artwork</option>
+              <option value="false">⬡ Blind Box</option>
+              <option value="true">✦ Revealed</option>
             </select>
 
             {(statusFilter || revealFilter || waveFilter || stageFilter) && (
