@@ -1220,228 +1220,328 @@ export default function NftPage() {
 
       {/* ══ Full History Modal ══════════════════════════════════════════════════ */}
       {viewRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
-          <div className="bg-white shadow-xl flex flex-col"
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(10,14,33,0.7)", backdropFilter: "blur(4px)" }}>
+          <div className="flex flex-col shadow-2xl overflow-hidden"
             style={{
               width: "100%",
-              maxWidth:    modalMaximized ? "100vw" : 720,
-              height:      modalMaximized ? "100vh" : "auto",
-              maxHeight:   modalMaximized ? "100vh" : "92vh",
-              borderRadius: modalMaximized ? 0 : 16,
-              border: "1px solid #e5e7eb",
+              maxWidth:     modalMaximized ? "100vw" : 780,
+              height:       modalMaximized ? "100vh" : "auto",
+              maxHeight:    modalMaximized ? "100vh" : "94vh",
+              borderRadius: modalMaximized ? 0 : 20,
+              border: "1px solid rgba(255,255,255,0.08)",
               transition: "max-width 0.2s ease, height 0.2s ease, border-radius 0.2s ease",
+              background: "#0f172a",
             }}>
-            <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
-              <div>
-                <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>NFT {viewRecord.serialNumber} — Full History</h2>
-                <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>Complete lifecycle from generation to delivery</p>
+
+            {/* ── Hero Header ─────────────────────────────────────────────── */}
+            <div className="flex-shrink-0 relative overflow-hidden"
+              style={{ background: "linear-gradient(135deg, #1e1b4b 0%, #1e3a5f 50%, #0f172a 100%)", padding: "24px 24px 0" }}>
+              {/* Top bar: title + window controls */}
+              <div className="flex items-start justify-between mb-5">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: "rgba(65,175,235,0.2)", color: "#41afeb", border: "1px solid rgba(65,175,235,0.3)" }}>
+                      NFT Record
+                    </span>
+                    {viewRecord.isRevealed
+                      ? <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(124,58,237,0.2)", color: "#a78bfa", border: "1px solid rgba(124,58,237,0.3)" }}>Revealed</span>
+                      : <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(217,119,6,0.2)", color: "#fbbf24", border: "1px solid rgba(217,119,6,0.3)" }}>Blind Box</span>
+                    }
+                  </div>
+                  <h2 className="text-xl font-extrabold tracking-tight" style={{ color: "#f8fafc" }}>
+                    {viewRecord.serialNumber}
+                    {viewRecord.tokenId != null && (
+                      <span className="ml-2 text-sm font-semibold" style={{ color: "#64748b" }}>· Token #{viewRecord.tokenId}</span>
+                    )}
+                  </h2>
+                  <p className="text-xs mt-0.5" style={{ color: "#475569" }}>Complete lifecycle — generation to delivery</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => setModalMaximized(v => !v)}
+                    title={modalMaximized ? "Minimize" : "Maximize"}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold"
+                    style={{ background: "rgba(255,255,255,0.07)", color: "#94a3b8", border: "1px solid rgba(255,255,255,0.1)" }}>
+                    {modalMaximized ? (
+                      <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3" />
+                      </svg>
+                    ) : (
+                      <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                      </svg>
+                    )}
+                    {modalMaximized ? "Minimize" : "Maximize"}
+                  </button>
+                  <button onClick={() => setViewRecord(null)} title="Close"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center"
+                    style={{ background: "rgba(239,68,68,0.15)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {/* Minimize */}
-                {modalMaximized && (
-                  <button
-                    onClick={() => setModalMaximized(false)}
-                    title="Minimize"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-                    style={{ background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb" }}>
-                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3" />
-                    </svg>
-                    Minimize
-                  </button>
-                )}
-                {/* Maximize */}
-                {!modalMaximized && (
-                  <button
-                    onClick={() => setModalMaximized(true)}
-                    title="Maximize"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-                    style={{ background: "#eff6ff", color: "#3b82f6", border: "1px solid #bfdbfe" }}>
-                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                    </svg>
-                    Maximize
-                  </button>
-                )}
-                {/* Close */}
-                <button onClick={() => setViewRecord(null)} title="Close" style={{ color: "#9bafc5" }}>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+
+              {/* NFT image + quick-stat strip */}
+              <div className="flex gap-6 items-end">
+                {/* Image */}
+                <div className="flex-shrink-0" style={{ marginBottom: -1 }}>
+                  <div style={{ borderRadius: "12px 12px 0 0", overflow: "hidden", border: "2px solid rgba(255,255,255,0.12)", borderBottom: "none" }}>
+                    <NftImage hash={viewRecord.imageIpfsHash} isRevealed={viewRecord.isRevealed} blindBoxUri={blindBoxImageUrl} size={160} />
+                  </div>
+                </div>
+                {/* Quick stats */}
+                <div className="flex-1 grid grid-cols-2 gap-3 pb-5">
+                  {[
+                    { label: "Serial",  val: viewRecord.serialNumber,                                                                           accent: "#41afeb" },
+                    { label: "Token",   val: viewRecord.tokenId != null ? `#${viewRecord.tokenId}` : "Not minted",                             accent: "#a78bfa" },
+                    { label: "Status",  val: viewRecord.deliveryStatusName ?? "—",                                                              accent: "#34d399" },
+                    { label: "Price",   val: viewRecord.effectivePriceEth != null ? `${Number(viewRecord.effectivePriceEth)} ETH` : "Free",     accent: "#fbbf24" },
+                  ].map(s => (
+                    <div key={s.label} className="rounded-xl px-3 py-2.5"
+                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                      <p className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: "#475569" }}>{s.label}</p>
+                      <p className="text-sm font-bold leading-tight" style={{ color: s.accent }}>{s.val}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <div className="px-6 py-4 overflow-y-auto flex-1 space-y-6">
+            {/* ── Scrollable Body ──────────────────────────────────────────── */}
+            <div className="overflow-y-auto flex-1" style={{ background: "#f8fafc" }}>
 
-              {/* NFT Identity */}
-              <div className="flex gap-5">
-                <div className="flex-shrink-0 flex flex-col items-center gap-2">
-                  <NftImage hash={viewRecord.imageIpfsHash} isRevealed={viewRecord.isRevealed} blindBoxUri={blindBoxImageUrl} size={200} />
-                  <RevealBadge revealed={viewRecord.isRevealed} />
-                </div>
-                <div className="flex-1 grid grid-cols-2 gap-x-6 gap-y-3">
-                  {[
-                    { label: "Serial Number", val: viewRecord.serialNumber },
-                    { label: "Token ID",      val: viewRecord.tokenId != null ? `#${viewRecord.tokenId}` : "Not minted" },
-                    { label: "Stage",         val: viewRecord.waveNumber != null ? `Wave ${viewRecord.waveNumber}${viewRecord.waveName ? ` — ${viewRecord.waveName}` : ""}` : "—" },
-                    { label: "Current Status",val: viewRecord.deliveryStatusName ?? "—" },
-                    { label: "Owner Address", val: viewRecord.ownerAddress ? `${viewRecord.ownerAddress.slice(0,6)}…${viewRecord.ownerAddress.slice(-4)}` : "—" },
-                  ].map(({ label, val }) => (
-                    <div key={label}>
-                      <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#9bafc5" }}>{label}</p>
-                      <p className="text-sm font-semibold mt-0.5" style={{ color: "#24315f" }}>{val}</p>
+              {/* Owner & Wave strip */}
+              <div className="px-6 py-4 flex flex-wrap gap-4" style={{ background: "#fff", borderBottom: "1px solid #e5e7eb" }}>
+                {viewRecord.ownerAddress && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: "rgba(65,175,235,0.1)" }}>
+                      <svg className="w-4 h-4" style={{ color: "#41afeb" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Wave Info */}
-              {viewRecord.waveNumber != null && (
-                <div className="p-4 rounded-xl" style={{ background: "rgba(65,175,235,0.05)", border: "1px solid rgba(65,175,235,0.2)" }}>
-                  <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: "#41afeb" }}>Wave Information</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#9bafc5" }}>Owner</p>
+                      <p className="text-xs font-mono font-bold" style={{ color: "#24315f" }}>
+                        {viewRecord.ownerAddress.slice(0,8)}…{viewRecord.ownerAddress.slice(-6)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {viewRecord.waveNumber != null && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: "rgba(124,58,237,0.1)" }}>
+                      <svg className="w-4 h-4" style={{ color: "#7c3aed" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+                      </svg>
+                    </div>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#9bafc5" }}>Wave</p>
-                      <p className="text-sm font-bold mt-0.5" style={{ color: "#24315f" }}>
-                        Wave {viewRecord.waveNumber}{viewRecord.waveName ? ` — ${viewRecord.waveName}` : ""}
+                      <p className="text-xs font-bold" style={{ color: "#24315f" }}>
+                        W{viewRecord.waveNumber}{viewRecord.waveName ? ` — ${viewRecord.waveName.split("—")[0]?.trim()}` : ""}
+                        {viewRecord.waveQuantity != null && <span style={{ color: "#9bafc5", fontWeight: 400 }}> · {viewRecord.waveQuantity.toLocaleString()} NFTs</span>}
                       </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#9bafc5" }}>Wave Qty</p>
-                      <p className="text-sm font-bold mt-0.5" style={{ color: "#24315f" }}>
-                        {viewRecord.waveQuantity != null ? viewRecord.waveQuantity.toLocaleString() : "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#9bafc5" }}>Wave Start</p>
-                      <p className="text-sm font-semibold mt-0.5" style={{ color: "#374151" }}>{fmt(viewRecord.waveScheduledStart)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#9bafc5" }}>Wave End</p>
-                      <p className="text-sm font-semibold mt-0.5" style={{ color: "#374151" }}>{fmt(viewRecord.waveScheduledEnd)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#9bafc5" }}>Reveal Date</p>
-                      <p className="text-sm font-semibold mt-0.5" style={{ color: "#7c3aed" }}>{fmt(viewRecord.waveRevealScheduledAt)}</p>
                     </div>
                   </div>
-                  {viewRecord.effectivePriceEth != null && (
-                    <div className="mt-3 pt-3" style={{ borderTop: "1px solid rgba(65,175,235,0.15)" }}>
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#9bafc5" }}>
-                        Sale Price {viewRecord.priceEth != null ? "(Custom Override)" : "(Wave Default)"}
-                      </p>
-                      <p className="text-lg font-bold mt-0.5" style={{ color: viewRecord.priceEth != null ? "#7c3aed" : "#24315f" }}>
-                        {Number(viewRecord.effectivePriceEth)} ETH
-                      </p>
+                )}
+                {viewRecord.stageName && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: "rgba(16,185,129,0.1)" }}>
+                      <svg className="w-4 h-4" style={{ color: "#10b981" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
                     </div>
-                  )}
-                </div>
-              )}
-
-              {/* Lifecycle Timeline */}
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: "#9bafc5" }}>Lifecycle Timeline</p>
-                <div className="space-y-0">
-                  {[
-                    { label: "Generated",  date: viewRecord.createdAt,   color: "#41afeb", desc: "NFT created in DB from generator",         txHash: null },
-                    { label: "Minted",     date: viewRecord.mintedAt,     color: "#7c3aed", desc: "Minted on-chain to buyer wallet",          txHash: viewRecord.mintTxHash },
-                    { label: "Revealed",   date: viewRecord.revealedAt,   color: "#7c3aed", desc: "NFT artwork revealed, blind box unsealed",  txHash: null },
-                    { label: "Sold",       date: viewRecord.soldAt,       color: "#f59e0b", desc: "NFT sold, ownership transferred",           txHash: viewRecord.lastTxHash },
-                    { label: "Delivered",  date: viewRecord.deliveredAt,  color: "#16a34a", desc: "NFT delivered to customer wallet",          txHash: null },
-                  ].map((step, i, arr) => (
-                    <div key={step.label} className="flex gap-4">
-                      <div className="flex flex-col items-center">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                          style={{
-                            background: step.date ? `${step.color}15` : "#f9fafb",
-                            border: `2px solid ${step.date ? step.color : "#e5e7eb"}`,
-                          }}>
-                          {step.date ? (
-                            <svg className="w-3.5 h-3.5" style={{ color: step.color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                            </svg>
-                          ) : (
-                            <div className="w-2 h-2 rounded-full" style={{ background: "#d1d5db" }} />
-                          )}
-                        </div>
-                        {i < arr.length - 1 && (
-                          <div className="w-0.5 h-8 mt-1" style={{ background: step.date ? "#e5e7eb" : "#f3f4f6" }} />
-                        )}
-                      </div>
-                      <div className="pb-6">
-                        <div className="flex items-baseline gap-3 flex-wrap">
-                          <p className="text-sm font-bold" style={{ color: step.date ? "#24315f" : "#9bafc5" }}>{step.label}</p>
-                          {step.date && (
-                            <p className="text-xs" style={{ color: "#6b7280" }}>{fmt(step.date)}</p>
-                          )}
-                          {step.txHash && (
-                            <a href={`${ETHERSCAN}${step.txHash}`} target="_blank" rel="noreferrer"
-                              className="text-xs font-mono"
-                              style={{ color: "#41afeb", textDecoration: "none" }}
-                              title={step.txHash}>
-                              {shortHash(step.txHash)} ↗
-                            </a>
-                          )}
-                        </div>
-                        <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>{step.desc}</p>
-                      </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#9bafc5" }}>Stage</p>
+                      <p className="text-xs font-bold" style={{ color: "#24315f" }}>{viewRecord.stageName}</p>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
 
-              {/* Blind Box notice */}
-              {!viewRecord.isRevealed && (
-                <div className="p-3 rounded-xl flex items-center gap-3"
-                  style={{ background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.2)" }}>
-                  <svg className="w-5 h-5 flex-shrink-0" style={{ color: "#d97706" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  <div>
-                    <p className="text-xs font-bold" style={{ color: "#d97706" }}>Sealed — Blind Box</p>
-                    <p className="text-xs mt-0.5" style={{ color: "#92400e" }}>
-                      {viewRecord.waveRevealScheduledAt
-                        ? `Scheduled to reveal on ${fmt(viewRecord.waveRevealScheduledAt)}. Attributes and artwork are hidden until then.`
-                        : "Attributes and artwork will be shown after the wave reveal event."}
-                    </p>
-                  </div>
-                </div>
-              )}
+              <div className="p-6 space-y-5">
 
-              {/* Traits (post-reveal) */}
-              {viewRecord.isRevealed && viewRecord.traits && Object.keys(viewRecord.traits).length > 0 && (
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: "#9bafc5" }}>Attributes</p>
-                  <div className="flex flex-wrap gap-2">
-                    {Object.entries(viewRecord.traits).map(([trait, value]) => (
-                      <div key={trait} className="px-3 py-1.5 rounded-xl text-center"
-                        style={{ background: "rgba(65,175,235,0.08)", border: "1px solid rgba(65,175,235,0.2)" }}>
-                        <div className="text-xs font-bold uppercase tracking-wide" style={{ color: "#9bafc5" }}>{trait}</div>
-                        <div className="text-sm font-semibold mt-0.5" style={{ color: "#24315f" }}>{value}</div>
+                {/* Wave Schedule Card */}
+                {viewRecord.waveNumber != null && (
+                  <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
+                    <div className="px-4 py-3 flex items-center gap-2" style={{ background: "linear-gradient(90deg, #eff6ff, #f5f3ff)", borderBottom: "1px solid #e5e7eb" }}>
+                      <svg className="w-4 h-4" style={{ color: "#6366f1" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#6366f1" }}>Wave Schedule</p>
+                    </div>
+                    <div className="bg-white">
+                      {/* Progress bar */}
+                      <div className="px-4 pt-4 pb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 rounded-full" style={{ background: "#e5e7eb" }}>
+                            <div className="h-full rounded-full" style={{
+                              width: viewRecord.isRevealed ? "100%" : viewRecord.mintedAt ? "66%" : viewRecord.waveScheduledStart && new Date(viewRecord.waveScheduledStart) < new Date() ? "33%" : "0%",
+                              background: "linear-gradient(90deg, #6366f1, #8b5cf6, #7c3aed)",
+                              transition: "width 0.4s ease",
+                            }} />
+                          </div>
+                          <span className="text-xs font-bold" style={{ color: "#6366f1" }}>
+                            {viewRecord.isRevealed ? "Revealed" : viewRecord.mintedAt ? "Minted" : "Pending"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 divide-x" style={{ borderTop: "1px solid #f3f4f6" }}>
+                        {[
+                          { label: "Wave Start",   val: fmt(viewRecord.waveScheduledStart),   color: "#41afeb", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
+                          { label: "Wave End",     val: fmt(viewRecord.waveScheduledEnd),     color: "#f59e0b", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
+                          { label: "Reveal Date",  val: fmt(viewRecord.waveRevealScheduledAt), color: "#7c3aed", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" },
+                        ].map(s => (
+                          <div key={s.label} className="px-4 py-3">
+                            <div className="flex items-center gap-1 mb-1">
+                              <svg className="w-3 h-3 flex-shrink-0" style={{ color: s.color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={s.icon} />
+                              </svg>
+                              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#9bafc5" }}>{s.label}</p>
+                            </div>
+                            <p className="text-xs font-bold" style={{ color: s.val === "—" ? "#d1d5db" : "#24315f" }}>{s.val}</p>
+                          </div>
+                        ))}
+                      </div>
+                      {viewRecord.priceEth != null && (
+                        <div className="px-4 py-3 flex items-center gap-3" style={{ borderTop: "1px solid #f3f4f6", background: "#fafaff" }}>
+                          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#9bafc5" }}>
+                            Sale Price <span style={{ color: "#7c3aed" }}>(Custom Override)</span>
+                          </span>
+                          <span className="text-base font-extrabold ml-auto" style={{ color: "#7c3aed" }}>{Number(viewRecord.priceEth)} ETH</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Lifecycle Timeline */}
+                <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
+                  <div className="px-4 py-3 flex items-center gap-2" style={{ background: "linear-gradient(90deg, #f0fdf4, #f8fafc)", borderBottom: "1px solid #e5e7eb" }}>
+                    <svg className="w-4 h-4" style={{ color: "#10b981" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#10b981" }}>Lifecycle Timeline</p>
+                  </div>
+                  <div className="bg-white divide-y" style={{ borderColor: "#f3f4f6" }}>
+                    {[
+                      { label: "Generated", date: viewRecord.createdAt,  color: "#41afeb", bg: "#eff6ff", desc: "NFT created from generator",          txHash: null },
+                      { label: "Minted",    date: viewRecord.mintedAt,   color: "#7c3aed", bg: "#f5f3ff", desc: "Minted on-chain to buyer wallet",     txHash: viewRecord.mintTxHash },
+                      { label: "Revealed",  date: viewRecord.revealedAt, color: "#8b5cf6", bg: "#f5f3ff", desc: "Artwork revealed, blind box opened",  txHash: null },
+                      { label: "Sold",      date: viewRecord.soldAt,     color: "#f59e0b", bg: "#fffbeb", desc: "Ownership transferred",               txHash: viewRecord.lastTxHash },
+                      { label: "Delivered", date: viewRecord.deliveredAt,color: "#10b981", bg: "#f0fdf4", desc: "Delivered to customer wallet",         txHash: null },
+                    ].map(step => (
+                      <div key={step.label} className="flex items-center gap-4 px-4 py-3">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                          style={{ background: step.date ? step.bg : "#f9fafb", border: `2px solid ${step.date ? step.color : "#e5e7eb"}` }}>
+                          {step.date
+                            ? <svg className="w-3.5 h-3.5" style={{ color: step.color }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                            : <div className="w-2 h-2 rounded-full" style={{ background: "#d1d5db" }} />
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-bold" style={{ color: step.date ? "#24315f" : "#9bafc5" }}>{step.label}</span>
+                            {step.date && <span className="text-xs" style={{ color: "#6b7280" }}>{fmt(step.date)}</span>}
+                            {step.txHash && (
+                              <a href={`${ETHERSCAN}${step.txHash}`} target="_blank" rel="noreferrer"
+                                className="inline-flex items-center gap-0.5 text-xs font-mono px-2 py-0.5 rounded-md"
+                                style={{ background: "rgba(65,175,235,0.08)", color: "#41afeb", border: "1px solid rgba(65,175,235,0.2)", textDecoration: "none" }}
+                                title={step.txHash}>
+                                {shortHash(step.txHash)} ↗
+                              </a>
+                            )}
+                          </div>
+                          <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>{step.desc}</p>
+                        </div>
+                        <div className="flex-shrink-0">
+                          {step.date
+                            ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: `${step.color}15`, color: step.color }}>Done</span>
+                            : <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "#f3f4f6", color: "#9bafc5" }}>Pending</span>
+                          }
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
 
-              {/* Metadata URI */}
-              {viewRecord.metadataUri && (
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wide mb-1" style={{ color: "#9bafc5" }}>Metadata URI</p>
-                  <p className="text-xs font-mono break-all px-3 py-2 rounded-lg"
-                    style={{ background: "#f9fafb", color: "#6b7280", border: "1px solid #e5e7eb" }}>
-                    {viewRecord.metadataUri}
-                  </p>
-                </div>
-              )}
+                {/* Blind Box notice */}
+                {!viewRecord.isRevealed && (
+                  <div className="rounded-2xl flex items-start gap-3 px-4 py-3"
+                    style={{ background: "linear-gradient(90deg, rgba(217,119,6,0.06), rgba(251,191,36,0.04))", border: "1px solid rgba(217,119,6,0.2)" }}>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                      style={{ background: "rgba(217,119,6,0.1)" }}>
+                      <svg className="w-5 h-5" style={{ color: "#d97706" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold" style={{ color: "#d97706" }}>Sealed — Blind Box</p>
+                      <p className="text-xs mt-0.5 leading-relaxed" style={{ color: "#92400e" }}>
+                        {viewRecord.waveRevealScheduledAt
+                          ? `Scheduled to reveal on ${fmt(viewRecord.waveRevealScheduledAt)}. Artwork and attributes are hidden until the reveal event.`
+                          : "Artwork and attributes will be shown after the wave reveal event."}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Traits */}
+                {viewRecord.isRevealed && viewRecord.traits && Object.keys(viewRecord.traits).length > 0 && (
+                  <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
+                    <div className="px-4 py-3 flex items-center gap-2" style={{ background: "linear-gradient(90deg, #faf5ff, #f8fafc)", borderBottom: "1px solid #e5e7eb" }}>
+                      <svg className="w-4 h-4" style={{ color: "#7c3aed" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                      <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#7c3aed" }}>Attributes</p>
+                    </div>
+                    <div className="bg-white p-4">
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(viewRecord.traits).map(([trait, value]) => (
+                          <div key={trait} className="px-3 py-2 rounded-xl text-center"
+                            style={{ background: "rgba(124,58,237,0.05)", border: "1px solid rgba(124,58,237,0.15)", minWidth: 80 }}>
+                            <div className="text-xs font-bold uppercase tracking-wide mb-0.5" style={{ color: "#9bafc5" }}>{trait}</div>
+                            <div className="text-sm font-bold" style={{ color: "#24315f" }}>{value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Metadata URI */}
+                {viewRecord.metadataUri && (
+                  <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
+                    <div className="px-4 py-3 flex items-center gap-2" style={{ background: "#f8fafc", borderBottom: "1px solid #e5e7eb" }}>
+                      <svg className="w-4 h-4" style={{ color: "#6b7280" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                      <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#6b7280" }}>Metadata URI</p>
+                    </div>
+                    <div className="bg-white px-4 py-3">
+                      <p className="text-xs font-mono break-all leading-relaxed" style={{ color: "#6b7280" }}>{viewRecord.metadataUri}</p>
+                    </div>
+                  </div>
+                )}
+
+              </div>
             </div>
 
-            <div className="flex justify-end px-6 py-4 flex-shrink-0" style={{ borderTop: "1px solid #e5e7eb" }}>
-              <button onClick={() => setViewRecord(null)} className="px-4 py-2 text-sm font-medium rounded-lg"
-                style={{ border: "1px solid #e5e7eb", color: "#6b7280" }}>Close</button>
+            {/* ── Footer ──────────────────────────────────────────────────── */}
+            <div className="flex-shrink-0 flex items-center justify-end gap-3 px-6 py-4"
+              style={{ background: "#fff", borderTop: "1px solid #e5e7eb" }}>
+              <button onClick={() => setViewRecord(null)}
+                className="px-5 py-2 text-sm font-semibold rounded-xl transition-colors"
+                style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0" }}>
+                Close
+              </button>
             </div>
+
           </div>
         </div>
       )}
