@@ -44,6 +44,8 @@ interface NftRecord {
   ownerAddress: string | null;
   notes: string | null;
   traits: Record<string, string> | null;
+  mintTxHash: string | null;
+  lastTxHash: string | null;
   createdAt: string;
   updatedAt: string;
   totalCount: number;
@@ -114,7 +116,9 @@ interface FulfillStageRow {
 
 function fmt(dt: string | null): string {
   if (!dt) return "—";
-  return new Date(dt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  const d = new Date(dt);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
 function fmtDate(d: string | null) {
@@ -229,8 +233,10 @@ export default function NftPage() {
   // ── Records tab state ─────────────────────────────────────────────────────
   const [records, setRecords]         = useState<NftRecord[]>([]);
   const [total, setTotal]             = useState(0);
+  const [totalAll, setTotalAll]       = useState(0);
   const [blindCount, setBlindCount]   = useState(0);
   const [revealedCount, setRevealedCount] = useState(0);
+  const [mintedCount, setMintedCount] = useState(0);
   const [soldCount, setSoldCount]     = useState(0);
   const [deliveredCount, setDeliveredCount] = useState(0);
   const [offset, setOffset]           = useState(0);
@@ -320,8 +326,10 @@ export default function NftPage() {
       .then(data => {
         setRecords(data.nftRecords ?? []);
         setTotal(data.total ?? 0);
+        setTotalAll(data.totalAll ?? 0);
         setBlindCount(data.blindCount ?? 0);
         setRevealedCount(data.revealedCount ?? 0);
+        setMintedCount(data.mintedCount ?? 0);
         setSoldCount(data.soldCount ?? 0);
         setDeliveredCount(data.deliveredCount ?? 0);
         setLoading(false);
@@ -570,9 +578,9 @@ export default function NftPage() {
       render: r => (
         <div>
           <div className="font-mono font-bold text-sm" style={{ color: "#24315f" }}>{r.serialNumber}</div>
-          {r.tokenId != null && (
-            <div className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>Token #{r.tokenId}</div>
-          )}
+          {r.tokenId != null
+            ? <div className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>Token #{r.tokenId}</div>
+            : <div className="text-xs mt-0.5" style={{ color: "#d1d5db" }}>Not minted</div>}
         </div>
       ),
     },
@@ -585,50 +593,49 @@ export default function NftPage() {
     },
     {
       key: "wave",
-      header: "Wave",
+      header: "Wave & Schedule",
       sortKey: "wave",
       render: r => r.waveNumber != null ? (
-        <div>
-          <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-            style={{ background: "rgba(65,175,235,0.1)", color: "#41afeb" }}>
-            W{r.waveNumber}
-          </span>
-          {r.waveName && <div className="text-xs mt-1" style={{ color: "#9bafc5" }}>{r.waveName.split("—")[0]?.trim()}</div>}
+        <div style={{ minWidth: 150 }}>
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+              style={{ background: "rgba(65,175,235,0.1)", color: "#41afeb" }}>
+              W{r.waveNumber}
+            </span>
+            {r.waveName && (
+              <span className="text-xs" style={{ color: "#9bafc5" }}>{r.waveName.split("—")[0]?.trim()}</span>
+            )}
+          </div>
           {r.waveQuantity != null && (
-            <div className="text-xs mt-0.5" style={{ color: "#6b7280" }}>Qty: {r.waveQuantity.toLocaleString()}</div>
+            <div className="text-xs mb-1" style={{ color: "#6b7280" }}>Qty: {r.waveQuantity.toLocaleString()}</div>
           )}
+          <div className="text-xs space-y-0.5" style={{ color: "#9bafc5", borderTop: "1px solid #f3f4f6", paddingTop: 4 }}>
+            {r.waveScheduledStart && (
+              <div>Start: <strong style={{ color: "#374151" }}>{fmt(r.waveScheduledStart)}</strong></div>
+            )}
+            {r.waveScheduledEnd && (
+              <div>End: <strong style={{ color: "#374151" }}>{fmt(r.waveScheduledEnd)}</strong></div>
+            )}
+            {r.waveRevealScheduledAt && (
+              <div style={{ color: "#7c3aed" }}>Reveal: <strong>{fmt(r.waveRevealScheduledAt)}</strong></div>
+            )}
+          </div>
         </div>
       ) : <span style={{ color: "#d1d5db" }}>—</span>,
     },
     {
-      key: "schedule",
-      header: "Wave Schedule",
-      render: r => (
-        <div className="text-xs space-y-0.5" style={{ color: "#6b7280", minWidth: 120 }}>
-          {r.waveScheduledStart && <div>Start: <strong style={{ color: "#374151" }}>{fmt(r.waveScheduledStart)}</strong></div>}
-          {r.waveScheduledEnd   && <div>End: <strong style={{ color: "#374151" }}>{fmt(r.waveScheduledEnd)}</strong></div>}
-          {r.waveRevealScheduledAt && (
-            <div style={{ color: "#7c3aed" }}>Reveal: <strong>{fmt(r.waveRevealScheduledAt)}</strong></div>
-          )}
-          {!r.waveScheduledStart && !r.waveScheduledEnd && <span style={{ color: "#d1d5db" }}>—</span>}
-        </div>
-      ),
-    },
-    {
-      key: "reveal",
-      header: "Reveal",
-      sortKey: "is_revealed",
-      align: "center",
-      render: r => <RevealBadge revealed={r.isRevealed} />,
-    },
-    {
-      key: "delivery",
+      key: "status",
       header: "Status",
       sortKey: "delivery_status",
       align: "center",
-      render: r => r.deliveryStatusCode
-        ? <StatusBadge code={r.deliveryStatusCode} name={r.deliveryStatusName} />
-        : <span style={{ color: "#9bafc5" }}>—</span>,
+      render: r => (
+        <div className="flex flex-col items-center gap-1.5">
+          <RevealBadge revealed={r.isRevealed} />
+          {r.deliveryStatusCode
+            ? <StatusBadge code={r.deliveryStatusCode} name={r.deliveryStatusName} />
+            : <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>}
+        </div>
+      ),
     },
     {
       key: "price",
@@ -644,18 +651,19 @@ export default function NftPage() {
     },
     {
       key: "timeline",
-      header: "Key Dates",
-      render: r => (
-        <div className="text-xs space-y-0.5" style={{ minWidth: 110 }}>
-          {r.mintedAt   && <div style={{ color: "#6b7280" }}>Minted: <strong style={{ color: "#374151" }}>{fmt(r.mintedAt)}</strong></div>}
-          {r.revealedAt && <div style={{ color: "#7c3aed" }}>Revealed: <strong>{fmt(r.revealedAt)}</strong></div>}
-          {r.soldAt     && <div style={{ color: "#d97706" }}>Sold: <strong>{fmt(r.soldAt)}</strong></div>}
-          {r.deliveredAt && <div style={{ color: "#16a34a" }}>Delivered: <strong>{fmt(r.deliveredAt)}</strong></div>}
-          {!r.mintedAt && !r.revealedAt && !r.soldAt && !r.deliveredAt && (
-            <span style={{ color: "#d1d5db" }}>No activity</span>
-          )}
-        </div>
-      ),
+      header: "Activity",
+      render: r => {
+        const hasActivity = r.mintedAt || r.revealedAt || r.soldAt || r.deliveredAt;
+        if (!hasActivity) return <span className="text-xs" style={{ color: "#d1d5db" }}>No activity yet</span>;
+        return (
+          <div className="text-xs space-y-0.5" style={{ minWidth: 120 }}>
+            {r.mintedAt    && <div style={{ color: "#6b7280" }}>🔗 Minted: <strong style={{ color: "#374151" }}>{fmt(r.mintedAt)}</strong></div>}
+            {r.revealedAt  && <div style={{ color: "#7c3aed" }}>✦ Revealed: <strong>{fmt(r.revealedAt)}</strong></div>}
+            {r.soldAt      && <div style={{ color: "#d97706" }}>💰 Sold: <strong>{fmt(r.soldAt)}</strong></div>}
+            {r.deliveredAt && <div style={{ color: "#16a34a" }}>✓ Delivered: <strong>{fmt(r.deliveredAt)}</strong></div>}
+          </div>
+        );
+      },
     },
     {
       key: "actions",
@@ -663,14 +671,15 @@ export default function NftPage() {
       align: "center",
       render: r => (
         <button onClick={() => setViewRecord(r)} title="View full history"
-          className="p-1.5 rounded-lg transition-colors"
-          style={{ color: "#41afeb" }}
-          onMouseEnter={e => (e.currentTarget.style.background = "rgba(65,175,235,0.1)")}
-          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+          style={{ color: "#41afeb", border: "1px solid rgba(65,175,235,0.3)", background: "rgba(65,175,235,0.05)" }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(65,175,235,0.12)"; e.currentTarget.style.borderColor = "rgba(65,175,235,0.5)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(65,175,235,0.05)"; e.currentTarget.style.borderColor = "rgba(65,175,235,0.3)"; }}>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
           </svg>
+          History
         </button>
       ),
     },
@@ -775,18 +784,20 @@ export default function NftPage() {
       {activeTab === "records" && (
         <>
           {/* ── Stats ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
             {[
-              { label: "Total NFTs",  value: total,          color: "#41afeb", filter: () => { setRevealFilter(""); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "", ""); } },
-              { label: "Blind Box",   value: blindCount,     color: "#d97706", filter: () => { setRevealFilter("false"); applyFilter(statusFilter, stageFilter, "false", waveFilter); } },
-              { label: "Revealed",    value: revealedCount,  color: "#7c3aed", filter: () => { setRevealFilter("true");  applyFilter(statusFilter, stageFilter, "true",  waveFilter); } },
-              { label: "Sold",        value: soldCount,      color: "#f59e0b", filter: () => { setStatusFilter("sold");      applyFilter("sold",      stageFilter, revealFilter, waveFilter); } },
-              { label: "Delivered",   value: deliveredCount, color: "#16a34a", filter: () => { setStatusFilter("delivered"); applyFilter("delivered", stageFilter, revealFilter, waveFilter); } },
+              { label: "Total NFTs",  value: totalAll,       color: "#24315f", sub: "All generated",   filter: () => { setRevealFilter(""); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "", ""); } },
+              { label: "Minted",      value: mintedCount,    color: "#41afeb", sub: "On-chain",        filter: () => { setRevealFilter(""); setStatusFilter(""); applyFilter("", stageFilter, "", waveFilter); } },
+              { label: "Blind Box",   value: blindCount,     color: "#d97706", sub: "Unrevealed",      filter: () => { setRevealFilter("false"); applyFilter(statusFilter, stageFilter, "false", waveFilter); } },
+              { label: "Revealed",    value: revealedCount,  color: "#7c3aed", sub: "Artwork visible", filter: () => { setRevealFilter("true");  applyFilter(statusFilter, stageFilter, "true",  waveFilter); } },
+              { label: "Sold",        value: soldCount,      color: "#f59e0b", sub: "Ownership transferred", filter: () => { setStatusFilter("sold");      applyFilter("sold",      stageFilter, revealFilter, waveFilter); } },
+              { label: "Delivered",   value: deliveredCount, color: "#16a34a", sub: "In customer wallet",    filter: () => { setStatusFilter("delivered"); applyFilter("delivered", stageFilter, revealFilter, waveFilter); } },
             ].map(s => (
-              <button key={s.label} onClick={s.filter} className="text-left bg-white rounded-xl shadow-sm hover:shadow-md"
+              <button key={s.label} onClick={s.filter} className="text-left bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow"
                 style={{ border: "1px solid #e5e7eb", borderLeft: `3px solid ${s.color}`, padding: "14px 16px" }}>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "#9bafc5" }}>{s.label}</p>
-                <p className="text-2xl font-extrabold leading-none" style={{ color: s.color }}>{s.value.toLocaleString()}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#9bafc5" }}>{s.label}</p>
+                <p className="text-2xl font-extrabold leading-none mb-1" style={{ color: s.color }}>{s.value.toLocaleString()}</p>
+                <p className="text-[10px]" style={{ color: "#c4cdd9" }}>{s.sub}</p>
               </button>
             ))}
           </div>
@@ -1265,11 +1276,11 @@ export default function NftPage() {
                 <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: "#9bafc5" }}>Lifecycle Timeline</p>
                 <div className="space-y-0">
                   {[
-                    { label: "Generated",  date: viewRecord.createdAt,   color: "#41afeb", desc: "NFT created in DB from generator" },
-                    { label: "Minted",     date: viewRecord.mintedAt,     color: "#7c3aed", desc: "Minted on-chain to buyer wallet" },
-                    { label: "Revealed",   date: viewRecord.revealedAt,   color: "#7c3aed", desc: "NFT artwork revealed, blind box unsealed" },
-                    { label: "Sold",       date: viewRecord.soldAt,       color: "#f59e0b", desc: "NFT sold, ownership transferred" },
-                    { label: "Delivered",  date: viewRecord.deliveredAt,  color: "#16a34a", desc: "NFT delivered to customer wallet" },
+                    { label: "Generated",  date: viewRecord.createdAt,   color: "#41afeb", desc: "NFT created in DB from generator",         txHash: null },
+                    { label: "Minted",     date: viewRecord.mintedAt,     color: "#7c3aed", desc: "Minted on-chain to buyer wallet",          txHash: viewRecord.mintTxHash },
+                    { label: "Revealed",   date: viewRecord.revealedAt,   color: "#7c3aed", desc: "NFT artwork revealed, blind box unsealed",  txHash: null },
+                    { label: "Sold",       date: viewRecord.soldAt,       color: "#f59e0b", desc: "NFT sold, ownership transferred",           txHash: viewRecord.lastTxHash },
+                    { label: "Delivered",  date: viewRecord.deliveredAt,  color: "#16a34a", desc: "NFT delivered to customer wallet",          txHash: null },
                   ].map((step, i, arr) => (
                     <div key={step.label} className="flex gap-4">
                       <div className="flex flex-col items-center">
@@ -1291,10 +1302,18 @@ export default function NftPage() {
                         )}
                       </div>
                       <div className="pb-6">
-                        <div className="flex items-baseline gap-3">
+                        <div className="flex items-baseline gap-3 flex-wrap">
                           <p className="text-sm font-bold" style={{ color: step.date ? "#24315f" : "#9bafc5" }}>{step.label}</p>
                           {step.date && (
                             <p className="text-xs" style={{ color: "#6b7280" }}>{fmt(step.date)}</p>
+                          )}
+                          {step.txHash && (
+                            <a href={`${ETHERSCAN}${step.txHash}`} target="_blank" rel="noreferrer"
+                              className="text-xs font-mono"
+                              style={{ color: "#41afeb", textDecoration: "none" }}
+                              title={step.txHash}>
+                              {shortHash(step.txHash)} ↗
+                            </a>
                           )}
                         </div>
                         <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>{step.desc}</p>
