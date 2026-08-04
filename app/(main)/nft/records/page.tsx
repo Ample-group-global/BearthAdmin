@@ -1222,17 +1222,48 @@ export default function NftPage() {
       {viewRecord && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
           <div className="bg-white rounded-2xl shadow-xl flex flex-col"
-            style={{ width: "100%", maxWidth: 720, maxHeight: "92vh", border: "1px solid #e5e7eb" }}>
+            style={{
+              width: "100%", maxWidth: 720, maxHeight: "92vh", border: "1px solid #e5e7eb",
+              transform: `scale(${modalZoom})`, transformOrigin: "center center", transition: "transform 0.15s ease",
+            }}>
             <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
               <div>
                 <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>NFT {viewRecord.serialNumber} — Full History</h2>
                 <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>Complete lifecycle from generation to delivery</p>
               </div>
-              <button onClick={() => setViewRecord(null)} style={{ color: "#9bafc5" }}>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              {/* Zoom controls + close */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 px-2 py-1 rounded-lg" style={{ background: "#f3f4f6", border: "1px solid #e5e7eb" }}>
+                  <button
+                    onClick={() => setModalZoom(z => Math.max(0.6, +(z - 0.1).toFixed(1)))}
+                    disabled={modalZoom <= 0.6}
+                    title="Zoom out"
+                    className="w-6 h-6 flex items-center justify-center rounded text-base font-bold leading-none"
+                    style={{ color: modalZoom <= 0.6 ? "#d1d5db" : "#374151", background: "transparent", border: "none", cursor: modalZoom <= 0.6 ? "default" : "pointer" }}>
+                    −
+                  </button>
+                  <button
+                    onClick={() => setModalZoom(1)}
+                    title="Reset to 100%"
+                    className="text-xs font-semibold"
+                    style={{ color: "#6b7280", background: "transparent", border: "none", cursor: "pointer", minWidth: 32, textAlign: "center" }}>
+                    {Math.round(modalZoom * 100)}%
+                  </button>
+                  <button
+                    onClick={() => setModalZoom(z => Math.min(1.5, +(z + 0.1).toFixed(1)))}
+                    disabled={modalZoom >= 1.5}
+                    title="Zoom in"
+                    className="w-6 h-6 flex items-center justify-center rounded text-base font-bold leading-none"
+                    style={{ color: modalZoom >= 1.5 ? "#d1d5db" : "#374151", background: "transparent", border: "none", cursor: modalZoom >= 1.5 ? "default" : "pointer" }}>
+                    +
+                  </button>
+                </div>
+                <button onClick={() => setViewRecord(null)} style={{ color: "#9bafc5" }}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <div className="px-6 py-4 overflow-y-auto flex-1 space-y-6">
@@ -1240,36 +1271,7 @@ export default function NftPage() {
               {/* NFT Identity */}
               <div className="flex gap-5">
                 <div className="flex-shrink-0 flex flex-col items-center gap-2">
-                  {/* Zoomable image container */}
-                  <div style={{ width: 120 * modalZoom, height: 120 * modalZoom, transition: "width 0.2s, height 0.2s", overflow: "hidden", borderRadius: 12 }}>
-                    <NftImage hash={viewRecord.imageIpfsHash} isRevealed={viewRecord.isRevealed} blindBoxUri={blindBoxImageUrl} size={120 * modalZoom} />
-                  </div>
-                  {/* Zoom controls */}
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setModalZoom(z => Math.max(0.5, +(z - 0.25).toFixed(2)))}
-                      disabled={modalZoom <= 0.5}
-                      title="Zoom out"
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold transition-colors"
-                      style={{ background: "#f3f4f6", color: modalZoom <= 0.5 ? "#d1d5db" : "#374151", border: "1px solid #e5e7eb", cursor: modalZoom <= 0.5 ? "default" : "pointer" }}>
-                      −
-                    </button>
-                    <button
-                      onClick={() => setModalZoom(1)}
-                      title="Reset zoom"
-                      className="text-xs font-semibold px-2 py-0.5 rounded-lg transition-colors"
-                      style={{ background: "#f3f4f6", color: "#6b7280", border: "1px solid #e5e7eb", minWidth: 36, textAlign: "center" }}>
-                      {Math.round(modalZoom * 100)}%
-                    </button>
-                    <button
-                      onClick={() => setModalZoom(z => Math.min(3, +(z + 0.25).toFixed(2)))}
-                      disabled={modalZoom >= 3}
-                      title="Zoom in"
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold transition-colors"
-                      style={{ background: "#f3f4f6", color: modalZoom >= 3 ? "#d1d5db" : "#374151", border: "1px solid #e5e7eb", cursor: modalZoom >= 3 ? "default" : "pointer" }}>
-                      +
-                    </button>
-                  </div>
+                  <NftImage hash={viewRecord.imageIpfsHash} isRevealed={viewRecord.isRevealed} blindBoxUri={blindBoxImageUrl} size={200} />
                   <RevealBadge revealed={viewRecord.isRevealed} />
                 </div>
                 <div className="flex-1 grid grid-cols-2 gap-x-6 gap-y-3">
