@@ -318,7 +318,14 @@ export default function NftPage() {
     const params = new URLSearchParams({ search: q, limit: String(PAGE_SIZE), offset: String(off) });
     if (status)  params.set("delivery_status", status);
     if (stage)   params.set("stage", stage);
-    if (revealed) params.set("revealed", revealed);
+    if (revealed === "pre_mint") {
+      params.set("minted", "false");
+    } else if (revealed === "false") {
+      params.set("revealed", "false");
+      params.set("minted", "true");
+    } else if (revealed === "true") {
+      params.set("revealed", "true");
+    }
     if (wave)    params.set("wave_number", wave);
     if (sk)      params.set("sort_by", sk);
     if (sk && sd) params.set("sort_dir", sd);
@@ -813,7 +820,7 @@ export default function NftPage() {
       {activeTab === "records" && (
         <>
           {/* ── Stats ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               {
                 label: "Total NFTs", value: totalAll, color: "#24315f", bg: "#eef0f8", pct: 100,
@@ -838,18 +845,6 @@ export default function NftPage() {
                 sub: "Artwork unlocked",
                 icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
                 filter: () => { setRevealFilter("true"); applyFilter(statusFilter, stageFilter, "true", waveFilter); },
-              },
-              {
-                label: "Sold", value: soldCount, color: "#b45309", bg: "#fef9c3", pct: totalAll ? Math.round(soldCount / totalAll * 100) : 0,
-                sub: "Ownership transferred",
-                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" /></svg>,
-                filter: () => { setStatusFilter("sold"); applyFilter("sold", stageFilter, revealFilter, waveFilter); },
-              },
-              {
-                label: "Delivered", value: deliveredCount, color: "#15803d", bg: "#f0fdf4", pct: totalAll ? Math.round(deliveredCount / totalAll * 100) : 0,
-                sub: "In holder wallet",
-                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-                filter: () => { setStatusFilter("delivered"); applyFilter("delivered", stageFilter, revealFilter, waveFilter); },
               },
             ].map(s => (
               <button key={s.label} onClick={s.filter}
@@ -908,23 +903,13 @@ export default function NftPage() {
               ))}
             </select>
 
-            {/* NFT Status — curated lifecycle options, not raw DB delivery codes */}
-            <select value={statusFilter}
-              onChange={e => { setStatusFilter(e.target.value); applyFilter(e.target.value, stageFilter, revealFilter, waveFilter); }}
-              className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
-              style={{ border: "1px solid #e5e7eb", color: statusFilter ? "#111827" : "#9bafc5" }}>
-              <option value="">All NFT Status</option>
-              <option value="sold">💰 Sold</option>
-              <option value="delivered">✓ Delivered</option>
-              <option value="cancelled">✕ Cancelled</option>
-            </select>
-
-            {/* Artwork state — matches badge language */}
+            {/* Artwork state — matches NFT lifecycle badge language */}
             <select value={revealFilter}
               onChange={e => { setRevealFilter(e.target.value); applyFilter(statusFilter, stageFilter, e.target.value, waveFilter); }}
               className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
               style={{ border: "1px solid #e5e7eb", color: revealFilter ? "#111827" : "#9bafc5" }}>
               <option value="">All Artwork</option>
+              <option value="pre_mint">○ Pre-mint</option>
               <option value="false">⬡ Blind Box</option>
               <option value="true">✦ Revealed</option>
             </select>

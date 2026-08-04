@@ -68,6 +68,7 @@ interface WaveSchedule {
   is_revealed:           boolean;
   wave_revealed_at:      string | null;
   sold_count:            number;
+  minted_count:          number;
   quantity:              number;
 }
 
@@ -115,12 +116,21 @@ const STATE_META: Record<string, { label: string; color: string; bg: string }> =
 
 const WAVE_COLORS = {
   completed: { bg: "rgba(22,163,74,0.1)",    color: "#16a34a", label: "Completed" },
+  revealed:  { bg: "rgba(124,58,237,0.1)",   color: "#7c3aed", label: "Revealed"  },
   active:    { bg: "rgba(65,175,235,0.12)",  color: "#41afeb", label: "Active"    },
   upcoming:  { bg: "rgba(156,163,175,0.12)", color: "#9ca3af", label: "Upcoming"  },
   paused:    { bg: "rgba(217,119,6,0.1)",    color: "#d97706", label: "Paused"    },
   closed:    { bg: "rgba(22,163,74,0.1)",    color: "#16a34a", label: "Closed"    },
+  ended:     { bg: "rgba(107,114,128,0.1)",  color: "#6b7280", label: "Ended"     },
   sold_out:  { bg: "rgba(124,58,237,0.1)",   color: "#7c3aed", label: "Sold Out"  },
 };
+
+function deriveWaveDisplayStatus(w: Wave): string {
+  if (w.waveRevealed) return "revealed";
+  if (w.waveClosed)   return "closed";
+  if (w.status === "active" && w.scheduledEnd && new Date(w.scheduledEnd) < new Date()) return "ended";
+  return w.status;
+}
 
 function SaleMethodBadge({ method, saleMethods }: { method: string; saleMethods: SaleMethod[] }) {
   const sm = saleMethods.find(s => s.code === method);
@@ -637,8 +647,8 @@ export default function WavesPage() {
   // ── Derived values ──
 
   const totalNfts      = waves.reduce((s, w) => s + (w.quantity ?? 0), 0);
-  const activeWave     = waves.find(w => w.status === "active");
-  const completedCount = waves.filter(w => ["completed", "closed", "sold_out"].includes(w.status)).length;
+  const activeWave     = waves.find(w => deriveWaveDisplayStatus(w) === "active");
+  const completedCount = waves.filter(w => ["revealed", "completed", "closed", "ended", "sold_out"].includes(deriveWaveDisplayStatus(w))).length;
   const totalSold      = waves.reduce((s, w) => s + (w.soldCount ?? 0), 0);
 
   const revealNow = Date.now();
@@ -889,7 +899,7 @@ export default function WavesPage() {
 
                           <td style={{ padding: "10px 14px" }}>
                             <div className="space-y-1">
-                              <StatusBadge status={w.status} colorMap={WAVE_COLORS} dot />
+                              <StatusBadge status={deriveWaveDisplayStatus(w)} colorMap={WAVE_COLORS} dot />
                               {isClosed && w.closeAction && (
                                 <span className="block text-xs" style={{ color: "#9bafc5" }}>
                                   {w.closeAction === "treasury" ? "→ Treasury" : "→ Burned"}
@@ -1046,7 +1056,7 @@ export default function WavesPage() {
                 <table className="w-full" style={{ fontSize: 13, borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ background: "#fafafa", borderBottom: "1px solid #f3f4f6" }}>
-                      {["Wave", "Start Date", "End Date", "Reveal Date", "Sold / Qty", "State", "Action"].map(h => (
+                      {["Wave", "Start Date", "End Date", "Reveal Date", "Minted / Qty", "State", "Action"].map(h => (
                         <th key={h} className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wide"
                           style={{ color: "#9bafc5", whiteSpace: "nowrap" }}>
                           {h}
@@ -1120,14 +1130,14 @@ export default function WavesPage() {
                             )}
                           </td>
 
-                          {/* Sold / Qty */}
+                          {/* Minted / Qty */}
                           <td className="px-4 py-3 text-xs" style={{ whiteSpace: "nowrap" }}>
-                            <span className="font-bold" style={{ color: "#41afeb" }}>{w.sold_count.toLocaleString()}</span>
+                            <span className="font-bold" style={{ color: "#41afeb" }}>{(w.minted_count ?? 0).toLocaleString()}</span>
                             <span style={{ color: "#9bafc5" }}> / {w.quantity.toLocaleString()}</span>
                             {w.quantity > 0 && (
                               <div className="mt-1 h-1 rounded-full overflow-hidden" style={{ background: "#f3f4f6", width: 60 }}>
                                 <div className="h-full rounded-full" style={{
-                                  width: `${Math.min(100, (w.sold_count / w.quantity) * 100)}%`,
+                                  width: `${Math.min(100, ((w.minted_count ?? 0) / w.quantity) * 100)}%`,
                                   background: "#41afeb",
                                 }} />
                               </div>
