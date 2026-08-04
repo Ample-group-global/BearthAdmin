@@ -1288,19 +1288,63 @@ export default function NftPage() {
                   {/* Details grid */}
                   <div className="flex-1 min-w-0">
                     <div className="grid grid-cols-3 gap-x-4 gap-y-4">
-                      {[
-                        { label: "Serial #",       val: viewRecord.serialNumber,                                                                        mono: false },
-                        { label: "Token ID",        val: viewRecord.tokenId != null ? `#${viewRecord.tokenId}` : "Not minted",                          mono: false },
-                        { label: "Delivery Status", val: viewRecord.deliveryStatusName ?? "—",                                                          mono: false },
-                        { label: "Stage",           val: viewRecord.stageName ?? "—",                                                                   mono: false },
-                        { label: "Price",           val: viewRecord.effectivePriceEth != null ? `${Number(viewRecord.effectivePriceEth)} ETH` : "Free", mono: false },
-                        { label: "Wave",            val: viewRecord.waveNumber != null ? `W${viewRecord.waveNumber}${viewRecord.waveName ? ` — ${viewRecord.waveName.split("—")[0]?.trim()}` : ""}` : "—", mono: false },
-                      ].map(f => (
-                        <div key={f.label}>
-                          <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>{f.label}</p>
-                          <p className={`text-sm font-semibold leading-tight ${f.mono ? "font-mono" : ""}`} style={{ color: "#0f172a" }}>{f.val}</p>
+                      {/* Serial # */}
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Serial #</p>
+                        <p className="text-sm font-semibold leading-tight" style={{ color: "#0f172a" }}>{viewRecord.serialNumber}</p>
+                      </div>
+                      {/* Token ID */}
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Token ID</p>
+                        <p className="text-sm font-semibold leading-tight" style={{ color: viewRecord.tokenId != null ? "#0f172a" : "#94a3b8" }}>
+                          {viewRecord.tokenId != null ? `#${viewRecord.tokenId}` : "Not minted"}
+                        </p>
+                      </div>
+                      {/* NFT Status — derived from lifecycle, industry-standard */}
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#94a3b8" }}>NFT Status</p>
+                        {(() => {
+                          const code = viewRecord.deliveryStatusCode;
+                          if (code === "delivered") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#dcfce7", color: "#15803d" }}>✓ Delivered</span>;
+                          if (code === "sold")      return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#fef9c3", color: "#a16207" }}>💰 Sold</span>;
+                          if (viewRecord.isRevealed) return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#f5f3ff", color: "#7c3aed" }}>✦ Revealed</span>;
+                          if (viewRecord.tokenId != null) return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#eff6ff", color: "#2563eb" }}>⬡ Minted</span>;
+                          return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#f8fafc", color: "#94a3b8", border: "1px solid #e2e8f0" }}>○ Pre-mint</span>;
+                        })()}
+                      </div>
+                      {/* Chain */}
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Chain</p>
+                        <div className="flex items-center gap-1.5">
+                          <svg width="14" height="14" viewBox="0 0 256 417" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M127.9 0L125.2 9V285.2L127.9 287.9L255.8 212.6L127.9 0Z" fill="#343434"/>
+                            <path d="M127.9 0L0 212.6L127.9 287.9V154.2V0Z" fill="#8C8C8C"/>
+                            <path d="M127.9 312.8L126.3 314.8V412.1L127.9 416.9L255.9 237.5L127.9 312.8Z" fill="#3C3C3B"/>
+                            <path d="M127.9 416.9V312.8L0 237.5L127.9 416.9Z" fill="#8C8C8C"/>
+                            <path d="M127.9 287.9L255.8 212.6L127.9 154.2V287.9Z" fill="#141414"/>
+                            <path d="M0 212.6L127.9 287.9V154.2L0 212.6Z" fill="#393939"/>
+                          </svg>
+                          <p className="text-sm font-semibold" style={{ color: "#0f172a" }}>
+                            {process.env.NEXT_PUBLIC_NETWORK === "mainnet" ? "Ethereum" : "Sepolia"}
+                          </p>
                         </div>
-                      ))}
+                      </div>
+                      {/* Price */}
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Mint Price</p>
+                        <p className="text-sm font-semibold leading-tight" style={{ color: viewRecord.effectivePriceEth != null ? "#0f172a" : "#15803d" }}>
+                          {viewRecord.effectivePriceEth != null ? `${Number(viewRecord.effectivePriceEth)} ETH` : "Free"}
+                        </p>
+                      </div>
+                      {/* Wave */}
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Wave</p>
+                        <p className="text-sm font-semibold leading-tight" style={{ color: viewRecord.waveNumber != null ? "#0f172a" : "#94a3b8" }}>
+                          {viewRecord.waveNumber != null
+                            ? `W${viewRecord.waveNumber}${viewRecord.waveName ? ` — ${viewRecord.waveName.split("—")[0]?.trim()}` : ""}`
+                            : "—"}
+                        </p>
+                      </div>
                     </div>
                     {viewRecord.ownerAddress && (
                       <div className="mt-4 pt-3" style={{ borderTop: "1px solid #f1f5f9" }}>
