@@ -659,7 +659,7 @@ export default function WavesPage() {
   const totalNfts      = waves.reduce((s, w) => s + (w.quantity ?? 0), 0);
   const activeWave     = waves.find(w => deriveWaveDisplayStatus(w) === "active");
   const completedCount = waves.filter(w => ["revealed", "completed", "sold_out", "closed"].includes(deriveWaveDisplayStatus(w))).length;
-  const totalSold      = waves.reduce((s, w) => s + (w.onChain?.soldCount ?? w.soldCount ?? 0), 0);
+  const totalSold      = waves.reduce((s, w) => s + (w.soldCount ?? w.onChain?.soldCount ?? 0), 0);
 
   const revealNow = Date.now();
   const readyCount = Math.max(
@@ -869,7 +869,7 @@ export default function WavesPage() {
 
                           <td style={{ padding: "10px 14px", textAlign: "center" }}>
                             {(() => {
-                              const minted = w.onChain?.soldCount ?? w.soldCount ?? 0;
+                              const minted = w.soldCount ?? w.onChain?.soldCount ?? 0;
                               return (
                                 <>
                                   <div className="text-xs">
