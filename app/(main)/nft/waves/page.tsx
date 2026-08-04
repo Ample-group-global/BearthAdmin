@@ -805,9 +805,9 @@ export default function WavesPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: "Total Waves",  value: String(waves.length),    color: "#41afeb" },
-              { label: "Closed/Done",  value: String(completedCount),  color: "#16a34a" },
+              { label: "Complete",      value: String(completedCount),  color: "#16a34a" },
               { label: "Active Wave",  value: activeWave?.name ?? "—", color: "#7c3aed", small: true },
-              { label: "Total Sold",   value: `${totalSold.toLocaleString()} / ${totalNfts.toLocaleString()}`, color: "#24315f", small: true },
+              { label: "Total Minted", value: `${totalSold.toLocaleString()} / ${totalNfts.toLocaleString()}`, color: "#24315f", small: true },
             ].map(s => (
               <div key={s.label} className="bg-white rounded-xl p-4 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
                 <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "#9bafc5" }}>{s.label}</p>
@@ -833,8 +833,8 @@ export default function WavesPage() {
                 <table className="w-full text-sm min-w-max">
                   <thead>
                     <tr>
-                      {["Wave", "Qty", "Price (ETH)", "Sold", "Sale Method", "Schedule", "Reveal Date", "Status", "Revealed", "Actions"].map(h => (
-                        <th key={h} style={{ ...thStyle, textAlign: ["Qty", "Sold", "Revealed"].includes(h) ? "center" : "left" }}>{h}</th>
+                      {["Wave", "Qty", "Price (ETH)", "Minted", "Sale Method", "Schedule", "Reveal Date", "Status", "Reveal", "Actions"].map(h => (
+                        <th key={h} style={{ ...thStyle, textAlign: ["Qty", "Minted", "Reveal"].includes(h) ? "center" : "left" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -863,7 +863,13 @@ export default function WavesPage() {
                                   🐻
                                 </div>
                               )}
-                              <div className="font-semibold text-xs" style={{ color: "#111827" }}>{w.name}</div>
+                              <div>
+                                <span className="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded mb-0.5"
+                                  style={{ background: "rgba(65,175,235,0.1)", color: "#41afeb" }}>
+                                  W{w.waveNumber}
+                                </span>
+                                <div className="font-semibold text-xs" style={{ color: "#111827" }}>{w.name}</div>
+                              </div>
                             </div>
                           </td>
 
@@ -961,9 +967,28 @@ export default function WavesPage() {
 
                           <td style={{ padding: "10px 14px", textAlign: "center" }}>
                             {w.waveRevealed ? (
-                              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: "#16a34a" }} title="Revealed" />
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                                style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>
+                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Done
+                              </span>
+                            ) : w.revealScheduledAt ? (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                                  style={{ background: "rgba(124,58,237,0.1)", color: "#7c3aed" }}>
+                                  Scheduled
+                                </span>
+                                <span className="text-[9px]" style={{ color: "#9bafc5" }}>
+                                  {new Date(w.revealScheduledAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                                </span>
+                              </div>
                             ) : (
-                              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: "#d1d5db" }} title="Not revealed" />
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                                style={{ background: "#f3f4f6", color: "#9bafc5" }}>
+                                Blind
+                              </span>
                             )}
                           </td>
 
@@ -975,10 +1000,13 @@ export default function WavesPage() {
                                 Edit
                               </button>
                               <button onClick={() => openChainModal(w)}
-                                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white"
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white"
                                 style={{ background: isClosed ? "#9bafc5" : "#41afeb" }}
                                 disabled={isClosed}>
-                                ⛓ On-Chain
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                </svg>
+                                On-Chain
                               </button>
                             </div>
                           </td>
@@ -1137,7 +1165,7 @@ export default function WavesPage() {
             <div className="px-5 py-4" style={{ borderBottom: "1px solid #f3f4f6" }}>
               <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Wave Schedule</h2>
               <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
-                Set dates on the Waves tab. Click "Reveal Now" when a wave's reveal date arrives.
+                Use "Set Date" on each row to schedule a reveal. Click "Reveal Now" when the reveal date arrives.
               </p>
             </div>
 
@@ -1312,7 +1340,7 @@ export default function WavesPage() {
                 icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
                 color: "#41afeb",
                 title: "1. Set Reveal Date",
-                desc: "On the Waves tab, set a reveal date for each wave. This date is shown to the community.",
+                desc: "Click \"Set Date\" in the wave row below to schedule each wave's reveal. The date is announced to your community and triggers the alert when it arrives.",
               },
               {
                 icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
