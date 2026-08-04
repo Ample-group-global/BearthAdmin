@@ -813,20 +813,72 @@ export default function NftPage() {
       {activeTab === "records" && (
         <>
           {/* ── Stats ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
-              { label: "Total NFTs",  value: totalAll,       color: "#24315f", sub: "All generated",   filter: () => { setRevealFilter(""); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "", ""); } },
-              { label: "Minted",      value: mintedCount,    color: "#41afeb", sub: "On-chain",        filter: () => { setRevealFilter(""); setStatusFilter(""); applyFilter("", stageFilter, "", waveFilter); } },
-              { label: "Blind Box",   value: blindCount,     color: "#d97706", sub: "Unrevealed",      filter: () => { setRevealFilter("false"); applyFilter(statusFilter, stageFilter, "false", waveFilter); } },
-              { label: "Revealed",    value: revealedCount,  color: "#7c3aed", sub: "Artwork visible", filter: () => { setRevealFilter("true");  applyFilter(statusFilter, stageFilter, "true",  waveFilter); } },
-              { label: "Sold",        value: soldCount,      color: "#f59e0b", sub: "Ownership transferred", filter: () => { setStatusFilter("sold");      applyFilter("sold",      stageFilter, revealFilter, waveFilter); } },
-              { label: "Delivered",   value: deliveredCount, color: "#16a34a", sub: "In customer wallet",    filter: () => { setStatusFilter("delivered"); applyFilter("delivered", stageFilter, revealFilter, waveFilter); } },
+              {
+                label: "Total NFTs", value: totalAll, color: "#24315f", bg: "#eef0f8", pct: 100,
+                sub: "Full collection",
+                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>,
+                filter: () => { setRevealFilter(""); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "", ""); },
+              },
+              {
+                label: "Minted", value: mintedCount, color: "#2563eb", bg: "#eff6ff", pct: totalAll ? Math.round(mintedCount / totalAll * 100) : 0,
+                sub: "On-chain tokens",
+                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>,
+                filter: () => { setRevealFilter(""); setStatusFilter(""); applyFilter("", stageFilter, "", waveFilter); },
+              },
+              {
+                label: "Blind Box", value: blindCount, color: "#d97706", bg: "#fffbeb", pct: totalAll ? Math.round(blindCount / totalAll * 100) : 0,
+                sub: "Minted, unrevealed",
+                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+                filter: () => { setRevealFilter("false"); applyFilter(statusFilter, stageFilter, "false", waveFilter); },
+              },
+              {
+                label: "Revealed", value: revealedCount, color: "#7c3aed", bg: "#f5f3ff", pct: totalAll ? Math.round(revealedCount / totalAll * 100) : 0,
+                sub: "Artwork unlocked",
+                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+                filter: () => { setRevealFilter("true"); applyFilter(statusFilter, stageFilter, "true", waveFilter); },
+              },
+              {
+                label: "Sold", value: soldCount, color: "#b45309", bg: "#fef9c3", pct: totalAll ? Math.round(soldCount / totalAll * 100) : 0,
+                sub: "Ownership transferred",
+                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" /></svg>,
+                filter: () => { setStatusFilter("sold"); applyFilter("sold", stageFilter, revealFilter, waveFilter); },
+              },
+              {
+                label: "Delivered", value: deliveredCount, color: "#15803d", bg: "#f0fdf4", pct: totalAll ? Math.round(deliveredCount / totalAll * 100) : 0,
+                sub: "In holder wallet",
+                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+                filter: () => { setStatusFilter("delivered"); applyFilter("delivered", stageFilter, revealFilter, waveFilter); },
+              },
             ].map(s => (
-              <button key={s.label} onClick={s.filter} className="text-left bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow"
-                style={{ border: "1px solid #e5e7eb", borderLeft: `3px solid ${s.color}`, padding: "14px 16px" }}>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#9bafc5" }}>{s.label}</p>
-                <p className="text-2xl font-extrabold leading-none mb-1" style={{ color: s.color }}>{s.value.toLocaleString()}</p>
-                <p className="text-[10px]" style={{ color: "#c4cdd9" }}>{s.sub}</p>
+              <button key={s.label} onClick={s.filter}
+                className="text-left bg-white rounded-2xl transition-all duration-150 group"
+                style={{ border: "1px solid #e5e7eb", padding: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)"; e.currentTarget.style.borderColor = s.color + "60"; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.06)"; e.currentTarget.style.borderColor = "#e5e7eb"; }}>
+                {/* Icon + label row */}
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#94a3b8" }}>{s.label}</p>
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: s.bg, color: s.color }}>
+                    {s.icon}
+                  </div>
+                </div>
+                {/* Number */}
+                <p className="text-2xl font-extrabold leading-none mb-1" style={{ color: s.color }}>
+                  {s.value.toLocaleString()}
+                </p>
+                {/* Subtitle */}
+                <p className="text-[10px] mb-3" style={{ color: "#94a3b8" }}>{s.sub}</p>
+                {/* Progress bar */}
+                <div className="h-1 rounded-full overflow-hidden" style={{ background: "#f1f5f9" }}>
+                  <div className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${s.pct}%`, background: s.color, opacity: 0.7 }} />
+                </div>
+                <p className="text-[10px] mt-1 font-semibold" style={{ color: s.color + "99" }}>
+                  {s.pct}% of collection
+                </p>
               </button>
             ))}
           </div>
