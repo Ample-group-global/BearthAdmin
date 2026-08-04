@@ -1304,8 +1304,21 @@ export default function NftPage() {
                     </div>
                     {viewRecord.ownerAddress && (
                       <div className="mt-4 pt-3" style={{ borderTop: "1px solid #f1f5f9" }}>
-                        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Owner Address</p>
-                        <p className="text-xs font-mono font-semibold" style={{ color: "#334155" }}>{viewRecord.ownerAddress}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#94a3b8" }}>Owner Address</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-mono font-semibold flex-1 min-w-0 truncate" style={{ color: "#334155" }}>{viewRecord.ownerAddress}</p>
+                          <button
+                            onClick={() => navigator.clipboard.writeText(viewRecord.ownerAddress!)}
+                            title="Copy address"
+                            className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+                            style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", color: "#64748b" }}
+                            onMouseEnter={e => { e.currentTarget.style.background = "#e0e7ff"; e.currentTarget.style.color = "#6366f1"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = "#f1f5f9"; e.currentTarget.style.color = "#64748b"; }}>
+                            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
