@@ -320,9 +320,11 @@ export default function NftPage() {
     if (stage)   params.set("stage", stage);
     if (revealed === "pre_mint") {
       params.set("minted", "false");
+    } else if (revealed === "minted") {
+      params.set("minted", "true");          // all minted (blind box + revealed combined)
     } else if (revealed === "false") {
       params.set("revealed", "false");
-      params.set("minted", "true");
+      params.set("minted", "true");          // blind box = minted but not revealed
     } else if (revealed === "true") {
       params.set("revealed", "true");
     }
@@ -838,7 +840,7 @@ export default function NftPage() {
                 label: "Minted", value: mintedCount, color: "#2563eb", bg: "#eff6ff", pct: totalAll ? Math.round(mintedCount / totalAll * 100) : 0,
                 sub: "On-chain tokens",
                 icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>,
-                filter: () => { setRevealFilter(""); setStatusFilter(""); applyFilter("", stageFilter, "", waveFilter); },
+                filter: () => { setRevealFilter("minted"); setStatusFilter(""); applyFilter("", stageFilter, "minted", waveFilter); },
               },
               {
                 label: "Blind Box", value: blindCount, color: "#d97706", bg: "#fffbeb", pct: totalAll ? Math.round(blindCount / totalAll * 100) : 0,
