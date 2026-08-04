@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useInterval } from "@/lib/useInterval";
 import DataTable, { type ColumnDef } from "@/components/DataTable";
 import { ErrBanner } from "@/components/nft/Banner";
@@ -59,6 +59,8 @@ interface NftRecord {
   waveRevealScheduledAt: string | null;
   priceEth: number | null;
   effectivePriceEth: number | null;
+  rarityTier: string | null;
+  lastSalePriceEth: number | null;
 }
 
 interface Master {
@@ -67,50 +69,12 @@ interface Master {
   deliveryStatuses: Array<{ id: string; name: string; code: string }>;
 }
 
-// ─── Types — Sales History tab ────────────────────────────────────────────────
-
-type SaleRecord = {
-  serial_number:       string;
-  token_id:            number | null;
-  wave_num:            number | null;
-  wallet:              string | null;
-  price_eth:           string | null;
-  rarity_tier:         string | null;
-  image_ipfs_hash:     string | null;
-  is_revealed:         boolean;
-  mint_tx_hash:        string | null;
-  minted_at:           string | null;
-  last_sale_price_eth: string | null;
-  last_tx_hash:        string | null;
-  sold_at:             string | null;
-};
-
-type SalesSummary = {
-  wave:           string;
-  total_minted:   string;
-  total_eth:      string | null;
-  total_sold:     string;
-  total_sale_eth: string | null;
-};
-
 const TIER_COLORS: Record<string, string> = {
   Legendary: "#f59e0b",
   Epic:       "#a855f7",
   Rare:       "#3b82f6",
   Common:     "#6b7280",
 };
-
-// ─── Types — Fulfillment tab ──────────────────────────────────────────────────
-
-interface FulfillStageRow {
-  stageId: string;
-  stageName: string;
-  stageCode: string;
-  total: number;
-  delivered: number;
-  pending: number;
-  cancelled: number;
-}
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
@@ -128,10 +92,6 @@ function fmtDate(d: string | null) {
 
 function shortAddr(addr: string) { return addr.slice(0, 6) + "…" + addr.slice(-4); }
 function shortHash(h: string)    { return h.slice(0, 8) + "…" + h.slice(-6); }
-
-function fulfillPct(n: number, total: number) {
-  return total > 0 ? Math.round((n / total) * 100) : 0;
-}
 
 // ─── Sub-components (Records tab) ─────────────────────────────────────────────
 
@@ -226,9 +186,7 @@ function RevealBadge({ revealed }: { revealed: boolean }) {
 
 export default function NftPage() {
   // ── Tab ──────────────────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<"records" | "sales" | "fulfillment" | "otc" | "bulk" | "gifts" | "auctions" | "seasons" | "events" | "burn">("records");
-  const salesLoadedRef    = useRef(false);
-  const fulfillLoadedRef  = useRef(false);
+  const [activeTab, setActiveTab] = useState<"records" | "otc" | "bulk" | "gifts" | "auctions" | "seasons" | "events" | "burn">("records");
 
   // ── Records tab state ─────────────────────────────────────────────────────
   const [records, setRecords]         = useState<NftRecord[]>([]);
@@ -255,64 +213,16 @@ export default function NftPage() {
   const [waves, setWaves]             = useState<Array<{ waveNumber: number; name: string }>>([]);
   const [blindBoxImageUrl, setBlindBoxImageUrl] = useState<string | null>(null);
 
-  // ── Sales History tab state ───────────────────────────────────────────────
-  const [saleRecords,  setSaleRecords]  = useState<SaleRecord[]>([]);
-  const [saleSummary,  setSaleSummary]  = useState<SalesSummary[]>([]);
-  const [saleTotal,    setSaleTotal]    = useState(0);
-  const [saleLoading,  setSaleLoading]  = useState(false);
-  const [salePage,     setSalePage]     = useState(0);
-  const [saleWave,     setSaleWave]     = useState("");
-  const [saleWallet,   setSaleWallet]   = useState("");
-  const [saleFrom,     setSaleFrom]     = useState("");
-  const [saleTo,       setSaleTo]       = useState("");
-
-  const SALE_LIMIT = 50;
-
-  // ── Fulfillment tab state ─────────────────────────────────────────────────
-  const [fulfillStages,   setFulfillStages]   = useState<FulfillStageRow[]>([]);
-  const [fulfillLoading,  setFulfillLoading]  = useState(false);
-  const [fulfillErr,      setFulfillErr]      = useState<string | null>(null);
-  const [fulfillStageOff, setFulfillStageOff] = useState(0);
-  const [fulfillSortKey,  setFulfillSortKey]  = useState<string | undefined>(undefined);
-  const [fulfillSortDir,  setFulfillSortDir]  = useState<"asc" | "desc">("asc");
-  // highlighted stat (for visual highlight only — no navigation)
-  const [fulfillHighlight, setFulfillHighlight] = useState<"" | "delivered" | "pending" | "cancelled">("");
-
-  const FULFILL_STAGE_PAGE = 10;
+  const [mintedFrom,   setMintedFrom]   = useState("");
+  const [mintedTo,     setMintedTo]     = useState("");
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // ── Fulfillment derived values ────────────────────────────────────────────
-  const fulfillSortedStages = useMemo(() => {
-    if (!fulfillSortKey) return fulfillStages;
-    return [...fulfillStages].sort((a, b) => {
-      let av: string | number, bv: string | number;
-      switch (fulfillSortKey) {
-        case "stage":     av = a.stageName;                                             bv = b.stageName;                                             break;
-        case "total":     av = Number(a.total);                                         bv = Number(b.total);                                         break;
-        case "delivered": av = Number(a.delivered);                                     bv = Number(b.delivered);                                     break;
-        case "pending":   av = Number(a.pending);                                       bv = Number(b.pending);                                       break;
-        case "cancelled": av = Number(a.cancelled);                                     bv = Number(b.cancelled);                                     break;
-        case "pct":       av = fulfillPct(Number(a.delivered), Number(a.total));        bv = fulfillPct(Number(b.delivered), Number(b.total));        break;
-        default: return 0;
-      }
-      if (av < bv) return fulfillSortDir === "asc" ? -1 : 1;
-      if (av > bv) return fulfillSortDir === "asc" ? 1  : -1;
-      return 0;
-    });
-  }, [fulfillStages, fulfillSortKey, fulfillSortDir]);
-
-  const fulfillStagePage = fulfillSortedStages.slice(fulfillStageOff, fulfillStageOff + FULFILL_STAGE_PAGE);
-
-  const grandTotal     = fulfillStages.reduce((s, r) => s + Number(r.total),     0);
-  const grandDelivered = fulfillStages.reduce((s, r) => s + Number(r.delivered), 0);
-  const grandPending   = fulfillStages.reduce((s, r) => s + Number(r.pending),   0);
-  const grandCancelled = fulfillStages.reduce((s, r) => s + Number(r.cancelled), 0);
 
   // ── Records data loading ─────────────────────────────────────────────────
   const loadRecords = useCallback((
     q: string, off: number, status: string, stage: string, revealed: string, wave: string,
     sk?: string, sd?: "asc" | "desc",
+    mFrom?: string, mTo?: string,
   ) => {
     setLoading(true); setError(null);
     const params = new URLSearchParams({ search: q, limit: String(PAGE_SIZE), offset: String(off) });
@@ -329,6 +239,8 @@ export default function NftPage() {
       params.set("revealed", "true");
     }
     if (wave)    params.set("wave_number", wave);
+    if (mFrom)   params.set("minted_from", mFrom);
+    if (mTo)     params.set("minted_to",   mTo);
     if (sk)      params.set("sort_by", sk);
     if (sk && sd) params.set("sort_dir", sd);
     fetch(`/api/nft?${params}`, { credentials: "include" })
@@ -347,37 +259,6 @@ export default function NftPage() {
       .catch(e => { setError(e.message ?? "Failed to load NFT records."); setLoading(false); });
   }, []);
 
-  // ── Sales data loading ────────────────────────────────────────────────────
-  const fetchSalesData = useCallback(async (pg = 0, wv = saleWave, wlt = saleWallet, fr = saleFrom, t = saleTo) => {
-    setSaleLoading(true);
-    const qs = new URLSearchParams({ limit: String(SALE_LIMIT), offset: String(pg * SALE_LIMIT) });
-    if (wv)  qs.set("wave",   wv);
-    if (wlt) qs.set("wallet", wlt);
-    if (fr)  qs.set("from",   fr);
-    if (t)   qs.set("to",     t);
-
-    const [histRes, sumRes] = await Promise.all([
-      fetch(`/api/nft-sell/admin-sales/history?${qs}`, { credentials: "include" }),
-      fetch("/api/nft-sell/admin-sales/history/summary", { credentials: "include" }),
-    ]);
-    const histJson = await histRes.json().catch(() => ({}));
-    const sumJson  = await sumRes.json().catch(() => ({}));
-
-    setSaleRecords(histJson.records ?? []);
-    setSaleTotal(histJson.total   ?? 0);
-    setSaleSummary(sumJson.summary ?? []);
-    setSaleLoading(false);
-  }, [saleWave, saleWallet, saleFrom, saleTo]);
-
-  // ── Fulfillment data loading ──────────────────────────────────────────────
-  const fetchFulfillData = useCallback(() => {
-    setFulfillLoading(true); setFulfillErr(null);
-    fetch("/api/reports/sales-by-stage", { credentials: "include" })
-      .then(r => r.json())
-      .then(d => { setFulfillStages(d.stages ?? []); setFulfillLoading(false); })
-      .catch(() => { setFulfillErr("Failed to load fulfillment data."); setFulfillLoading(false); });
-  }, []);
-
   // ── Initial loads ─────────────────────────────────────────────────────────
   useEffect(() => {
     fetch("/api/master", { credentials: "include" })
@@ -393,25 +274,6 @@ export default function NftPage() {
   useEffect(() => {
     loadRecords(search, offset, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir);
   }, [offset, statusFilter, stageFilter, revealFilter, waveFilter]);
-
-  // ── Lazy load sales when tab first activated ──────────────────────────────
-  useEffect(() => {
-    if (activeTab === "sales" && !salesLoadedRef.current) {
-      salesLoadedRef.current = true;
-      fetchSalesData(0, saleWave, saleWallet, saleFrom, saleTo);
-    }
-    if (activeTab === "fulfillment" && !fulfillLoadedRef.current) {
-      fulfillLoadedRef.current = true;
-      fetchFulfillData();
-    }
-  }, [activeTab]);
-
-  // ── Re-fetch sales when filters change (only if tab already loaded) ───────
-  useEffect(() => {
-    if (!salesLoadedRef.current) return;
-    setSalePage(0);
-    fetchSalesData(0, saleWave, saleWallet, saleFrom, saleTo);
-  }, [saleWave, saleWallet, saleFrom, saleTo]);
 
   // ── Watchdog: silent 30s poll on stats ───────────────────────────────────
   const [recWatchAlert, setRecWatchAlert] = useState<string | null>(null);
@@ -440,144 +302,19 @@ export default function NftPage() {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
       setOffset(0);
-      loadRecords(v, 0, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir);
+      loadRecords(v, 0, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo);
     }, 300);
   };
 
-  const applyFilter = (status = statusFilter, stage = stageFilter, revealed = revealFilter, wave = waveFilter) => {
+  const applyFilter = (status = statusFilter, stage = stageFilter, revealed = revealFilter, wave = waveFilter, mFrom = mintedFrom, mTo = mintedTo) => {
     setOffset(0);
-    loadRecords(search, 0, status, stage, revealed, wave, sortKey, sortDir);
+    loadRecords(search, 0, status, stage, revealed, wave, sortKey, sortDir, mFrom, mTo);
   };
 
   const handleSort = (key: string, dir: "asc" | "desc") => {
     setSortKey(key); setSortDir(dir); setOffset(0);
-    loadRecords(search, 0, statusFilter, stageFilter, revealFilter, waveFilter, key, dir);
+    loadRecords(search, 0, statusFilter, stageFilter, revealFilter, waveFilter, key, dir, mintedFrom, mintedTo);
   };
-
-  // ── Sales handlers ────────────────────────────────────────────────────────
-  function goSalePage(p: number) {
-    setSalePage(p);
-    fetchSalesData(p, saleWave, saleWallet, saleFrom, saleTo);
-  }
-
-  async function exportSalesCsv() {
-    const qs = new URLSearchParams({ limit: "9999", offset: "0" });
-    if (saleWave)   qs.set("wave",   saleWave);
-    if (saleWallet) qs.set("wallet", saleWallet);
-    if (saleFrom)   qs.set("from",   saleFrom);
-    if (saleTo)     qs.set("to",     saleTo);
-    const res  = await fetch(`/api/nft-sell/admin-sales/history?${qs}`, { credentials: "include" });
-    const json = await res.json();
-    const rows: SaleRecord[] = json.records ?? [];
-    const header = ["Serial #","Token ID","Wave","Wallet","Mint Price (ETH)","Rarity","Mint Tx Hash","Minted At","Last Sale (ETH)","Last Tx Hash","Sold At"];
-    const lines  = [header.join(","), ...rows.map(r => [
-      r.serial_number, r.token_id ?? "", r.wave_num ?? "", r.wallet ?? "",
-      r.price_eth ?? "", r.rarity_tier ?? "", r.mint_tx_hash ?? "", r.minted_at ?? "",
-      r.last_sale_price_eth ?? "", r.last_tx_hash ?? "", r.sold_at ?? "",
-    ].join(","))];
-    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-    a.download = "sales-history.csv"; a.click();
-  }
-
-  const saleTotalPages = Math.ceil(saleTotal / SALE_LIMIT);
-
-  const waveName = (num: number | null) => {
-    if (num == null) return "—";
-    const w = waves.find(w => w.waveNumber === num);
-    return w ? `W${num} — ${w.name}` : `Wave ${num}`;
-  };
-
-  // ── Fulfillment stage table columns ───────────────────────────────────────
-  const fulfillStageColumns: ColumnDef<FulfillStageRow>[] = [
-    {
-      key: "stage",
-      header: "Stage",
-      sortKey: "stage",
-      render: r => (
-        <span className="font-semibold" style={{ color: "#24315f" }}>{r.stageName}</span>
-      ),
-    },
-    {
-      key: "total",
-      header: "Total",
-      sortKey: "total",
-      align: "right",
-      render: r => (
-        <span className="font-bold" style={{ color: "#374151" }}>{Number(r.total).toLocaleString()}</span>
-      ),
-    },
-    {
-      key: "delivered",
-      header: "Delivered",
-      sortKey: "delivered",
-      align: "right",
-      render: r => (
-        <span
-          className="tabular-nums font-semibold"
-          style={{
-            color: "#16a34a",
-            background: fulfillHighlight === "delivered" ? "rgba(22,163,74,0.08)" : "transparent",
-            borderRadius: 6, padding: "2px 6px",
-          }}
-        >
-          {Number(r.delivered).toLocaleString()}
-        </span>
-      ),
-    },
-    {
-      key: "pending",
-      header: "Pending",
-      sortKey: "pending",
-      align: "right",
-      render: r => (
-        <span
-          className="tabular-nums font-semibold"
-          style={{
-            color: "#d97706",
-            background: fulfillHighlight === "pending" ? "rgba(217,119,6,0.08)" : "transparent",
-            borderRadius: 6, padding: "2px 6px",
-          }}
-        >
-          {Number(r.pending).toLocaleString()}
-        </span>
-      ),
-    },
-    {
-      key: "cancelled",
-      header: "Cancelled",
-      sortKey: "cancelled",
-      align: "right",
-      render: r => (
-        <span
-          className="tabular-nums font-semibold"
-          style={{
-            color: "#dc2626",
-            background: fulfillHighlight === "cancelled" ? "rgba(220,38,38,0.08)" : "transparent",
-            borderRadius: 6, padding: "2px 6px",
-          }}
-        >
-          {Number(r.cancelled).toLocaleString()}
-        </span>
-      ),
-    },
-    {
-      key: "pct",
-      header: "% Delivered",
-      sortKey: "pct",
-      render: r => {
-        const p = fulfillPct(Number(r.delivered), Number(r.total));
-        return (
-          <div className="flex items-center gap-2">
-            <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#f3f4f6", minWidth: 60 }}>
-              <div className="h-full rounded-full" style={{ width: `${p}%`, background: "#16a34a" }} />
-            </div>
-            <span className="text-xs font-semibold" style={{ color: "#16a34a" }}>{p}%</span>
-          </div>
-        );
-      },
-    },
-  ];
 
   // ── Records columns ───────────────────────────────────────────────────────
   const columns: ColumnDef<NftRecord>[] = [
@@ -596,6 +333,14 @@ export default function NftPage() {
             <div className="text-xs mt-0.5" style={{ color: r.tokenId != null ? "#64748b" : "#cbd5e1" }}>
               {r.tokenId != null ? `Token #${r.tokenId}` : "Not minted"}
             </div>
+            {r.rarityTier && (
+              <div className="mt-0.5">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                  style={{ background: (TIER_COLORS[r.rarityTier.charAt(0).toUpperCase() + r.rarityTier.slice(1)] ?? "#6b7280") + "20", color: TIER_COLORS[r.rarityTier.charAt(0).toUpperCase() + r.rarityTier.slice(1)] ?? "#6b7280" }}>
+                  ● {r.rarityTier.charAt(0).toUpperCase() + r.rarityTier.slice(1)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       ),
@@ -736,7 +481,7 @@ export default function NftPage() {
           </p>
         </div>
         {/* Per-tab CSV export */}
-        {activeTab === "records" ? (
+        {activeTab === "records" && (
           <button onClick={() => {
             const headers = ["Serial #", "Token ID", "Wave", "Wave Start", "Wave End", "Reveal Date", "Minted At", "Revealed At", "Sold At", "Delivered At", "Status", "Price (ETH)", "Owner"];
             const rows = records.map(r => [
@@ -757,23 +502,14 @@ export default function NftPage() {
             </svg>
             Export CSV
           </button>
-        ) : activeTab === "sales" ? (
-          <button onClick={exportSalesCsv}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white"
-            style={{ border: "1px solid #e5e7eb", color: "#6b7280" }}>
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export CSV
-          </button>
-        ) : null}
+        )}
       </div>
 
       {/* ── Tab Bar ── */}
       <div style={{ borderBottom: "1px solid #e5e7eb" }}>
         <div className="flex gap-1">
-          {(["records", "sales", "fulfillment", "otc", "bulk", "gifts", "auctions", "seasons", "events", "burn"] as const).map(tab => {
-            const LABELS: Record<string, string> = { records: "Records", sales: "Sales History", fulfillment: "Fulfillment", otc: "OTC Deals", bulk: "Bulk Ops", gifts: "Gifts", auctions: "Auctions", seasons: "Season Passes", events: "Events", burn: "Burn to Mint" };
+          {(["records", "otc", "bulk", "gifts", "auctions", "seasons", "events", "burn"] as const).map(tab => {
+            const LABELS: Record<string, string> = { records: "Records", otc: "OTC Deals", bulk: "Bulk Ops", gifts: "Gifts", auctions: "Auctions", seasons: "Season Passes", events: "Events", burn: "Burn to Mint" };
             const label = LABELS[tab] ?? tab;
             const isActive = activeTab === tab;
             return (
@@ -922,10 +658,22 @@ export default function NftPage() {
               <option value="true">✦ Revealed</option>
             </select>
 
-            {(statusFilter || revealFilter || waveFilter || stageFilter) && (
+            <input type="date" value={mintedFrom}
+              onChange={e => { setMintedFrom(e.target.value); applyFilter(statusFilter, stageFilter, revealFilter, waveFilter, e.target.value, mintedTo); }}
+              className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
+              style={{ border: "1px solid #e5e7eb", color: mintedFrom ? "#111827" : "#9bafc5" }}
+              title="Minted from date" />
+            <input type="date" value={mintedTo}
+              onChange={e => { setMintedTo(e.target.value); applyFilter(statusFilter, stageFilter, revealFilter, waveFilter, mintedFrom, e.target.value); }}
+              className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
+              style={{ border: "1px solid #e5e7eb", color: mintedTo ? "#111827" : "#9bafc5" }}
+              title="Minted to date" />
+
+            {(statusFilter || revealFilter || waveFilter || stageFilter || mintedFrom || mintedTo) && (
               <button onClick={() => {
                 setStatusFilter(""); setRevealFilter(""); setWaveFilter(""); setStageFilter("");
-                applyFilter("", "", "", "");
+                setMintedFrom(""); setMintedTo("");
+                applyFilter("", "", "", "", "", "");
               }} className="px-3 py-2 rounded-xl text-xs font-semibold"
                 style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
                 Clear filters
@@ -949,307 +697,6 @@ export default function NftPage() {
             sortDir={sortDir}
             onSort={handleSort}
           />
-        </>
-      )}
-
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* SALES HISTORY TAB                                                     */}
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "sales" && (
-        <>
-          {/* Summary cards */}
-          {saleSummary.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {saleSummary.map(s => (
-                <div key={s.wave} className="bg-white rounded-xl shadow-sm"
-                  style={{ border: "1px solid #e5e7eb", borderLeft: "3px solid #41afeb", padding: "14px 16px" }}>
-                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#9bafc5" }}>
-                    {waveName(s.wave === "—" ? null : Number(s.wave))}
-                  </p>
-                  <p className="text-2xl font-extrabold leading-none" style={{ color: "#24315f" }}>
-                    {Number(s.total_minted).toLocaleString()}
-                  </p>
-                  <p className="text-xs mt-1" style={{ color: "#9bafc5" }}>
-                    minted · {s.total_eth ? Number(s.total_eth).toFixed(4) : "0"} ETH
-                  </p>
-                  {Number(s.total_sold) > 0 && (
-                    <p className="text-xs mt-0.5" style={{ color: "#16a34a" }}>
-                      {s.total_sold} sold · {s.total_sale_eth ? Number(s.total_sale_eth).toFixed(4) : "0"} ETH
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Filters */}
-          <div className="flex flex-wrap items-center gap-2">
-            <select value={saleWave} onChange={e => setSaleWave(e.target.value)}
-              className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
-              style={{ border: "1px solid #e5e7eb", color: saleWave ? "#111827" : "#9bafc5" }}>
-              <option value="">All Waves</option>
-              {waves.map(w => (
-                <option key={w.waveNumber} value={String(w.waveNumber)}>
-                  W{w.waveNumber} — {w.name}
-                </option>
-              ))}
-            </select>
-
-            <div className="relative">
-              <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#9bafc5" }}
-                fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input placeholder="Search wallet 0x..." value={saleWallet} onChange={e => setSaleWallet(e.target.value)}
-                className="pl-9 pr-4 py-2 rounded-xl text-sm bg-white outline-none"
-                style={{ border: "1px solid #e5e7eb", color: "#111827", width: 220 }} />
-            </div>
-
-            <input type="date" value={saleFrom} onChange={e => setSaleFrom(e.target.value)}
-              className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
-              style={{ border: "1px solid #e5e7eb", color: saleFrom ? "#111827" : "#9bafc5" }} />
-            <input type="date" value={saleTo} onChange={e => setSaleTo(e.target.value)}
-              className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
-              style={{ border: "1px solid #e5e7eb", color: saleTo ? "#111827" : "#9bafc5" }} />
-
-            {(saleWave || saleWallet || saleFrom || saleTo) && (
-              <button onClick={() => { setSaleWave(""); setSaleWallet(""); setSaleFrom(""); setSaleTo(""); }}
-                className="px-3 py-2 rounded-xl text-xs font-semibold"
-                style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
-                Clear filters
-              </button>
-            )}
-          </div>
-
-          {/* Table */}
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
-                    {["NFT","Serial #","Wave","Wallet","Mint Price","Rarity","Mint Tx Hash","Minted At","Last Sale","Last Tx","Sold At"].map(h => (
-                      <th key={h} style={{ padding: "12px 14px", textAlign: "left", color: "#9bafc5", fontWeight: 700, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap", background: "#fafafa" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {saleLoading ? (
-                    <tr><td colSpan={11} style={{ textAlign: "center", padding: 48, color: "#9bafc5" }}>Loading…</td></tr>
-                  ) : saleRecords.length === 0 ? (
-                    <tr><td colSpan={11} style={{ textAlign: "center", padding: 64 }}>
-                      <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
-                      <div style={{ fontWeight: 700, color: "#24315f", marginBottom: 4 }}>No sales yet</div>
-                      <div style={{ fontSize: 12, color: "#9bafc5" }}>Records will appear here once NFTs are minted on-chain</div>
-                    </td></tr>
-                  ) : saleRecords.map((r, i) => (
-                    <tr key={i} style={{ borderBottom: "1px solid #f9fafb" }}
-                      onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
-                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                      {/* NFT image */}
-                      <td style={{ padding: "10px 14px" }}>
-                        {r.image_ipfs_hash ? (
-                          <img src={`${IPFS_GATEWAY}/${r.image_ipfs_hash}`} alt={r.serial_number}
-                            style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover", display: "block" }} />
-                        ) : (
-                          <div style={{ width: 44, height: 44, borderRadius: 8, background: "#f3f4f6", border: "1.5px dashed #d1d5db" }} />
-                        )}
-                      </td>
-                      {/* Serial */}
-                      <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
-                        <div className="font-mono font-bold text-sm" style={{ color: "#24315f" }}>{r.serial_number}</div>
-                        {r.token_id != null && <div style={{ fontSize: 11, color: "#9bafc5", marginTop: 2 }}>Token #{r.token_id}</div>}
-                      </td>
-                      {/* Wave */}
-                      <td style={{ padding: "10px 14px" }}>
-                        {r.wave_num != null ? (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                            style={{ background: "rgba(65,175,235,0.1)", color: "#41afeb", whiteSpace: "nowrap" }}>
-                            {waveName(r.wave_num)}
-                          </span>
-                        ) : <span style={{ color: "#d1d5db" }}>—</span>}
-                      </td>
-                      {/* Wallet */}
-                      <td style={{ padding: "10px 14px", fontFamily: "monospace" }}>
-                        {r.wallet ? (
-                          <a href={`https://etherscan.io/address/${r.wallet}`} target="_blank" rel="noreferrer"
-                            style={{ color: "#41afeb", textDecoration: "none" }} title={r.wallet}>
-                            {shortAddr(r.wallet)}
-                          </a>
-                        ) : <span style={{ color: "#d1d5db" }}>—</span>}
-                      </td>
-                      {/* Mint price */}
-                      <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
-                        {r.price_eth
-                          ? <span className="font-bold text-xs" style={{ color: "#24315f" }}>{Number(r.price_eth).toFixed(4)} ETH</span>
-                          : <span className="text-xs font-semibold" style={{ color: "#16a34a" }}>Free</span>}
-                      </td>
-                      {/* Rarity */}
-                      <td style={{ padding: "10px 14px" }}>
-                        {r.rarity_tier ? (
-                          <span style={{ color: TIER_COLORS[r.rarity_tier] ?? "#6b7280", fontWeight: 700, fontSize: 12 }}>
-                            ● {r.rarity_tier}
-                          </span>
-                        ) : <span style={{ color: "#d1d5db" }}>—</span>}
-                      </td>
-                      {/* Mint tx */}
-                      <td style={{ padding: "10px 14px", fontFamily: "monospace" }}>
-                        {r.mint_tx_hash ? (
-                          <a href={`${ETHERSCAN}${r.mint_tx_hash}`} target="_blank" rel="noreferrer"
-                            style={{ color: "#7c3aed", textDecoration: "none" }} title={r.mint_tx_hash}>
-                            {shortHash(r.mint_tx_hash)}
-                          </a>
-                        ) : <span style={{ color: "#d1d5db" }}>—</span>}
-                      </td>
-                      {/* Minted at */}
-                      <td style={{ padding: "10px 14px", color: "#6b7280", whiteSpace: "nowrap", fontSize: 12 }}>{fmtDate(r.minted_at)}</td>
-                      {/* Last sale */}
-                      <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
-                        {r.last_sale_price_eth
-                          ? <span className="text-xs font-bold" style={{ color: "#16a34a" }}>{Number(r.last_sale_price_eth).toFixed(4)} ETH</span>
-                          : <span style={{ color: "#d1d5db" }}>—</span>}
-                      </td>
-                      {/* Last tx */}
-                      <td style={{ padding: "10px 14px", fontFamily: "monospace" }}>
-                        {r.last_tx_hash ? (
-                          <a href={`${ETHERSCAN}${r.last_tx_hash}`} target="_blank" rel="noreferrer"
-                            style={{ color: "#7c3aed", textDecoration: "none" }} title={r.last_tx_hash}>
-                            {shortHash(r.last_tx_hash)}
-                          </a>
-                        ) : <span style={{ color: "#d1d5db" }}>—</span>}
-                      </td>
-                      {/* Sold at */}
-                      <td style={{ padding: "10px 14px", color: "#6b7280", whiteSpace: "nowrap", fontSize: 12 }}>{fmtDate(r.sold_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {saleTotalPages > 1 && (
-              <div className="flex items-center justify-between px-5 py-3" style={{ borderTop: "1px solid #f3f4f6" }}>
-                <span style={{ fontSize: 13, color: "#9bafc5" }}>
-                  Showing {salePage * SALE_LIMIT + 1}–{Math.min((salePage + 1) * SALE_LIMIT, saleTotal)} of {saleTotal.toLocaleString()} records
-                </span>
-                <div className="flex gap-2">
-                  <button disabled={salePage === 0} onClick={() => goSalePage(salePage - 1)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white"
-                    style={{ border: "1px solid #e5e7eb", color: salePage === 0 ? "#d1d5db" : "#374151", cursor: salePage === 0 ? "default" : "pointer" }}>
-                    ← Prev
-                  </button>
-                  <span style={{ padding: "6px 10px", fontSize: 12, color: "#9bafc5" }}>{salePage + 1} / {saleTotalPages}</span>
-                  <button disabled={salePage >= saleTotalPages - 1} onClick={() => goSalePage(salePage + 1)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white"
-                    style={{ border: "1px solid #e5e7eb", color: salePage >= saleTotalPages - 1 ? "#d1d5db" : "#374151", cursor: salePage >= saleTotalPages - 1 ? "default" : "pointer" }}>
-                    Next →
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* FULFILLMENT TAB                                                       */}
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "fulfillment" && (
-        <>
-          {fulfillErr ? (
-            <div className="p-4 rounded-xl text-sm" style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
-              {fulfillErr}
-            </div>
-          ) : (
-            <>
-              {/* ── Stat Cards ── */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[
-                  {
-                    label: "Total NFTs",
-                    value: grandTotal,
-                    color: "#24315f",
-                    key: "" as const,
-                  },
-                  {
-                    label: "Delivered",
-                    value: grandDelivered,
-                    color: "#16a34a",
-                    key: "delivered" as const,
-                  },
-                  {
-                    label: "Pending",
-                    value: grandPending,
-                    color: "#d97706",
-                    key: "pending" as const,
-                  },
-                  {
-                    label: "Cancelled",
-                    value: grandCancelled,
-                    color: "#dc2626",
-                    key: "cancelled" as const,
-                  },
-                ].map(card => {
-                  const isHighlighted = fulfillHighlight === card.key;
-                  return (
-                    <button
-                      key={card.label}
-                      onClick={() => setFulfillHighlight(isHighlighted ? "" : card.key)}
-                      className="text-left bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow select-none"
-                      style={{
-                        border: `1px solid ${isHighlighted ? card.color : "#e5e7eb"}`,
-                        borderLeft: `3px solid ${card.color}`,
-                        padding: "14px 16px",
-                        cursor: card.key ? "pointer" : "default",
-                        outline: "none",
-                        boxShadow: isHighlighted ? `0 0 0 2px ${card.color}22` : undefined,
-                      }}
-                      title={card.key ? `Highlight ${card.label} column` : undefined}
-                    >
-                      <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "#9bafc5" }}>{card.label}</p>
-                      <p className="text-2xl font-extrabold leading-none" style={{ color: card.color }}>
-                        {fulfillLoading ? "—" : card.value.toLocaleString()}
-                      </p>
-                      {card.key && (
-                        <p className="text-[10px] mt-1.5" style={{ color: "#9bafc5" }}>
-                          {isHighlighted ? "Click to clear highlight" : "Click to highlight column"}
-                        </p>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* ── Stage Breakdown ── */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "#9bafc5" }}>Stage Breakdown</p>
-                  {fulfillHighlight && (
-                    <button
-                      onClick={() => setFulfillHighlight("")}
-                      className="text-xs px-2 py-1 rounded-lg"
-                      style={{ background: "#f3f4f6", color: "#6b7280", border: "1px solid #e5e7eb" }}
-                    >
-                      Clear highlight
-                    </button>
-                  )}
-                </div>
-                <DataTable
-                  columns={fulfillStageColumns}
-                  data={fulfillStagePage}
-                  total={fulfillSortedStages.length}
-                  offset={fulfillStageOff}
-                  pageSize={FULFILL_STAGE_PAGE}
-                  onPageChange={setFulfillStageOff}
-                  loading={fulfillLoading}
-                  emptyText="No stage data available"
-                  keyExtractor={r => r.stageId}
-                  sortKey={fulfillSortKey}
-                  sortDir={fulfillSortDir}
-                  onSort={(key, dir) => { setFulfillSortKey(key); setFulfillSortDir(dir); setFulfillStageOff(0); }}
-                />
-              </div>
-            </>
-          )}
         </>
       )}
 
@@ -1388,6 +835,26 @@ export default function NftPage() {
                             : "—"}
                         </p>
                       </div>
+                      {/* Rarity */}
+                      {viewRecord.rarityTier && (
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#94a3b8" }}>Rarity</p>
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                            style={{
+                              background: (TIER_COLORS[viewRecord.rarityTier.charAt(0).toUpperCase() + viewRecord.rarityTier.slice(1)] ?? "#6b7280") + "20",
+                              color: TIER_COLORS[viewRecord.rarityTier.charAt(0).toUpperCase() + viewRecord.rarityTier.slice(1)] ?? "#6b7280",
+                            }}>
+                            ● {viewRecord.rarityTier.charAt(0).toUpperCase() + viewRecord.rarityTier.slice(1)}
+                          </span>
+                        </div>
+                      )}
+                      {/* Last Sale */}
+                      {viewRecord.lastSalePriceEth != null && (
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Last Sale</p>
+                          <p className="text-sm font-bold" style={{ color: "#16a34a" }}>{Number(viewRecord.lastSalePriceEth).toFixed(4)} ETH</p>
+                        </div>
+                      )}
                     </div>
                     {viewRecord.ownerAddress && (
                       <div className="mt-4 pt-3" style={{ borderTop: "1px solid #f1f5f9" }}>
@@ -1484,7 +951,7 @@ export default function NftPage() {
                     { label: "Generated", date: viewRecord.createdAt,   color: "#6366f1", desc: "NFT created in DB from generator",  txHash: null },
                     { label: "Minted",    date: viewRecord.mintedAt,    color: "#7c3aed", desc: "Minted on-chain to buyer wallet",    txHash: viewRecord.mintTxHash },
                     { label: "Revealed",  date: viewRecord.revealedAt,  color: "#8b5cf6", desc: "Artwork revealed, blind box opened", txHash: null },
-                    { label: "Sold",      date: viewRecord.soldAt,      color: "#f59e0b", desc: "Ownership transferred on-chain",     txHash: viewRecord.lastTxHash },
+                    { label: "Sold",      date: viewRecord.soldAt,      color: "#f59e0b", desc: viewRecord.lastSalePriceEth != null ? `Sold for ${Number(viewRecord.lastSalePriceEth).toFixed(4)} ETH` : "Ownership transferred on-chain",     txHash: viewRecord.lastTxHash },
                     { label: "Delivered", date: viewRecord.deliveredAt, color: "#10b981", desc: "Delivered to customer wallet",        txHash: null },
                   ].filter(step => step.date).map((step, i, arr) => (
                     <div key={step.label} className="flex gap-4 px-5 py-3.5" style={{ borderTop: i > 0 ? "1px solid #f8fafc" : undefined }}>
