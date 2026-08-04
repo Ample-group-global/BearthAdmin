@@ -246,7 +246,7 @@ export default function NftPage() {
     if (sk)      params.set("sort_by", sk);
     if (sk && sd) params.set("sort_dir", sd);
     fetch(`/api/nft?${params}`, { credentials: "include" })
-      .then(r => { if (!r.ok) throw new Error("API error"); return r.json(); })
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
       .then(data => {
         setRecords(data.nftRecords ?? []);
         setTotal(data.total ?? 0);
@@ -258,7 +258,7 @@ export default function NftPage() {
         setDeliveredCount(data.deliveredCount ?? 0);
         setLoading(false);
       })
-      .catch(e => { setError(e.message ?? "Failed to load NFT records."); setLoading(false); });
+      .catch(() => { setError("Unable to load NFT records. Please try again."); setLoading(false); });
   }, []);
 
   // ── Initial loads ─────────────────────────────────────────────────────────
