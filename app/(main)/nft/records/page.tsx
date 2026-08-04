@@ -573,127 +573,122 @@ export default function NftPage() {
   // ── Records columns ───────────────────────────────────────────────────────
   const columns: ColumnDef<NftRecord>[] = [
     {
-      key: "serial",
-      header: "Serial / Token",
+      // NFT thumbnail + serial + token ID merged into one column
+      key: "nft",
+      header: "NFT",
       sortKey: "serial_number",
       render: r => (
-        <div>
-          <div className="font-mono font-bold text-sm" style={{ color: "#24315f" }}>{r.serialNumber}</div>
-          {r.tokenId != null
-            ? <div className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>Token #{r.tokenId}</div>
-            : <div className="text-xs mt-0.5" style={{ color: "#d1d5db" }}>Not minted</div>}
+        <div className="flex items-center gap-3">
+          <div className="flex-shrink-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid #e2e8f0" }}>
+            <NftImage hash={r.imageIpfsHash} isRevealed={r.isRevealed} blindBoxUri={blindBoxImageUrl} size={52} />
+          </div>
+          <div>
+            <div className="font-mono font-bold text-sm leading-tight" style={{ color: "#0f172a" }}>{r.serialNumber}</div>
+            <div className="text-xs mt-0.5" style={{ color: r.tokenId != null ? "#64748b" : "#cbd5e1" }}>
+              {r.tokenId != null ? `Token #${r.tokenId}` : "Not minted"}
+            </div>
+          </div>
         </div>
       ),
     },
     {
-      key: "image",
-      header: "NFT",
-      width: 90,
-      align: "center",
-      render: r => <NftImage hash={r.imageIpfsHash} isRevealed={r.isRevealed} blindBoxUri={blindBoxImageUrl} size={70} />,
-    },
-    {
       key: "wave",
-      header: "Wave & Schedule",
+      header: "Wave",
       sortKey: "wave",
       render: r => r.waveNumber != null ? (
-        <div style={{ minWidth: 140 }}>
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-              style={{ background: "rgba(65,175,235,0.1)", color: "#41afeb" }}>
-              W{r.waveNumber}
-            </span>
-            {r.waveName && (
-              <span className="text-xs" style={{ color: "#9bafc5" }}>{r.waveName.split("—")[0]?.trim()}</span>
-            )}
-          </div>
-          {r.waveQuantity != null && (
-            <div className="text-xs mb-1" style={{ color: "#6b7280" }}>Qty: {r.waveQuantity.toLocaleString()}</div>
+        <div>
+          <span className="inline-flex items-center text-xs font-bold px-2 py-0.5 rounded-full"
+            style={{ background: "rgba(65,175,235,0.1)", color: "#41afeb" }}>
+            W{r.waveNumber}
+          </span>
+          {r.waveName && (
+            <div className="text-xs mt-1 font-medium" style={{ color: "#374151" }}>{r.waveName.split("—")[0]?.trim()}</div>
           )}
-          <div className="text-xs space-y-0.5" style={{ color: "#9bafc5", borderTop: "1px solid #f3f4f6", paddingTop: 4 }}>
-            {r.waveScheduledStart && (
-              <div>Start: <strong style={{ color: "#374151" }}>{fmt(r.waveScheduledStart)}</strong></div>
-            )}
-            {r.waveScheduledEnd && (
-              <div>End: <strong style={{ color: "#374151" }}>{fmt(r.waveScheduledEnd)}</strong></div>
-            )}
-          </div>
         </div>
       ) : <span style={{ color: "#d1d5db" }}>—</span>,
     },
     {
-      key: "reveal_date",
-      header: "Reveal Date",
+      key: "schedule",
+      header: "Wave Schedule",
       render: r => {
         if (r.waveNumber == null) return <span style={{ color: "#d1d5db" }}>—</span>;
-        const schedAt = r.waveRevealScheduledAt;
-        const isRevealed = r.isRevealed;
-        if (isRevealed) {
-          return (
-            <div style={{ minWidth: 120 }}>
-              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold mb-1"
-                style={{ background: "rgba(124,58,237,0.1)", color: "#7c3aed" }}>
-                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#7c3aed" }} />
-                Revealed
-              </div>
-              {r.revealedAt && (
-                <div className="text-xs mt-0.5" style={{ color: "#374151" }}>{fmt(r.revealedAt)}</div>
-              )}
-            </div>
-          );
-        }
-        if (schedAt) {
-          const isPast = new Date(schedAt) < new Date();
-          return (
-            <div style={{ minWidth: 120 }}>
-              <div className="text-xs font-semibold mb-0.5" style={{ color: isPast ? "#dc2626" : "#7c3aed" }}>
-                {isPast ? "Overdue" : "Scheduled"}
-              </div>
-              <div className="text-xs" style={{ color: "#374151" }}>{fmt(schedAt)}</div>
-            </div>
-          );
-        }
-        return <span className="text-xs" style={{ color: "#d1d5db" }}>Not scheduled</span>;
+        const start = r.waveScheduledStart;
+        const end   = r.waveScheduledEnd;
+        if (!start && !end) return <span className="text-xs" style={{ color: "#d1d5db" }}>Not set</span>;
+        return (
+          <div className="text-xs space-y-0.5" style={{ minWidth: 130 }}>
+            {start && <div style={{ color: "#64748b" }}><span style={{ color: "#94a3b8" }}>From </span><strong style={{ color: "#374151" }}>{fmt(start)}</strong></div>}
+            {end   && <div style={{ color: "#64748b" }}><span style={{ color: "#94a3b8" }}>To </span><strong style={{ color: "#374151" }}>{fmt(end)}</strong></div>}
+          </div>
+        );
       },
     },
     {
+      // Single derived NFT status — industry standard, no logistics jargon
       key: "status",
       header: "Status",
-      sortKey: "delivery_status",
       align: "center",
-      render: r => (
-        <div className="flex flex-col items-center gap-1.5">
-          <RevealBadge revealed={r.isRevealed} />
-          {r.deliveryStatusCode
-            ? <StatusBadge code={r.deliveryStatusCode} name={r.deliveryStatusName} />
-            : <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>}
-        </div>
-      ),
+      render: r => {
+        const code = r.deliveryStatusCode;
+        if (code === "delivered") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#dcfce7", color: "#15803d" }}>✓ Delivered</span>;
+        if (code === "sold")      return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#fef9c3", color: "#a16207" }}>💰 Sold</span>;
+        if (r.isRevealed)         return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#f5f3ff", color: "#7c3aed" }}>✦ Revealed</span>;
+        if (r.tokenId != null)    return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#eff6ff", color: "#2563eb" }}>⬡ Minted</span>;
+        return <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: "#f8fafc", color: "#94a3b8", border: "1px solid #e2e8f0" }}>○ Pre-mint</span>;
+      },
+    },
+    {
+      key: "reveal_date",
+      header: "Reveal",
+      render: r => {
+        if (r.isRevealed && r.revealedAt) return (
+          <div>
+            <div className="text-xs font-semibold" style={{ color: "#7c3aed" }}>Revealed</div>
+            <div className="text-xs mt-0.5" style={{ color: "#64748b" }}>{fmt(r.revealedAt)}</div>
+          </div>
+        );
+        if (r.waveRevealScheduledAt) {
+          const isPast = new Date(r.waveRevealScheduledAt) < new Date();
+          return (
+            <div>
+              <div className="text-xs font-semibold" style={{ color: isPast ? "#dc2626" : "#6366f1" }}>
+                {isPast ? "Overdue" : "Scheduled"}
+              </div>
+              <div className="text-xs mt-0.5" style={{ color: "#64748b" }}>{fmt(r.waveRevealScheduledAt)}</div>
+            </div>
+          );
+        }
+        return <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
+      },
     },
     {
       key: "price",
-      header: "Price",
+      header: "Mint Price",
       sortKey: "price_eth",
       align: "right",
       render: r => {
         const eff = r.effectivePriceEth;
-        return eff != null ? (
-          <span className="text-xs font-bold" style={{ color: "#24315f" }}>{Number(eff)} ETH</span>
-        ) : <span className="text-xs font-semibold" style={{ color: "#16a34a" }}>Free</span>;
+        return eff != null
+          ? <span className="text-sm font-bold" style={{ color: "#0f172a" }}>{Number(eff)} ETH</span>
+          : <span className="text-sm font-semibold" style={{ color: "#15803d" }}>Free</span>;
       },
     },
     {
-      key: "timeline",
-      header: "Activity",
+      // Most recent lifecycle event only — single compact line
+      key: "last_activity",
+      header: "Last Activity",
       render: r => {
-        const hasActivity = r.mintedAt || r.revealedAt || r.soldAt || r.deliveredAt;
-        if (!hasActivity) return <span className="text-xs" style={{ color: "#d1d5db" }}>No activity yet</span>;
+        const latest =
+          r.deliveredAt ? { label: "Delivered", date: r.deliveredAt, color: "#15803d" } :
+          r.soldAt      ? { label: "Sold",      date: r.soldAt,      color: "#a16207" } :
+          r.revealedAt  ? { label: "Revealed",  date: r.revealedAt,  color: "#7c3aed" } :
+          r.mintedAt    ? { label: "Minted",    date: r.mintedAt,    color: "#2563eb" } :
+          null;
+        if (!latest) return <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
         return (
-          <div className="text-xs space-y-0.5" style={{ minWidth: 120 }}>
-            {r.mintedAt    && <div style={{ color: "#6b7280" }}>🔗 Minted: <strong style={{ color: "#374151" }}>{fmt(r.mintedAt)}</strong></div>}
-            {r.revealedAt  && <div style={{ color: "#7c3aed" }}>✦ Revealed: <strong>{fmt(r.revealedAt)}</strong></div>}
-            {r.soldAt      && <div style={{ color: "#d97706" }}>💰 Sold: <strong>{fmt(r.soldAt)}</strong></div>}
-            {r.deliveredAt && <div style={{ color: "#16a34a" }}>✓ Delivered: <strong>{fmt(r.deliveredAt)}</strong></div>}
+          <div>
+            <div className="text-xs font-semibold" style={{ color: latest.color }}>{latest.label}</div>
+            <div className="text-xs mt-0.5" style={{ color: "#64748b" }}>{fmt(latest.date)}</div>
           </div>
         );
       },
@@ -702,6 +697,7 @@ export default function NftPage() {
       key: "actions",
       header: "",
       align: "center",
+      width: 80,
       render: r => (
         <button onClick={() => { setViewRecord(r); setModalMaximized(false); }} title="View full history"
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors"
