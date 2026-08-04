@@ -60,6 +60,8 @@ interface NftRecord {
   priceEth: number | null;
   effectivePriceEth: number | null;
   rarityTier: string | null;
+  rarityScore: number | null;
+  rarityRank: number | null;
   lastSalePriceEth: number | null;
 }
 
@@ -836,18 +838,36 @@ export default function NftPage() {
                         </p>
                       </div>
                       {/* Rarity */}
-                      {viewRecord.rarityTier && (
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#94a3b8" }}>Rarity</p>
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                            style={{
-                              background: (TIER_COLORS[viewRecord.rarityTier.charAt(0).toUpperCase() + viewRecord.rarityTier.slice(1)] ?? "#6b7280") + "20",
-                              color: TIER_COLORS[viewRecord.rarityTier.charAt(0).toUpperCase() + viewRecord.rarityTier.slice(1)] ?? "#6b7280",
-                            }}>
-                            ● {viewRecord.rarityTier.charAt(0).toUpperCase() + viewRecord.rarityTier.slice(1)}
-                          </span>
-                        </div>
-                      )}
+                      {/* Rarity Tier + Score + Rank — three cells in one row */}
+                      {viewRecord.rarityTier && (() => {
+                        const tier = viewRecord.rarityTier!.charAt(0).toUpperCase() + viewRecord.rarityTier!.slice(1);
+                        const tierColor = TIER_COLORS[tier] ?? "#6b7280";
+                        return (
+                          <>
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#94a3b8" }}>Rarity Tier</p>
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                                style={{ background: tierColor + "20", color: tierColor }}>
+                                ● {tier}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Rarity Score</p>
+                              <p className="text-sm font-bold" style={{ color: tierColor }}>
+                                {viewRecord.rarityScore != null ? Number(viewRecord.rarityScore).toFixed(2) : <span style={{ color: "#cbd5e1" }}>—</span>}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Rank</p>
+                              <p className="text-sm font-bold" style={{ color: "#0f172a" }}>
+                                {viewRecord.rarityRank != null
+                                  ? <><span style={{ color: tierColor }}>#{viewRecord.rarityRank}</span><span className="text-xs font-normal" style={{ color: "#94a3b8" }}> / {totalAll.toLocaleString()}</span></>
+                                  : <span style={{ color: "#cbd5e1" }}>—</span>}
+                              </p>
+                            </div>
+                          </>
+                        );
+                      })()}
                       {/* Last Sale */}
                       {viewRecord.lastSalePriceEth != null && (
                         <div>
