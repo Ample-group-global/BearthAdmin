@@ -16,9 +16,22 @@ const TABS: { id: WlTab; label: string }[] = [
   { id: "export", label: "Export" },
 ];
 
-function Badge({ color, children }: { color: string; children: React.ReactNode }) {
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>{children}</span>;
-}
+const TAB_ACTIVE: React.CSSProperties = {
+  color: "#24315f", borderBottom: "2px solid #41afeb", fontWeight: 700,
+  background: "transparent", padding: "14px 16px", fontSize: 14,
+  whiteSpace: "nowrap", transition: "color 0.15s",
+};
+const TAB_INACTIVE: React.CSSProperties = {
+  color: "#9bafc5", borderBottom: "2px solid transparent", fontWeight: 600,
+  background: "transparent", padding: "14px 16px", fontSize: 14,
+  whiteSpace: "nowrap", transition: "color 0.15s",
+};
+
+const inputCls = "w-full px-3.5 py-2.5 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-[#41afeb]";
+const inputStyle: React.CSSProperties = { border: "1px solid #e5e7eb" };
+
+const btnPrimary = "px-4 py-2.5 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40";
+const btnPrimaryStyle: React.CSSProperties = { background: "#24315f" };
 
 export default function WhitelistTab() {
   const { toasts, showToast, removeToast } = useToast();
@@ -92,42 +105,47 @@ export default function WhitelistTab() {
 
   return (
     <div className="space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-slate-900">Whitelist Management</h2>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <h2 className="text-lg font-bold" style={{ color: "#24315f" }}>Whitelist Management</h2>
+          <p className="text-sm mt-0.5" style={{ color: "#9bafc5" }}>
             {addresses.length.toLocaleString()} addresses ·{" "}
             {stats?.merkleRoot ? `Root: ${stats.merkleRoot.slice(0, 12)}...` : "No root set"}
-            {stats?.manualOverride && <Badge color="bg-amber-100 text-amber-700 ml-2">Manual Override</Badge>}
+            {stats?.manualOverride && (
+              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                style={{ background: "rgba(217,119,6,0.1)", color: "#d97706" }}>
+                Manual Override
+              </span>
+            )}
           </p>
         </div>
       </div>
 
+      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Total Addresses", value: addresses.length.toLocaleString() },
-          { label: "Merkle Root", value: stats?.merkleRoot ? `${stats.merkleRoot.slice(0, 10)}...` : "—" },
+          { label: "Merkle Root",     value: stats?.merkleRoot ? `${stats.merkleRoot.slice(0, 10)}...` : "—" },
           { label: "Override Active", value: stats?.manualOverride ? "Yes" : "No" },
-          { label: "Last Updated", value: stats?.lastUpdated ? new Date(stats.lastUpdated).toLocaleDateString() : "—" },
+          { label: "Last Updated",    value: stats?.lastUpdated ? new Date(stats.lastUpdated).toLocaleDateString() : "—" },
         ].map((s) => (
-          <div key={s.label} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-            <p className="text-xs text-slate-500 mb-1">{s.label}</p>
-            <p className="text-sm font-semibold text-slate-900 font-mono truncate">{s.value}</p>
+          <div key={s.label} className="bg-white rounded-xl p-4 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
+            <p className="text-xs mb-1" style={{ color: "#9bafc5" }}>{s.label}</p>
+            <p className="text-sm font-semibold font-mono truncate" style={{ color: "#24315f" }}>{s.value}</p>
           </div>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 px-1 flex overflow-x-auto">
+      {/* Panel */}
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
+        {/* Sub-tabs */}
+        <div className="px-1 flex overflow-x-auto" style={{ borderBottom: "1px solid #e5e7eb" }}>
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setWlTab(t.id)}
-              className={`px-4 py-3.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-                wlTab === t.id
-                  ? "border-blue-600 text-blue-700"
-                  : "border-transparent text-slate-500 hover:text-slate-700"
-              }`}
+              style={wlTab === t.id ? TAB_ACTIVE : TAB_INACTIVE}
             >
               {t.label}
             </button>
@@ -135,58 +153,72 @@ export default function WhitelistTab() {
         </div>
 
         <div className="p-5">
+          {/* ── All Addresses ── */}
           {wlTab === "addresses" && (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="relative flex-1 max-w-sm">
-                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#9bafc5" }}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                   <input
                     value={search}
                     onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                     placeholder="Search addresses..."
-                    className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-9 pr-3 py-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#41afeb]"
+                    style={{ border: "1px solid #e5e7eb" }}
                   />
                 </div>
-                <Badge color="bg-slate-100 text-slate-600">{filtered.length} results</Badge>
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold"
+                  style={{ background: "#f3f4f6", color: "#6b7280" }}>
+                  {filtered.length} results
+                </span>
               </div>
 
               {isLoading ? (
                 <div className="space-y-2">{[...Array(5)].map((_, i) => (
-                  <div key={i} className="h-10 bg-slate-100 rounded-lg animate-pulse" />
+                  <div key={i} className="h-10 rounded-lg animate-pulse" style={{ background: "#f3f4f6" }} />
                 ))}</div>
               ) : paginated.length === 0 ? (
-                <div className="text-center py-10 text-slate-400 text-sm">No addresses found</div>
+                <div className="text-center py-10 text-sm" style={{ color: "#9bafc5" }}>No addresses found</div>
               ) : (
                 <>
-                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <div className="overflow-x-auto rounded-lg" style={{ border: "1px solid #e5e7eb" }}>
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">#</th>
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Address</th>
-                          <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Action</th>
+                        <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                          <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "#9bafc5" }}>#</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "#9bafc5" }}>Address</th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "#9bafc5" }}>Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody>
                         {paginated.map((addr, i) => (
-                          <tr key={addr} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-4 py-3 text-slate-400 font-mono text-xs">{(page - 1) * PER_PAGE + i + 1}</td>
-                            <td className="px-4 py-3 font-mono text-slate-800 text-xs break-all">{addr}</td>
+                          <tr key={addr}
+                            style={{ borderTop: i === 0 ? "none" : "1px solid #f3f4f6" }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "#fafbff")}
+                            onMouseLeave={e => (e.currentTarget.style.background = "")}>
+                            <td className="px-4 py-3 font-mono text-xs" style={{ color: "#9bafc5" }}>{(page - 1) * PER_PAGE + i + 1}</td>
+                            <td className="px-4 py-3 font-mono text-xs break-all" style={{ color: "#24315f" }}>{addr}</td>
                             <td className="px-4 py-3 text-right">
                               {confirmRemove === addr ? (
                                 <div className="flex items-center justify-end gap-2">
-                                  <span className="text-xs text-red-600">Confirm?</span>
+                                  <span className="text-xs" style={{ color: "#dc2626" }}>Confirm?</span>
                                   <button onClick={() => { handleRemove(addr); setConfirmRemove(null); }}
-                                    className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700">Yes</button>
+                                    className="text-xs px-2 py-1 rounded text-white" style={{ background: "#dc2626" }}>
+                                    Yes
+                                  </button>
                                   <button onClick={() => setConfirmRemove(null)}
-                                    className="text-xs px-2 py-1 bg-slate-100 text-slate-600 rounded hover:bg-slate-200">No</button>
+                                    className="text-xs px-2 py-1 rounded" style={{ background: "#f3f4f6", color: "#6b7280" }}>
+                                    No
+                                  </button>
                                 </div>
                               ) : (
                                 <button onClick={() => setConfirmRemove(addr)}
                                   disabled={removeAddressLoading}
-                                  className="text-xs px-3 py-1.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50">
+                                  className="text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                                  style={{ color: "#dc2626", background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.15)" }}>
                                   Remove
                                 </button>
                               )}
@@ -197,13 +229,19 @@ export default function WhitelistTab() {
                     </table>
                   </div>
                   {totalPages > 1 && (
-                    <div className="flex items-center justify-between text-sm text-slate-500">
+                    <div className="flex items-center justify-between text-sm" style={{ color: "#9bafc5" }}>
                       <span>Page {page} of {totalPages}</span>
                       <div className="flex gap-2">
                         <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-                          className="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40">← Prev</button>
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
+                          style={{ border: "1px solid #e5e7eb", color: "#374151", background: "white" }}>
+                          ← Prev
+                        </button>
                         <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                          className="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40">Next →</button>
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
+                          style={{ border: "1px solid #e5e7eb", color: "#374151", background: "white" }}>
+                          Next →
+                        </button>
                       </div>
                     </div>
                   )}
@@ -212,62 +250,75 @@ export default function WhitelistTab() {
             </div>
           )}
 
+          {/* ── Add Single ── */}
           {wlTab === "add" && (
             <div className="max-w-md space-y-4">
-              <h3 className="text-sm font-semibold text-slate-800">Add Single Address</h3>
+              <h3 className="text-sm font-semibold" style={{ color: "#24315f" }}>Add Single Address</h3>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1.5">Ethereum Address</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "#6b7280" }}>Ethereum Address</label>
                 <input value={newAddr} onChange={(e) => setNewAddr(e.target.value)}
                   placeholder="0x..."
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className={inputCls}
+                  style={inputStyle} />
               </div>
               <button onClick={handleAdd} disabled={addAddressLoading || !newAddr.trim()}
-                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-semibold rounded-lg transition-colors">
+                className={btnPrimary}
+                style={btnPrimaryStyle}>
                 {addAddressLoading ? "Adding..." : "Add Address"}
               </button>
             </div>
           )}
 
+          {/* ── Bulk Import ── */}
           {wlTab === "bulk" && (
             <div className="max-w-lg space-y-4">
-              <h3 className="text-sm font-semibold text-slate-800">Bulk Import</h3>
+              <h3 className="text-sm font-semibold" style={{ color: "#24315f" }}>Bulk Import</h3>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1.5">One address per line (or comma-separated)</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "#6b7280" }}>One address per line (or comma-separated)</label>
                 <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={10}
                   placeholder={"0xAb5801...\n0x742d35...\n0xd8dA6B..."}
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y" />
-                <p className="text-xs text-slate-400 mt-1">
+                  className="w-full px-3.5 py-2.5 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-[#41afeb] resize-y"
+                  style={inputStyle} />
+                <p className="text-xs mt-1" style={{ color: "#9bafc5" }}>
                   {bulkText.split(/[\n,]/).map((s) => s.trim()).filter(Boolean).length} addresses detected
                 </p>
               </div>
               <button onClick={handleBulk} disabled={addAddressesLoading || !bulkText.trim()}
-                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-semibold rounded-lg transition-colors">
+                className={btnPrimary}
+                style={btnPrimaryStyle}>
                 {addAddressesLoading ? "Importing..." : "Import Addresses"}
               </button>
             </div>
           )}
 
+          {/* ── Merkle Root ── */}
           {wlTab === "merkle" && (
             <div className="max-w-lg space-y-5">
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <p className="text-xs font-medium text-slate-500 mb-1">Current Merkle Root</p>
-                <p className="font-mono text-xs text-slate-800 break-all">{stats?.merkleRoot || "Not set"}</p>
+              <div className="p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                <p className="text-xs font-medium mb-1" style={{ color: "#9bafc5" }}>Current Merkle Root</p>
+                <p className="font-mono text-xs break-all" style={{ color: "#24315f" }}>{stats?.merkleRoot || "Not set"}</p>
                 {stats?.manualOverride && (
-                  <Badge color="bg-amber-100 text-amber-700 mt-2">Manual Override Active</Badge>
+                  <span className="inline-flex items-center mt-2 px-2 py-0.5 rounded-full text-xs font-medium"
+                    style={{ background: "rgba(217,119,6,0.1)", color: "#d97706" }}>
+                    Manual Override Active
+                  </span>
                 )}
               </div>
               <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-slate-800">Set Manual Override</h3>
+                <h3 className="text-sm font-semibold" style={{ color: "#24315f" }}>Set Manual Override</h3>
                 <input value={merkleInput} onChange={(e) => setMerkleInput(e.target.value)}
                   placeholder="0x..."
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className={inputCls}
+                  style={inputStyle} />
                 <div className="flex gap-3">
                   <button onClick={handleSetRoot} disabled={setMerkleRootLoading || !merkleInput.trim()}
-                    className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white text-sm font-semibold rounded-lg transition-colors">
+                    className="px-4 py-2.5 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40"
+                    style={{ background: "#d97706" }}>
                     {setMerkleRootLoading ? "Setting..." : "Set Root"}
                   </button>
                   <button onClick={handleClearRoot} disabled={clearMerkleRootOverrideLoading}
-                    className="px-4 py-2.5 bg-slate-600 hover:bg-slate-700 disabled:bg-slate-400 text-white text-sm font-semibold rounded-lg transition-colors">
+                    className="px-4 py-2.5 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40"
+                    style={{ background: "#6b7280" }}>
                     {clearMerkleRootOverrideLoading ? "Clearing..." : "Clear Override"}
                   </button>
                 </div>
@@ -275,31 +326,44 @@ export default function WhitelistTab() {
             </div>
           )}
 
+          {/* ── Test Address ── */}
           {wlTab === "test" && (
             <div className="max-w-md space-y-4">
-              <h3 className="text-sm font-semibold text-slate-800">Test Address Membership</h3>
+              <h3 className="text-sm font-semibold" style={{ color: "#24315f" }}>Test Address Membership</h3>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1.5">Ethereum Address</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "#6b7280" }}>Ethereum Address</label>
                 <input value={testAddr} onChange={(e) => { setTestAddr(e.target.value); setTestResult(null); }}
                   placeholder="0x..."
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className={inputCls}
+                  style={inputStyle} />
               </div>
               <button onClick={handleTest} disabled={testAddressLoading || !testAddr.trim()}
-                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-semibold rounded-lg transition-colors">
+                className={btnPrimary}
+                style={btnPrimaryStyle}>
                 {testAddressLoading ? "Checking..." : "Check Eligibility"}
               </button>
               {testResult && (
-                <div className={`p-4 rounded-xl border ${testResult.isWhitelisted ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
+                <div className={`p-4 rounded-xl`}
+                  style={{
+                    background: testResult.isWhitelisted ? "rgba(22,163,74,0.06)" : "rgba(239,68,68,0.06)",
+                    border: `1px solid ${testResult.isWhitelisted ? "rgba(22,163,74,0.2)" : "rgba(239,68,68,0.2)"}`,
+                  }}>
                   <div className="flex items-center gap-2 mb-3">
-                    <span className={`font-semibold text-sm ${testResult.isWhitelisted ? "text-emerald-700" : "text-red-700"}`}>
+                    <span className="font-semibold text-sm"
+                      style={{ color: testResult.isWhitelisted ? "#16a34a" : "#dc2626" }}>
                       {testResult.isWhitelisted ? "✓ Whitelisted" : "✗ Not Whitelisted"}
                     </span>
                   </div>
                   {testResult.isWhitelisted && (testResult.proof?.length ?? 0) > 0 && (
                     <div className="space-y-1">
-                      <p className="text-xs font-medium text-slate-600 mb-2">Merkle Proof ({testResult.proof!.length} elements):</p>
+                      <p className="text-xs font-medium mb-2" style={{ color: "#6b7280" }}>
+                        Merkle Proof ({testResult.proof!.length} elements):
+                      </p>
                       {testResult.proof!.map((p: string, i: number) => (
-                        <p key={i} className="font-mono text-xs text-slate-700 break-all bg-white px-2 py-1 rounded border">{p}</p>
+                        <p key={i} className="font-mono text-xs break-all px-2 py-1 rounded"
+                          style={{ background: "white", border: "1px solid #e5e7eb", color: "#374151" }}>
+                          {p}
+                        </p>
                       ))}
                     </div>
                   )}
@@ -308,18 +372,30 @@ export default function WhitelistTab() {
             </div>
           )}
 
+          {/* ── Export ── */}
           {wlTab === "export" && (
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-slate-800">Export Whitelist</h3>
-              <p className="text-sm text-slate-500">{addresses.length} addresses available to export</p>
+              <h3 className="text-sm font-semibold" style={{ color: "#24315f" }}>Export Whitelist</h3>
+              <p className="text-sm" style={{ color: "#9bafc5" }}>{addresses.length} addresses available to export</p>
               <div className="flex flex-wrap gap-3">
-                <button onClick={() => handleExport("csv")}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-sm font-medium text-slate-700 rounded-lg transition-colors">
-                  <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Download .CSV
-                </button>
+                {(["csv", "json", "txt"] as const).map((fmt) => (
+                  <button key={fmt} onClick={() => handleExport(fmt)}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                    style={{ background: "white", border: "1px solid #e5e7eb", color: "#374151" }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "#41afeb";
+                      (e.currentTarget as HTMLButtonElement).style.background = "rgba(65,175,235,0.06)";
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "#e5e7eb";
+                      (e.currentTarget as HTMLButtonElement).style.background = "white";
+                    }}>
+                    <svg className="w-4 h-4" style={{ color: "#41afeb" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download .{fmt.toUpperCase()}
+                  </button>
+                ))}
               </div>
             </div>
           )}

@@ -8,5 +8,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return proxyToApi(req, `/api/waves/${id}`);
+  const body = await req.json();
+  return proxyToApi(req, `/api/waves/${id}`, { method: "PUT", body });
 }
