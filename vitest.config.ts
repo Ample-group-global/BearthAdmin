@@ -6,7 +6,7 @@ export default defineConfig({
     environment: "node",
     globals: true,
     passWithNoTests: true,
-    exclude: ["**/node_modules/**", "**/.worktrees/**"],
+    exclude: ["**/node_modules/**", "**/.worktrees/**", "tests/**"],
   },
   resolve: {
     alias: {

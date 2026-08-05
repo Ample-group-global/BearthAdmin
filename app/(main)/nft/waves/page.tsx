@@ -26,6 +26,7 @@ interface Wave {
   scheduledStart: string | null;
   scheduledEnd: string | null;
   revealScheduledAt: string | null;
+  waveRevealedAt: string | null;
   tierPrices: { legendary?: number; epic?: number; rare?: number; common?: number } | null;
   status: string;
   notes: string | null;
@@ -963,7 +964,12 @@ export default function WavesPage() {
                           </td>
 
                           <td style={{ padding: "10px 14px", minWidth: 130 }}>
-                            {w.revealScheduledAt ? (
+                            {w.waveRevealed && w.waveRevealedAt ? (
+                              <div className="text-xs font-semibold" style={{ color: "#16a34a" }}>
+                                <div>{new Date(w.waveRevealedAt).toLocaleDateString()}</div>
+                                <div style={{ color: "#16a34a", fontWeight: 400, opacity: 0.7 }}>{new Date(w.waveRevealedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</div>
+                              </div>
+                            ) : w.revealScheduledAt ? (
                               <div className="text-xs font-semibold" style={{ color: "#7c3aed" }}>
                                 <div>{new Date(w.revealScheduledAt).toLocaleDateString()}</div>
                                 <div style={{ color: "#9bafc5", fontWeight: 400 }}>{new Date(w.revealScheduledAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</div>

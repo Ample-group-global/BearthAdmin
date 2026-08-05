@@ -322,7 +322,7 @@ function OrdersPageInner() {
       if (rateTimer.current) clearInterval(rateTimer.current);
       return;
     }
-    fetch("/api/nft?limit=500&offset=0", { credentials: "include" })
+    fetch("/api/nfts?limit=500&offset=0", { credentials: "include" })
       .then(r => r.json()).then(d => setNftRecords(d.nftRecords ?? [])).catch(() => {});
     fetch("/api/products?limit=500&offset=0", { credentials: "include" })
       .then(r => r.json()).then(d => setProductRecords(d.products ?? [])).catch(() => {});

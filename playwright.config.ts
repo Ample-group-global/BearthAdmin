@@ -9,7 +9,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 1,
-  timeout: 60000,
+  timeout: 120000,
   globalSetup: "./tests/global-setup.ts",
   use: {
     baseURL: "http://localhost:3000",
@@ -25,6 +25,7 @@ export default defineConfig({
       name: "Desktop Chrome",
       use: {
         ...devices["Desktop Chrome"],
+        storageState: TECH_AUTH,
         launchOptions: {
           args: [
             "--disable-dev-shm-usage",

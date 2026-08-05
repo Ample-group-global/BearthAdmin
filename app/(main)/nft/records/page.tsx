@@ -245,7 +245,7 @@ export default function NftPage() {
     if (mTo)     params.set("minted_to",   mTo);
     if (sk)      params.set("sort_by", sk);
     if (sk && sd) params.set("sort_dir", sd);
-    fetch(`/api/nft?${params}`, { credentials: "include" })
+    fetch(`/api/nfts?${params}`, { credentials: "include" })
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
       .then(data => {
         setRecords(data.nftRecords ?? []);
@@ -477,7 +477,7 @@ export default function NftPage() {
       {/* ── Page Header ── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-extrabold" style={{ color: "#24315f" }}>NFT Records</h1>
+          <h1 className="text-xl font-extrabold" style={{ color: "#24315f" }}>NFT Lists</h1>
           <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
             Full lifecycle report — generation, wave assignment, minting, reveal, sale, and delivery
           </p>
@@ -911,7 +911,7 @@ export default function NftPage() {
                         </svg>
                         <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#6366f1" }}>Wave Schedule</span>
                         <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "#eff0fe", color: "#6366f1" }}>
-                          W{viewRecord.waveNumber}{viewRecord.waveQuantity != null ? ` · ${viewRecord.waveQuantity.toLocaleString()} NFTs` : ""}
+                          W{viewRecord.waveNumber}{viewRecord.waveName ? ` — ${viewRecord.waveName.split("—")[0]?.trim()}` : ""}{viewRecord.waveQuantity != null ? ` · ${viewRecord.waveQuantity.toLocaleString()} NFTs` : ""}
                         </span>
                       </div>
                       <span className="text-xs font-bold px-2.5 py-1 rounded-full"
@@ -937,9 +937,8 @@ export default function NftPage() {
                     </div>
                     <div className="grid grid-cols-3 px-5 py-4 gap-4">
                       {[
-                        { label: "Wave Start",  val: fmt(viewRecord.waveScheduledStart),    dot: "#41afeb" },
-                        { label: "Wave End",    val: fmt(viewRecord.waveScheduledEnd),      dot: "#f59e0b" },
-                        { label: "Reveal Date", val: fmt(viewRecord.waveRevealScheduledAt), dot: "#7c3aed" },
+                        { label: "Wave Start",  val: fmt(viewRecord.waveScheduledStart), dot: "#41afeb" },
+                        { label: "Wave End",    val: fmt(viewRecord.waveScheduledEnd),   dot: "#f59e0b" },
                       ].map(s => (
                         <div key={s.label} className="flex items-start gap-2">
                           <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: s.dot }} />
@@ -949,6 +948,27 @@ export default function NftPage() {
                           </div>
                         </div>
                       ))}
+                      {/* Reveal Date — shows actual reveal time when revealed, scheduled date otherwise */}
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                          style={{ background: viewRecord.isRevealed ? "#16a34a" : "#7c3aed" }} />
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>
+                            {viewRecord.isRevealed ? "Revealed On" : "Reveal Date"}
+                          </p>
+                          <p className="text-xs font-semibold"
+                            style={{ color: viewRecord.isRevealed && viewRecord.revealedAt ? "#16a34a" : viewRecord.waveRevealScheduledAt ? "#7c3aed" : "#cbd5e1" }}>
+                            {viewRecord.isRevealed && viewRecord.revealedAt
+                              ? fmt(viewRecord.revealedAt)
+                              : viewRecord.waveRevealScheduledAt
+                              ? fmt(viewRecord.waveRevealScheduledAt)
+                              : "—"}
+                          </p>
+                          {viewRecord.isRevealed && (
+                            <p className="text-[9px] mt-0.5 font-semibold" style={{ color: "#16a34a" }}>✓ Revealed</p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     {viewRecord.priceEth != null && (
                       <div className="flex items-center justify-between px-5 py-3 mx-0" style={{ borderTop: "1px solid #f1f5f9", background: "#fafaff" }}>

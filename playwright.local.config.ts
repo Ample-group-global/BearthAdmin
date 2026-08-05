@@ -3,6 +3,8 @@ import path from "path";
 
 export default defineConfig({
   testDir: "./tests",
+  testMatch: ["**/bearth-e2e-full.spec.ts"],
+  globalSetup: "./tests/global-setup.ts",
   fullyParallel: false,
   workers: 1,
   retries: 0,

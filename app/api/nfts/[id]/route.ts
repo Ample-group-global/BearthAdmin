@@ -5,12 +5,12 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, { params }: Params) {
   const { id } = await params;
-  return proxyToApi(req, `/api/nft/${id}`);
+  return proxyToApi(req, `/api/nfts/${id}`);
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
   const { id } = await params;
-  return proxyToApi(req, `/api/nft/${id}`, {
+  return proxyToApi(req, `/api/nfts/${id}`, {
     method: "PUT",
     body: await req.json(),
   });

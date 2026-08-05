@@ -1,46 +1,56 @@
-import { chromium, FullConfig } from '@playwright/test';
-import path from 'path';
-import fs from 'fs';
+/**
+ * Playwright global setup — runs once before any browser opens.
+ *
+ * 1. Verifies BearthApi and BearthAdmin are reachable — fails immediately
+ *    with a clear message if either is down, preventing 51 Chrome windows
+ *    from opening just to fail on login.
+ * 2. Warms up the Next.js login API route — the dev server compiles routes
+ *    on first request; without this, the first browser POST returns 404.
+ *
+ * No browser is opened here. Each test handles its own login via loginAs().
+ */
 
-const TECH_AUTH = path.join(process.cwd(), 'tests', '.auth', 'tech.json');
+import { FullConfig } from '@playwright/test';
 
-function isTechAuthValid(): boolean {
-  if (!fs.existsSync(TECH_AUTH)) return false;
-  try {
-    const state = JSON.parse(fs.readFileSync(TECH_AUTH, 'utf8'));
-    const session = state.cookies?.find((c: any) => c.name === 'admin_session');
-    if (!session) return false;
-    // expires is in seconds; -1 means session cookie (no expiry set)
-    if (session.expires === -1) return true;
-    return session.expires > Date.now() / 1000 + 300; // valid for at least 5 more minutes
-  } catch {
-    return false;
+async function waitForService(url: string, label: string, timeoutMs = 60_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      if (res.status < 600) {
+        console.log(`[setup] ${label} ready (HTTP ${res.status})`);
+        return;
+      }
+    } catch { /* not ready yet */ }
+    await new Promise(r => setTimeout(r, 2000));
   }
+  throw new Error(
+    `[setup] ${label} did not become ready within ${timeoutMs / 1000}s.\n` +
+    `  Make sure both services are running before starting the test suite.\n  URL: ${url}`,
+  );
 }
 
-export default async function globalSetup(_config: FullConfig) {
-  // Reuse cached session if still valid — avoids needing DB for auth re-creation
-  if (isTechAuthValid()) {
-    console.log('[global-setup] Reusing valid cached tech session');
-    return;
-  }
+export default async function globalSetup(config: FullConfig): Promise<void> {
+  const baseURL = config.projects[0]?.use?.baseURL ?? 'http://localhost:3000';
 
-  const browser = await chromium.launch();
-  const context = await browser.newContext();
-  const page    = await context.newPage();
+  console.log('[setup] Verifying services...');
+  await Promise.all([
+    waitForService('http://localhost:8000/api/auth/admin/me', 'BearthApi  (port 8000)'),
+    waitForService(`${baseURL}/login`,                        'BearthAdmin (port 3000)'),
+  ]);
 
-  // ── Login as Technical user ───────────────────────────────────────────────
-  await page.goto('http://localhost:3000/login');
-  await page.waitForLoadState('networkidle');
+  // Warm up login API route — Next.js dev server compiles routes on first request.
+  // Without this warm-up the first browser POST hits the route while it's still
+  // compiling and gets a 404, causing the first login attempt to fail.
+  try {
+    await fetch(`${baseURL}/api/auth/login`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email: 'warmup@x.local', password: 'warmup' }),
+      signal:  AbortSignal.timeout(10_000),
+    });
+    console.log('[setup] Login API route compiled and ready');
+  } catch { /* ignore — we only care that compilation was triggered */ }
 
-  await page.fill('input[type="email"], input[name="email"], input[placeholder*="email" i]', 'amplecapitalholding@gmail.com');
-  await page.fill('input[type="password"], input[name="password"]', 'amplecapitalholding@123');
-  await page.click('button[type="submit"], button:has-text("Login"), button:has-text("Sign in")');
-
-  // Wait for redirect to dashboard
-  await page.waitForURL('**/dashboard**', { timeout: 15000 });
-  await page.waitForLoadState('networkidle');
-
-  await context.storageState({ path: TECH_AUTH });
-  await browser.close();
+  console.log('[setup] All services ready — starting tests');
 }
