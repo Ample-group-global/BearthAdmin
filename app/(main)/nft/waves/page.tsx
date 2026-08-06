@@ -540,7 +540,7 @@ export default function WavesPage() {
   const highlightRef      = useRef<HTMLDivElement>(null);
 
   // ── Tab state ──
-  const [activeTab, setActiveTab] = useState<"waves" | "reveal" | "whitelist" | "packs" | "collaborations">("waves");
+  const [activeTab, setActiveTab] = useState<"waves" | "whitelist" | "packs" | "collaborations">("waves");
 
   // ── Waves tab state ──
   const [waves, setWaves]             = useState<Wave[]>([]);
@@ -552,11 +552,12 @@ export default function WavesPage() {
 
   // DB edit modal
   const [editWave, setEditWave]   = useState<Wave | null>(null);
+  const [manageMaximized, setManageMaximized] = useState(false);
   const [saving, setSaving]       = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [form, setForm] = useState({
     defaultPriceEth: "", saleMethod: "", scheduledStart: "",
-    scheduledEnd: "", revealScheduledAt: "", status: "", notes: "",
+    scheduledEnd: "", status: "", notes: "",
     clearSchedule: false,
   });
 
@@ -569,8 +570,6 @@ export default function WavesPage() {
   const [tierOk, setTierOk]               = useState<string | null>(null);
   const [tierErr, setTierErr]             = useState<string | null>(null);
 
-  // Unified Manage modal tab
-  const [manageTab, setManageTab] = useState<"settings" | "blockchain">("settings");
 
   // On-chain action modal
   const [chainWave, setChainWave]         = useState<Wave | null>(null);
@@ -582,8 +581,6 @@ export default function WavesPage() {
 
   // Chain form fields
   const [chainPrice, setChainPrice]   = useState("");
-  const [chainStart, setChainStart]   = useState("");
-  const [chainEnd, setChainEnd]       = useState("");
   const [auctionTo, setAuctionTo]     = useState("");
   const [auctionQty, setAuctionQty]   = useState("1");
   const [auctionListingId, setAuctionListingId]     = useState("");
@@ -600,7 +597,6 @@ export default function WavesPage() {
   const [revealErr,         setRevealErr]         = useState<string | null>(null);
   const [revealWave,        setRevealWave]        = useState<WaveSchedule | null>(null);
   const [revealSuccessData, setRevealSuccessData] = useState<{ txHash: string; waveNum: number } | null>(null);
-  const revealLoadedRef = useRef(false);
   const [scheduleEditWave,   setScheduleEditWave]   = useState<WaveSchedule | null>(null);
   const [scheduleEditDate,   setScheduleEditDate]   = useState("");
   const [scheduleEditSaving, setScheduleEditSaving] = useState(false);
@@ -649,6 +645,7 @@ export default function WavesPage() {
 
   useEffect(() => {
     loadWaves();
+    loadRevealData();
     fetch("/api/nft-sell/lookups/wave-sale-methods", { credentials: "include" })
       .then(r => r.json())
       .then(d => setSaleMethods(d.saleMethods ?? []))
@@ -657,6 +654,7 @@ export default function WavesPage() {
       .then(r => r.json())
       .then(d => { if (d.blindBoxImageUrl) setBlindBoxUrl(d.blindBoxImageUrl); })
       .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -706,26 +704,7 @@ export default function WavesPage() {
     finally { setScheduleEditSaving(false); }
   };
 
-  // Load reveal data only when Reveal tab becomes active (lazy)
-  useEffect(() => {
-    if (activeTab === "reveal" && !revealLoadedRef.current) {
-      revealLoadedRef.current = true;
-      loadRevealData();
-    }
-  }, [activeTab, loadRevealData]);
 
-  // Lazy-load on-chain data when Blockchain tab is activated in Manage modal
-  useEffect(() => {
-    if (manageTab === "blockchain" && chainWave && !chainOnChain && !chainLoading) {
-      setChainLoading(true);
-      fetch(`/api/nft-sell/waves/${chainWave.waveNumber}`, { credentials: "include" })
-        .then(r => r.json())
-        .then(d => setChainOnChain(d.onChain ?? null))
-        .catch(() => {})
-        .finally(() => setChainLoading(false));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manageTab]);
 
   // ── Waves tab handlers ──
 
@@ -736,7 +715,6 @@ export default function WavesPage() {
       saleMethod:         w.saleMethod ?? "fixed_price",
       scheduledStart:     w.scheduledStart     ? w.scheduledStart.slice(0, 16)     : "",
       scheduledEnd:       w.scheduledEnd       ? w.scheduledEnd.slice(0, 16)       : "",
-      revealScheduledAt:  w.revealScheduledAt  ? w.revealScheduledAt.slice(0, 16)  : "",
       status:             w.status ?? "upcoming",
       notes:              w.notes  ?? "",
       clearSchedule:      false,
@@ -778,9 +756,8 @@ export default function WavesPage() {
       const body: Record<string, unknown> = {
         defaultPriceEth:   form.defaultPriceEth !== "" ? Number(form.defaultPriceEth) : null,
         saleMethod:        form.saleMethod   || null,
-        scheduledStart:    form.clearSchedule ? null : (form.scheduledStart    ? new Date(form.scheduledStart).toISOString()    : null),
-        scheduledEnd:      form.clearSchedule ? null : (form.scheduledEnd      ? new Date(form.scheduledEnd).toISOString()      : null),
-        revealScheduledAt: form.clearSchedule ? null : (form.revealScheduledAt ? new Date(form.revealScheduledAt).toISOString() : null),
+        scheduledStart:    form.clearSchedule ? null : (form.scheduledStart ? new Date(form.scheduledStart).toISOString() : null),
+        scheduledEnd:      form.clearSchedule ? null : (form.scheduledEnd   ? new Date(form.scheduledEnd).toISOString()   : null),
         status:            form.status       || null,
         notes:             form.notes        || null,
         clearSchedule:     form.clearSchedule,
@@ -795,20 +772,23 @@ export default function WavesPage() {
     finally { setSaving(false); }
   };
 
-  const openManage = (w: Wave, tab: "settings" | "blockchain" = "settings") => {
-    // open settings panel
+  const openManage = (w: Wave) => {
     openEdit(w);
-    // prepare blockchain panel (data loaded lazily when tab is activated)
     setChainWave(w); setChainError(null); setChainTx(null); setChainOnChain(null);
     setChainPrice(w.defaultPriceEth != null ? String(w.defaultPriceEth) : "");
-    setChainStart(w.scheduledStart ? w.scheduledStart.slice(0, 16) : "");
-    setChainEnd(w.scheduledEnd     ? w.scheduledEnd.slice(0, 16)   : "");
-    setManageTab(tab);
+    // Eagerly load on-chain state
+    setChainLoading(true);
+    fetch(`/api/nft-sell/waves/${w.waveNumber}`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => setChainOnChain(d.onChain ?? null))
+      .catch(() => {})
+      .finally(() => setChainLoading(false));
   };
 
   const closeManage = () => {
     setEditWave(null); setChainWave(null);
-    setChainTx(null); setChainError(null); setManageTab("settings");
+    setChainTx(null); setChainError(null);
+    setManageMaximized(false);
   };
 
   const chainOp = async (opName: string, fn: () => Promise<Response>) => {
@@ -826,13 +806,16 @@ export default function WavesPage() {
   };
 
   const handleSetScheduleOnChain = () => {
-    if (!chainStart || !chainEnd) { setChainError("Both start and end times required."); return; }
+    if (!editWave?.scheduledStart || !editWave?.scheduledEnd) {
+      setChainError("No schedule in DB — set start/end dates in the Settings tab first.");
+      return;
+    }
     chainOp("schedule", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/schedule`, {
       method: "PUT", credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        startUnix: Math.floor(new Date(chainStart).getTime() / 1000),
-        endUnix:   Math.floor(new Date(chainEnd).getTime()   / 1000),
+        startUnix: Math.floor(new Date(editWave.scheduledStart!).getTime() / 1000),
+        endUnix:   Math.floor(new Date(editWave.scheduledEnd!).getTime()   / 1000),
       }),
     }));
   };
@@ -920,7 +903,7 @@ export default function WavesPage() {
           </p>
         </div>
         <button
-          onClick={activeTab === "reveal" ? loadRevealData : activeTab === "waves" ? loadWaves : undefined}
+          onClick={activeTab === "waves" ? () => { loadWaves(); loadRevealData(); } : undefined}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
           style={{ border: "1px solid #e5e7eb", color: "#6b7280", background: "white" }}>
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -935,7 +918,6 @@ export default function WavesPage() {
         <div className="flex gap-0">
           {([
             { key: "waves",          label: "Waves" },
-            { key: "reveal",         label: "Reveal", badge: readyCount > 0 ? readyCount : null },
             { key: "whitelist",      label: "Whitelist" },
             { key: "packs",          label: "Mystery Packs" },
             { key: "collaborations", label: "Collaborations" },
@@ -946,12 +928,6 @@ export default function WavesPage() {
               className="flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors"
               style={activeTab === tab.key ? TAB_STYLE_ACTIVE : TAB_STYLE_INACTIVE}>
               {tab.label}
-              {"badge" in tab && tab.badge !== null && (
-                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full text-xs font-bold text-white"
-                  style={{ background: "#d97706", fontSize: 10 }}>
-                  {tab.badge}
-                </span>
-              )}
             </button>
           ))}
         </div>
@@ -1012,7 +988,101 @@ export default function WavesPage() {
             ))}
           </div>
 
-          {error && <ErrBanner msg={error} onDismiss={() => setError(null)} />}
+          {error    && <ErrBanner msg={error}     onDismiss={() => setError(null)} />}
+          {revealErr && <ErrBanner msg={revealErr} onDismiss={() => setRevealErr(null)} />}
+
+          {/* Contract phase badge */}
+          {revealPhase !== null && (
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1.5 rounded-full text-xs font-bold"
+                style={{ background: PHASE_COLORS[revealPhase]?.bg ?? "#f3f4f6", color: PHASE_COLORS[revealPhase]?.color ?? "#6b7280" }}>
+                Contract: {PHASE_LABELS[revealPhase] ?? `Phase ${revealPhase}`}
+              </span>
+            </div>
+          )}
+
+          {/* Collection Reveal Progress */}
+          {revealWaves.length > 0 && (
+            <div className="bg-white rounded-2xl p-5 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
+              <p className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: "#9bafc5" }}>
+                Collection Reveal Progress
+              </p>
+              <div className="flex items-center">
+                {revealWaves.map((w, i) => {
+                  const st   = waveState(w);
+                  const meta = STATE_META[st];
+                  const isLast = i === revealWaves.length - 1;
+                  return (
+                    <div key={w.wave_number} className="flex items-center" style={{ flex: 1, minWidth: 0 }}>
+                      <div className="flex flex-col items-center" style={{ flexShrink: 0 }}>
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold"
+                          style={{ background: meta.bg, color: meta.color, border: `2px solid ${meta.color}` }}>
+                          {w.is_revealed ? (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : st === "ready_reveal" ? (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                          ) : (
+                            <span>{w.wave_number}</span>
+                          )}
+                        </div>
+                        <div className="text-[10px] font-bold mt-1.5" style={{ color: meta.color }}>W{w.wave_number}</div>
+                        <div className="text-[9px] mt-0.5 text-center leading-tight" style={{ color: "#9bafc5", maxWidth: 56 }}>
+                          {meta.label}
+                        </div>
+                      </div>
+                      {!isLast && (
+                        <div style={{
+                          flex: 1, height: 2, minWidth: 4,
+                          background: w.is_revealed ? "#16a34a" : "#e5e7eb",
+                          margin: "0 4px", marginBottom: 28,
+                        }} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Ready-to-reveal alert */}
+          {readyCount > 0 && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+              style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.3)" }}>
+              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ background: "rgba(217,119,6,0.15)" }}>
+                <svg className="w-4 h-4" style={{ color: "#d97706" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-bold" style={{ color: "#d97706" }}>
+                  {readyCount} wave{readyCount > 1 ? "s" : ""} ready to reveal
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: "#92400e" }}>
+                  Reveal date has passed. Find the wave below and click &quot;Reveal Now&quot;.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Next upcoming action */}
+          {!readyCount && nextAction && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+              style={{ background: "rgba(65,175,235,0.06)", border: "1px solid rgba(65,175,235,0.2)" }}>
+              <svg className="w-4 h-4 flex-shrink-0" style={{ color: "#41afeb" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-sm" style={{ color: "#374151" }}>
+                <strong style={{ color: "#41afeb" }}>Next: </strong>
+                {nextAction.label} on {fmtFull(new Date(nextAction.dt).toISOString())}
+              </span>
+            </div>
+          )}
 
           {/* Waves Table */}
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
@@ -1173,35 +1243,57 @@ export default function WavesPage() {
                           </td>
 
                           <td style={{ padding: "10px 14px", textAlign: "center" }}>
-                            {w.waveRevealed ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
-                                style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>
-                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                </svg>
-                                Done
-                              </span>
-                            ) : w.revealScheduledAt ? (
-                              <div className="flex flex-col items-center gap-0.5">
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                                  style={{ background: "rgba(124,58,237,0.1)", color: "#7c3aed" }}>
-                                  Scheduled
+                            {(() => {
+                              const isReady = !w.waveRevealed && !!w.revealScheduledAt && new Date(w.revealScheduledAt).getTime() <= Date.now();
+                              const makeWS = (): WaveSchedule => ({
+                                wave_number: w.waveNumber, wave_name: w.name, status: w.status,
+                                scheduled_start: w.scheduledStart, scheduled_end: w.scheduledEnd,
+                                reveal_scheduled_at: w.revealScheduledAt, wave_start_triggered: false,
+                                wave_end_triggered: false, wave_reveal_triggered: false,
+                                is_revealed: w.waveRevealed ?? false, wave_revealed_at: w.waveRevealedAt,
+                                sold_count: w.soldCount ?? 0, minted_count: w.soldCount ?? 0, quantity: w.quantity ?? 0,
+                              });
+                              if (w.waveRevealed) return (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                                  style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>
+                                  <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Done
                                 </span>
-                                <span className="text-[9px]" style={{ color: "#9bafc5" }}>
-                                  {new Date(w.revealScheduledAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
-                                style={{ background: "#f3f4f6", color: "#9bafc5" }}>
-                                Blind
-                              </span>
-                            )}
+                              );
+                              if (isReady) return (
+                                <button onClick={() => setRevealWave(makeWS())}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold text-white"
+                                  style={{ background: "#d97706" }}>
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                  Reveal Now
+                                </button>
+                              );
+                              return (
+                                <button
+                                  onClick={() => {
+                                    setScheduleEditWave(makeWS());
+                                    setScheduleEditDate(w.revealScheduledAt ? new Date(w.revealScheduledAt).toISOString().slice(0, 16) : "");
+                                    setScheduleEditErr(null);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg"
+                                  style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed", border: "1px solid rgba(124,58,237,0.2)" }}>
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                  {w.revealScheduledAt ? "Edit Date" : "Set Date"}
+                                </button>
+                              );
+                            })()}
                           </td>
 
                           <td style={{ padding: "10px 14px" }}>
                             <div className="flex flex-col gap-1.5 items-start">
-                              <button onClick={() => openManage(w, "settings")}
+                              <button onClick={() => openManage(w)}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
                                 style={{ background: "#24315f" }}>
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1273,392 +1365,81 @@ export default function WavesPage() {
         </>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* ── REVEAL TAB ───────────────────────────────────────────────────── */}
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "reveal" && (
-        <>
-          {/* Contract phase badge */}
-          {revealPhase !== null && (
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1.5 rounded-full text-xs font-bold"
-                style={{ background: PHASE_COLORS[revealPhase]?.bg ?? "#f3f4f6", color: PHASE_COLORS[revealPhase]?.color ?? "#6b7280" }}>
-                Contract: {PHASE_LABELS[revealPhase] ?? `Phase ${revealPhase}`}
-              </span>
-            </div>
-          )}
-
-          {revealErr && <ErrBanner msg={revealErr} onDismiss={() => setRevealErr(null)} />}
-
-          {/* ── Wave Reveal Timeline ── */}
-          {revealWaves.length > 0 && (
-            <div className="bg-white rounded-2xl p-5 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
-              <p className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: "#9bafc5" }}>
-                Collection Reveal Progress
-              </p>
-              <div className="flex items-center">
-                {revealWaves.map((w, i) => {
-                  const st   = waveState(w);
-                  const meta = STATE_META[st];
-                  const isLast = i === revealWaves.length - 1;
-                  return (
-                    <div key={w.wave_number} className="flex items-center" style={{ flex: 1, minWidth: 0 }}>
-                      <div className="flex flex-col items-center" style={{ flexShrink: 0 }}>
-                        <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold"
-                          style={{ background: meta.bg, color: meta.color, border: `2px solid ${meta.color}` }}>
-                          {w.is_revealed ? (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                            </svg>
-                          ) : st === "ready_reveal" ? (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
-                          ) : (
-                            <span>{w.wave_number}</span>
-                          )}
-                        </div>
-                        <div className="text-[10px] font-bold mt-1.5" style={{ color: meta.color }}>W{w.wave_number}</div>
-                        <div className="text-[9px] mt-0.5 text-center leading-tight" style={{ color: "#9bafc5", maxWidth: 56 }}>
-                          {meta.label}
-                        </div>
-                      </div>
-                      {!isLast && (
-                        <div style={{
-                          flex: 1, height: 2, minWidth: 4,
-                          background: w.is_revealed ? "#16a34a" : "#e5e7eb",
-                          margin: "0 4px", marginBottom: 28,
-                        }} />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Ready to reveal alert */}
-          {readyCount > 0 && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
-              style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.3)" }}>
-              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ background: "rgba(217,119,6,0.15)" }}>
-                <svg className="w-4 h-4" style={{ color: "#d97706" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-bold" style={{ color: "#d97706" }}>
-                  {readyCount} wave{readyCount > 1 ? "s" : ""} ready to reveal
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: "#92400e" }}>
-                  The reveal date has passed. Review the wave below and click "Reveal Now" when you are ready.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Next upcoming action */}
-          {!readyCount && nextAction && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
-              style={{ background: "rgba(65,175,235,0.06)", border: "1px solid rgba(65,175,235,0.2)" }}>
-              <svg className="w-4 h-4 flex-shrink-0" style={{ color: "#41afeb" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="text-sm" style={{ color: "#374151" }}>
-                <strong style={{ color: "#41afeb" }}>Next: </strong>
-                {nextAction.label} on {fmtFull(new Date(nextAction.dt).toISOString())}
-              </span>
-            </div>
-          )}
-
-          {/* Wave schedule table */}
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
-            <div className="px-5 py-4" style={{ borderBottom: "1px solid #f3f4f6" }}>
-              <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Wave Schedule</h2>
-              <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
-                Use "Set Date" on each row to schedule a reveal. Click "Reveal Now" when the reveal date arrives.
-              </p>
-            </div>
-
-            {revealLoading ? (
-              <div className="flex items-center justify-center h-40" style={{ color: "#9bafc5" }}>
-                <svg className="w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Loading…
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full" style={{ fontSize: 13, borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ background: "#fafafa", borderBottom: "1px solid #f3f4f6" }}>
-                      {["Wave", "Start Date", "End Date", "Reveal Date", "Minted / Qty", "State", "Action"].map(h => (
-                        <th key={h} className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wide"
-                          style={{ color: "#9bafc5", whiteSpace: "nowrap" }}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {revealWaves.map((w, i) => {
-                      const state   = waveState(w);
-                      const meta    = STATE_META[state];
-                      const isReady = state === "ready_reveal";
-                      return (
-                        <tr key={w.wave_number}
-                          style={{ borderTop: i === 0 ? "none" : "1px solid #f9fafb", background: isReady ? "rgba(217,119,6,0.025)" : "transparent" }}
-                          onMouseEnter={e => { if (!isReady) e.currentTarget.style.background = "#fafbff"; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = isReady ? "rgba(217,119,6,0.025)" : "transparent"; }}>
-
-                          {/* Wave name */}
-                          <td className="px-4 py-3">
-                            <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                              style={{ background: "rgba(65,175,235,0.1)", color: "#41afeb" }}>
-                              W{w.wave_number}
-                            </span>
-                            <div className="text-xs mt-1" style={{ color: "#6b7280" }}>{w.wave_name}</div>
-                          </td>
-
-                          {/* Start date */}
-                          <td className="px-4 py-3">
-                            <div className="text-xs" style={{ color: w.wave_start_triggered ? "#16a34a" : "#374151" }}>
-                              {fmtFull(w.scheduled_start)}
-                            </div>
-                            {w.wave_start_triggered && (
-                              <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#16a34a" }}>
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                </svg>
-                                Started
-                              </div>
-                            )}
-                          </td>
-
-                          {/* End date */}
-                          <td className="px-4 py-3">
-                            <div className="text-xs" style={{ color: w.wave_end_triggered ? "#16a34a" : "#374151" }}>
-                              {fmtFull(w.scheduled_end)}
-                            </div>
-                            {w.wave_end_triggered && (
-                              <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#16a34a" }}>
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                </svg>
-                                Closed
-                              </div>
-                            )}
-                          </td>
-
-                          {/* Reveal date */}
-                          <td className="px-4 py-3">
-                            <div className="text-xs font-semibold"
-                              style={{ color: isReady ? "#d97706" : w.reveal_scheduled_at ? "#7c3aed" : "#d1d5db" }}>
-                              {fmtFull(w.reveal_scheduled_at)}
-                            </div>
-                            {isReady && (
-                              <div className="text-xs mt-0.5 font-bold" style={{ color: "#d97706" }}>⚡ Due now</div>
-                            )}
-                            {w.wave_reveal_triggered && !w.is_revealed && (
-                              <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#7c3aed" }}>
-                                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                </svg>
-                                Tx pending
-                              </div>
-                            )}
-                            {w.is_revealed && w.wave_revealed_at && (
-                              <div className="text-xs mt-0.5" style={{ color: "#16a34a" }}>
-                                Done {fmtFull(w.wave_revealed_at)}
-                              </div>
-                            )}
-                          </td>
-
-                          {/* Minted / Qty */}
-                          <td className="px-4 py-3 text-xs" style={{ whiteSpace: "nowrap" }}>
-                            <span className="font-bold" style={{ color: "#41afeb" }}>{(w.minted_count ?? 0).toLocaleString()}</span>
-                            <span style={{ color: "#9bafc5" }}> / {w.quantity.toLocaleString()}</span>
-                            {w.quantity > 0 && (
-                              <div className="mt-1 h-1 rounded-full overflow-hidden" style={{ background: "#f3f4f6", width: 60 }}>
-                                <div className="h-full rounded-full" style={{
-                                  width: `${Math.min(100, ((w.minted_count ?? 0) / w.quantity) * 100)}%`,
-                                  background: "#41afeb",
-                                }} />
-                              </div>
-                            )}
-                          </td>
-
-                          {/* State badge */}
-                          <td className="px-4 py-3">
-                            <span className="px-2 py-0.5 rounded-full text-xs font-bold"
-                              style={{ background: meta.bg, color: meta.color }}>
-                              {meta.label}
-                            </span>
-                          </td>
-
-                          {/* Action */}
-                          <td className="px-4 py-3">
-                            {isReady ? (
-                              <button onClick={() => setRevealWave(w)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
-                                style={{ background: "#d97706" }}>
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                                Reveal Now
-                              </button>
-                            ) : state === "revealed" ? (
-                              <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: "#16a34a" }}>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                </svg>
-                                Done
-                              </span>
-                            ) : state === "not_scheduled" || state === "upcoming" || state === "reveal_scheduled" ? (
-                              <button
-                                onClick={() => {
-                                  setScheduleEditWave(w);
-                                  setScheduleEditDate(w.reveal_scheduled_at ? new Date(w.reveal_scheduled_at).toISOString().slice(0, 16) : "");
-                                  setScheduleEditErr(null);
-                                }}
-                                className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg"
-                                style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed", border: "1px solid rgba(124,58,237,0.2)" }}>
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                {w.reveal_scheduled_at ? "Edit Date" : "Set Date"}
-                              </button>
-                            ) : (
-                              <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* How reveals work */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[
-              {
-                icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
-                color: "#41afeb",
-                title: "1. Set Reveal Date",
-                desc: "Click \"Set Date\" in the wave row below to schedule each wave's reveal. The date is announced to your community and triggers the alert when it arrives.",
-              },
-              {
-                icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
-                color: "#d97706",
-                title: "2. Receive Alert",
-                desc: "When the reveal date arrives, this tab shows a \"Ready to Reveal\" alert. No action happens automatically.",
-              },
-              {
-                icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z",
-                color: "#7c3aed",
-                title: "3. Admin Confirms",
-                desc: "Admin clicks \"Reveal Now\", enters the IPFS URI, ticks the confirmation checkbox, and submits the transaction.",
-              },
-            ].map(item => (
-              <div key={item.title} className="bg-white rounded-2xl p-4 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 rounded-xl" style={{ background: `${item.color}15`, flexShrink: 0 }}>
-                    <svg className="w-4 h-4" style={{ color: item.color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-                    </svg>
-                  </div>
-                  <h3 className="text-xs font-bold" style={{ color: "#24315f" }}>{item.title}</h3>
-                </div>
-                <p className="text-xs leading-relaxed" style={{ color: "#6b7280" }}>{item.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Inline reveal-date editor modal */}
-          {scheduleEditWave && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
-              <div className="bg-white rounded-2xl shadow-xl" style={{ width: "100%", maxWidth: 420, border: "1px solid #e5e7eb" }}>
-                <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid #e5e7eb" }}>
-                  <div>
-                    <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>
-                      Set Reveal Date — W{scheduleEditWave.wave_number} {scheduleEditWave.wave_name}
-                    </h2>
-                    <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
-                      Choose when this wave will be revealed to holders
-                    </p>
-                  </div>
-                  <button onClick={() => setScheduleEditWave(null)} style={{ color: "#9bafc5" }}>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <div className="px-6 py-5 space-y-4">
-                  {scheduleEditErr && <ErrBanner msg={scheduleEditErr} onDismiss={() => setScheduleEditErr(null)} />}
-                  <div>
-                    <label className="block text-xs font-semibold mb-1.5" style={{ color: "#374151" }}>
-                      Reveal Date &amp; Time
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={scheduleEditDate}
-                      onChange={e => setScheduleEditDate(e.target.value)}
-                      className="w-full rounded-lg px-3 py-2 text-sm"
-                      style={{ border: "1px solid #d1d5db", outline: "none" }}
-                    />
-                    <p className="text-xs mt-1.5" style={{ color: "#9bafc5" }}>
-                      This date is shown to your community. The actual on-chain reveal tx runs when you click &quot;Reveal Now&quot;.
-                    </p>
-                  </div>
-                  <div className="flex gap-3 pt-1">
-                    <button
-                      onClick={() => setScheduleEditWave(null)}
-                      className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
-                      style={{ border: "1px solid #e5e7eb", color: "#6b7280", background: "white" }}>
-                      Cancel
-                    </button>
-                    <button
-                      onClick={saveRevealDate}
-                      disabled={scheduleEditSaving || !scheduleEditDate}
-                      className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white"
-                      style={{ background: scheduleEditSaving || !scheduleEditDate ? "#9bafc5" : "#7c3aed", cursor: scheduleEditSaving || !scheduleEditDate ? "not-allowed" : "pointer" }}>
-                      {scheduleEditSaving ? "Saving…" : "Save Reveal Date"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Reveal modals */}
-          {revealWave && (
-            <RevealModal
-              wave={revealWave}
-              onClose={() => setRevealWave(null)}
-              onSuccess={(txHash) => handleRevealSuccess(txHash, revealWave.wave_number)}
-            />
-          )}
-          {revealSuccessData && (
-            <SuccessModal
-              txHash={revealSuccessData.txHash}
-              waveNum={revealSuccessData.waveNum}
-              onClose={() => setRevealSuccessData(null)}
-            />
-          )}
-        </>
-      )}
-
       {activeTab === "whitelist"      && <WhitelistTab />}
       {activeTab === "packs"          && <PacksTab />}
       {activeTab === "collaborations" && <CollaborationsTab />}
+
+      {/* ── Reveal Date Editor Modal ─────────────────────────────────────── */}
+      {scheduleEditWave && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
+          <div className="bg-white rounded-2xl shadow-xl" style={{ width: "100%", maxWidth: 420, border: "1px solid #e5e7eb" }}>
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid #e5e7eb" }}>
+              <div>
+                <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>
+                  Set Reveal Date — W{scheduleEditWave.wave_number} {scheduleEditWave.wave_name}
+                </h2>
+                <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
+                  Choose when this wave will be revealed to holders
+                </p>
+              </div>
+              <button onClick={() => setScheduleEditWave(null)} style={{ color: "#9bafc5" }}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {scheduleEditErr && <ErrBanner msg={scheduleEditErr} onDismiss={() => setScheduleEditErr(null)} />}
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: "#374151" }}>
+                  Reveal Date &amp; Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={scheduleEditDate}
+                  onChange={e => setScheduleEditDate(e.target.value)}
+                  className="w-full rounded-lg px-3 py-2 text-sm"
+                  style={{ border: "1px solid #d1d5db", outline: "none" }}
+                />
+                <p className="text-xs mt-1.5" style={{ color: "#9bafc5" }}>
+                  This date is shown to your community. The actual on-chain reveal tx runs when you click &quot;Reveal Now&quot;.
+                </p>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setScheduleEditWave(null)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+                  style={{ border: "1px solid #e5e7eb", color: "#6b7280", background: "white" }}>
+                  Cancel
+                </button>
+                <button
+                  onClick={saveRevealDate}
+                  disabled={scheduleEditSaving || !scheduleEditDate}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white"
+                  style={{ background: scheduleEditSaving || !scheduleEditDate ? "#9bafc5" : "#7c3aed", cursor: scheduleEditSaving || !scheduleEditDate ? "not-allowed" : "pointer" }}>
+                  {scheduleEditSaving ? "Saving…" : "Save Reveal Date"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reveal Modals ────────────────────────────────────────────────── */}
+      {revealWave && (
+        <RevealModal
+          wave={revealWave}
+          onClose={() => setRevealWave(null)}
+          onSuccess={(txHash) => handleRevealSuccess(txHash, revealWave.wave_number)}
+        />
+      )}
+      {revealSuccessData && (
+        <SuccessModal
+          txHash={revealSuccessData.txHash}
+          waveNum={revealSuccessData.waveNum}
+          onClose={() => setRevealSuccessData(null)}
+        />
+      )}
 
       {/* ── Treasury Move Modal ─────────────────────────────────────────────── */}
       {treasuryMoveWave && (
@@ -1680,11 +1461,18 @@ export default function WavesPage() {
         />
       )}
 
-      {/* ══ Manage Modal (unified Settings + Blockchain tabs) ═══════════════════ */}
+      {/* ══ Manage Modal ═══════════════════════════════════════════════════════ */}
       {editWave && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
-          <div className="bg-white rounded-2xl shadow-xl flex flex-col"
-            style={{ width: "100%", maxWidth: 580, maxHeight: "92vh", border: "1px solid #e5e7eb" }}>
+          <div className="bg-white shadow-xl flex flex-col transition-all duration-200"
+            style={{
+              width: "100%",
+              maxWidth: manageMaximized ? "98vw" : 580,
+              maxHeight: manageMaximized ? "97vh" : "92vh",
+              height: manageMaximized ? "97vh" : undefined,
+              borderRadius: manageMaximized ? "12px" : "16px",
+              border: "1px solid #e5e7eb",
+            }}>
 
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
@@ -1697,39 +1485,37 @@ export default function WavesPage() {
                   <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>{editWave.name}</h2>
                 </div>
                 <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
-                  Settings tab for daily config · Blockchain tab for on-chain actions
+                  Configure wave settings and push on-chain actions
                 </p>
               </div>
-              <button onClick={closeManage} style={{ color: "#9bafc5" }}>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Tab bar */}
-            <div className="flex flex-shrink-0 px-6" style={{ borderBottom: "1px solid #e5e7eb" }}>
-              {(["settings", "blockchain"] as const).map(t => (
-                <button key={t} onClick={() => setManageTab(t)}
-                  className="flex items-center gap-1.5 py-3 text-sm mr-4 transition-colors"
-                  style={manageTab === t
-                    ? { color: "#24315f", borderBottom: "2px solid #41afeb", fontWeight: 700, marginBottom: -1 }
-                    : { color: "#9bafc5", borderBottom: "2px solid transparent", fontWeight: 600, marginBottom: -1 }}>
-                  {t === "settings" ? (
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  onClick={() => setManageMaximized(m => !m)}
+                  title={manageMaximized ? "Restore" : "Maximize"}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
+                  style={{ color: "#9bafc5", border: "1px solid #e5e7eb" }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "#f3f4f6"; e.currentTarget.style.color = "#374151"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#9bafc5"; }}>
+                  {manageMaximized ? (
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
                     </svg>
                   ) : (
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                     </svg>
                   )}
-                  {t === "settings" ? "Settings" : "Blockchain"}
                 </button>
-              ))}
+                <button onClick={closeManage} style={{ color: "#9bafc5" }}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
-            {/* ── Settings Tab ── */}
-            {manageTab === "settings" && <><div className="px-6 py-4 overflow-y-auto flex-1 space-y-4">
+
+            {/* Single scrollable body */}
+            <div className="px-6 py-4 overflow-y-auto flex-1 space-y-4">
               {saveError && (
                 <div className="p-3 rounded-lg text-sm" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>
                   {saveError}
@@ -1798,7 +1584,7 @@ export default function WavesPage() {
                   <label style={{ ...labelStyle, marginBottom: 0 }}>Wave Schedule</label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={form.clearSchedule}
-                      onChange={e => setForm({ ...form, clearSchedule: e.target.checked, scheduledStart: "", scheduledEnd: "", revealScheduledAt: "" })} />
+                      onChange={e => setForm({ ...form, clearSchedule: e.target.checked, scheduledStart: "", scheduledEnd: "" })} />
                     <span className="text-xs" style={{ color: "#9bafc5" }}>Clear all dates</span>
                   </label>
                 </div>
@@ -1817,18 +1603,6 @@ export default function WavesPage() {
                   </div>
                 )}
               </div>
-
-              {/* Reveal Date */}
-              {!form.clearSchedule && (
-                <div className="p-3 rounded-xl" style={{ background: "rgba(124,58,237,0.04)", border: "1px solid rgba(124,58,237,0.2)" }}>
-                  <label style={{ ...labelStyle, color: "#7c3aed" }}>Reveal Date (auto-reveal on this date)</label>
-                  <input type="datetime-local" value={form.revealScheduledAt}
-                    onChange={e => setForm({ ...form, revealScheduledAt: e.target.value })} style={inputStyle} />
-                  <p className="text-xs mt-1.5" style={{ color: "#9bafc5" }}>
-                    System auto-reveals on this date. NFTs are randomly assigned to buyers at reveal time.
-                  </p>
-                </div>
-              )}
 
               {/* Notes */}
               <div>
@@ -1874,227 +1648,220 @@ export default function WavesPage() {
                   </button>
                 </div>
               </div>
-            </div>
 
-            <div className="flex justify-end gap-3 px-6 py-4 flex-shrink-0" style={{ borderTop: "1px solid #e5e7eb" }}>
-              <button onClick={closeManage} className="px-4 py-2 text-sm font-medium rounded-lg"
-                style={{ border: "1px solid #e5e7eb", color: "#6b7280" }}>Cancel</button>
-              <button onClick={handleSave} disabled={saving}
-                className="px-4 py-2 text-sm font-bold text-white rounded-lg"
-                style={{ background: saving ? "#9bafc5" : "#41afeb" }}>
-                {saving ? "Saving…" : "Save Settings"}
-              </button>
-            </div></>}
-
-            {/* ── Blockchain Tab ── */}
-            {manageTab === "blockchain" && <>
-              {/* Gas cost warning banner */}
-              <div className="mx-6 mt-4 flex items-start gap-3 px-4 py-3 rounded-xl flex-shrink-0"
+              {/* ── On-Chain Actions ── */}
+              <div className="flex items-start gap-3 px-4 py-3 rounded-xl"
                 style={{ background: "rgba(217,119,6,0.07)", border: "1px solid rgba(217,119,6,0.25)" }}>
                 <svg className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "#d97706" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <p className="text-xs leading-relaxed" style={{ color: "#92400e" }}>
-                  <strong style={{ color: "#d97706" }}>These actions submit blockchain transactions.</strong> Each costs gas, requires wallet approval, and cannot be undone. Use the <strong>Settings</strong> tab for routine price and schedule changes.
-                </p>
-              </div>
-              <div className="px-6 py-4 overflow-y-auto flex-1 space-y-5">
-                {chainLoading && (
-                  <div className="flex items-center gap-2 text-xs" style={{ color: "#9bafc5" }}>
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Reading on-chain state…
-                  </div>
-                )}
-
-                {chainOnChain && (
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { label: "Minted",   value: `${chainOnChain.soldCount} / ${chainOnChain.qty}` },
-                      { label: "Price",    value: `${chainOnChain.price} ETH` },
-                      { label: "Closed",   value: chainOnChain.closed ? "Yes" : "No" },
-                    ].map(s => (
-                      <div key={s.label} className="p-3 rounded-xl text-center" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                        <p className="text-xs" style={{ color: "#9bafc5" }}>{s.label}</p>
-                        <p className="font-bold text-sm mt-0.5" style={{ color: "#24315f" }}>{s.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {chainTx    && <SharedTxBanner txHash={chainTx} />}
-                {chainError && <ErrBanner msg={chainError} onDismiss={() => setChainError(null)} />}
-
-                {/* 1 — Set Schedule */}
-                <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                  <p className="text-xs font-bold" style={{ color: "#24315f" }}>1. Push Wave Schedule On-Chain</p>
-                  <p className="text-xs" style={{ color: "#9bafc5" }}>Manually push wave start/end to the contract. The system auto-does this when the scheduled date arrives.</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label style={labelStyle}>Start Time</label>
-                      <input type="datetime-local" value={chainStart} onChange={e => setChainStart(e.target.value)} style={inputStyle} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>End Time</label>
-                      <input type="datetime-local" value={chainEnd}  onChange={e => setChainEnd(e.target.value)}   style={inputStyle} />
-                    </div>
-                  </div>
-                  <button onClick={handleSetScheduleOnChain} disabled={chainSaving === "schedule"}
-                    className="px-4 py-2 text-xs font-bold text-white rounded-lg"
-                    style={{ background: chainSaving === "schedule" ? "#9bafc5" : "#41afeb" }}>
-                    {chainSaving === "schedule" ? "Submitting…" : "Push Schedule to Chain"}
-                  </button>
+                <div>
+                  <p className="text-xs font-bold mb-0.5" style={{ color: "#d97706" }}>On-Chain Actions</p>
+                  <p className="text-xs leading-relaxed" style={{ color: "#92400e" }}>
+                    Each action submits a blockchain transaction. Costs gas, requires wallet approval, and cannot be undone.
+                  </p>
                 </div>
-
-                {/* 2 — Set Price */}
-                {!editWave.priceLocked && editWave.waveNumber > 1 && (
-                  <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                    <p className="text-xs font-bold" style={{ color: "#24315f" }}>2. Update Wave Price On-Chain</p>
-                    <p className="text-xs" style={{ color: "#9bafc5" }}>Only allowed before first sale in this wave.</p>
-                    <div className="flex gap-2 items-end">
-                      <div className="flex-1">
-                        <label style={labelStyle}>Price (ETH)</label>
-                        <input type="number" step="0.0001" min="0" value={chainPrice}
-                          onChange={e => setChainPrice(e.target.value)} style={inputStyle} />
-                      </div>
-                      <button onClick={handleSetPriceOnChain} disabled={chainSaving === "price"}
-                        className="px-4 py-2 text-xs font-bold text-white rounded-lg flex-shrink-0"
-                        style={{ background: chainSaving === "price" ? "#9bafc5" : "#41afeb" }}>
-                        {chainSaving === "price" ? "Submitting…" : "Set Price"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {editWave.priceLocked && (
-                  <div className="px-4 py-3 rounded-xl text-xs" style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
-                    Price is locked — first sale has already occurred in this wave.
-                  </div>
-                )}
-
-                {/* 3 — Auction Listing (Waves 3–7) */}
-                {editWave.waveNumber >= 3 && !chainOnChain?.closed && (
-                  <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                    <p className="text-xs font-bold" style={{ color: "#24315f" }}>3. Record OpenSea Auction Listing</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label style={labelStyle}>OpenSea Listing ID</label>
-                        <input type="text" value={auctionListingId} onChange={e => setAuctionListingId(e.target.value)}
-                          style={inputStyle} placeholder="listing-id from OpenSea" />
-                      </div>
-                      <div>
-                        <label style={labelStyle}>Start Price (ETH)</label>
-                        <input type="number" step="0.001" value={auctionStartPrice} onChange={e => setAuctionStartPrice(e.target.value)}
-                          style={inputStyle} placeholder="0.0303" />
-                      </div>
-                    </div>
-                    <button onClick={handleSaveAuctionListing} disabled={chainSaving === "auction"}
-                      className="px-4 py-2 text-xs font-bold text-white rounded-lg"
-                      style={{ background: chainSaving === "auction" ? "#9bafc5" : "#7c3aed" }}>
-                      {chainSaving === "auction" ? "Saving…" : "Save Auction Listing"}
-                    </button>
-                  </div>
-                )}
-
-                {/* 4 — Mint & Transfer (Waves 3–7) */}
-                {editWave.waveNumber >= 3 && !chainOnChain?.closed && (
-                  <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                    <p className="text-xs font-bold" style={{ color: "#24315f" }}>4. Mint & Transfer to Auction Winner</p>
-                    <p className="text-xs" style={{ color: "#9bafc5" }}>After OpenSea auction settles — mints the NFT directly to the winner.</p>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="col-span-2">
-                        <label style={labelStyle}>Winner Address</label>
-                        <input type="text" value={auctionTo} onChange={e => setAuctionTo(e.target.value)}
-                          style={inputStyle} placeholder="0x..." />
-                      </div>
-                      <div>
-                        <label style={labelStyle}>Qty</label>
-                        <input type="number" min="1" value={auctionQty} onChange={e => setAuctionQty(e.target.value)}
-                          style={inputStyle} />
-                      </div>
-                    </div>
-                    <button onClick={handleMintTransfer} disabled={chainSaving === "mint-transfer"}
-                      className="px-4 py-2 text-xs font-bold text-white rounded-lg"
-                      style={{ background: chainSaving === "mint-transfer" ? "#9bafc5" : "#41afeb" }}>
-                      {chainSaving === "mint-transfer" ? "Submitting tx…" : "Mint & Transfer On-Chain"}
-                    </button>
-                  </div>
-                )}
-
-                {/* 5 — Move Unsold to Wallet (requires wave closed + revealed) */}
-                {editWave.waveClosed && editWave.waveRevealed && (
-                  <div className="space-y-3 p-4 rounded-xl" style={{ background: "rgba(22,163,74,0.03)", border: "1px solid rgba(22,163,74,0.3)" }}>
-                    <p className="text-xs font-bold" style={{ color: "#16a34a" }}>5. Move Unsold NFTs to Wallet</p>
-                    <p className="text-xs" style={{ color: "#9bafc5" }}>
-                      Wave is closed and revealed. Transfer{" "}
-                      {(editWave.treasuryPendingCount ?? 0) > 0
-                        ? `${(editWave.treasuryPendingCount ?? 0).toLocaleString()} unsold NFTs`
-                        : "unsold NFTs"}{" "}
-                      to the treasury wallet or a custom wallet address.
-                    </p>
-                    <button
-                      onClick={() => {
-                        const wave = waves.find(w => w.waveNumber === editWave.waveNumber);
-                        if (wave) { closeManage(); setTreasuryMoveWave(wave); }
-                      }}
-                      disabled={(editWave.treasuryPendingCount ?? 0) === 0}
-                      className="px-4 py-2 text-xs font-bold rounded-xl"
-                      style={{
-                        background: (editWave.treasuryPendingCount ?? 0) === 0 ? "rgba(156,163,175,0.1)" : "rgba(22,163,74,0.08)",
-                        color: (editWave.treasuryPendingCount ?? 0) === 0 ? "#9bafc5" : "#16a34a",
-                        border: `1px solid ${(editWave.treasuryPendingCount ?? 0) === 0 ? "#e5e7eb" : "rgba(22,163,74,0.3)"}`,
-                        cursor: (editWave.treasuryPendingCount ?? 0) === 0 ? "not-allowed" : "pointer",
-                      }}>
-                      {(editWave.treasuryPendingCount ?? 0) === 0 ? "No Unsold NFTs" : "Move Unsold → Wallet"}
-                    </button>
-                  </div>
-                )}
-                {editWave.waveClosed && !editWave.waveRevealed && (
-                  <div className="px-4 py-3 rounded-xl text-xs"
-                    style={{ background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.25)", color: "#92400e" }}>
-                    Wave is closed but not yet revealed. Complete the reveal first before moving NFTs to wallet.
-                  </div>
-                )}
-                {!editWave.waveClosed && (
-                  <div className="space-y-2 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                    <p className="text-xs font-bold" style={{ color: "#9bafc5" }}>5. Move Unsold NFTs to Wallet</p>
-                    <p className="text-xs" style={{ color: "#d1d5db" }}>
-                      Available after wave is closed and revealed.
-                    </p>
-                  </div>
-                )}
-
-                {/* Reveal status */}
-                {editWave.waveRevealed ? (
-                  <div className="px-4 py-3 rounded-xl text-xs flex items-center gap-2"
-                    style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.3)", color: "#16a34a" }}>
-                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    This wave has been revealed
-                  </div>
-                ) : (
-                  <div className="px-4 py-3 rounded-xl text-xs flex items-center gap-2"
-                    style={{ background: "rgba(124,58,237,0.05)", border: "1px solid rgba(124,58,237,0.2)", color: "#7c3aed" }}>
-                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {editWave.revealScheduledAt
-                      ? `Reveal scheduled for ${new Date(editWave.revealScheduledAt).toLocaleString()} — system will auto-reveal`
-                      : "No reveal date set — use the Settings tab to set a reveal date"}
-                  </div>
-                )}
               </div>
-              <div className="px-6 py-4 flex-shrink-0" style={{ borderTop: "1px solid #e5e7eb" }}>
-                <button onClick={closeManage}
-                  className="px-4 py-2 text-sm font-medium rounded-lg w-full"
-                  style={{ border: "1px solid #e5e7eb", color: "#6b7280" }}>
-                  Close
+
+              {chainLoading && (
+                <div className="flex items-center gap-2 text-xs" style={{ color: "#9bafc5" }}>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Reading on-chain state…
+                </div>
+              )}
+
+              {chainOnChain && (
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: "Minted", value: `${chainOnChain.soldCount} / ${chainOnChain.qty}` },
+                    { label: "Price",  value: `${chainOnChain.price} ETH` },
+                    { label: "Closed", value: chainOnChain.closed ? "Yes" : "No" },
+                  ].map(s => (
+                    <div key={s.label} className="p-3 rounded-xl text-center" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                      <p className="text-xs" style={{ color: "#9bafc5" }}>{s.label}</p>
+                      <p className="font-bold text-sm mt-0.5" style={{ color: "#24315f" }}>{s.value}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {chainTx    && <SharedTxBanner txHash={chainTx} />}
+              {chainError && <ErrBanner msg={chainError} onDismiss={() => setChainError(null)} />}
+
+              {/* 1 — Push Schedule */}
+              <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                <p className="text-xs font-bold" style={{ color: "#24315f" }}>1. Push Wave Schedule On-Chain</p>
+                <p className="text-xs" style={{ color: "#9bafc5" }}>Manually push wave start/end to the contract. The system auto-does this when the scheduled date arrives.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-2.5 rounded-lg" style={{ background: "#f3f4f6", border: "1px solid #e5e7eb" }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#9bafc5" }}>Start (from DB)</p>
+                    <p className="text-xs font-semibold" style={{ color: "#374151" }}>
+                      {editWave?.scheduledStart ? new Date(editWave.scheduledStart).toLocaleString() : <span style={{ color: "#d1d5db" }}>Not set</span>}
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-lg" style={{ background: "#f3f4f6", border: "1px solid #e5e7eb" }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#9bafc5" }}>End (from DB)</p>
+                    <p className="text-xs font-semibold" style={{ color: "#374151" }}>
+                      {editWave?.scheduledEnd ? new Date(editWave.scheduledEnd).toLocaleString() : <span style={{ color: "#d1d5db" }}>Not set</span>}
+                    </p>
+                  </div>
+                </div>
+                <button onClick={handleSetScheduleOnChain} disabled={chainSaving === "schedule"}
+                  className="px-4 py-2 text-xs font-bold text-white rounded-lg"
+                  style={{ background: chainSaving === "schedule" ? "#9bafc5" : "#41afeb" }}>
+                  {chainSaving === "schedule" ? "Submitting…" : "Push Schedule to Chain"}
                 </button>
               </div>
-            </>}
+
+              {/* 2 — Set Price */}
+              {!editWave.priceLocked && editWave.waveNumber > 1 && (
+                <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                  <p className="text-xs font-bold" style={{ color: "#24315f" }}>2. Update Wave Price On-Chain</p>
+                  <p className="text-xs" style={{ color: "#9bafc5" }}>Only allowed before first sale in this wave.</p>
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <label style={labelStyle}>Price (ETH)</label>
+                      <input type="number" step="0.0001" min="0" value={chainPrice}
+                        onChange={e => setChainPrice(e.target.value)} style={inputStyle} />
+                    </div>
+                    <button onClick={handleSetPriceOnChain} disabled={chainSaving === "price"}
+                      className="px-4 py-2 text-xs font-bold text-white rounded-lg flex-shrink-0"
+                      style={{ background: chainSaving === "price" ? "#9bafc5" : "#41afeb" }}>
+                      {chainSaving === "price" ? "Submitting…" : "Set Price"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {editWave.priceLocked && (
+                <div className="px-4 py-3 rounded-xl text-xs" style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
+                  Price is locked — first sale has already occurred in this wave.
+                </div>
+              )}
+
+              {/* 3 — Auction Listing (Waves 3–7) */}
+              {editWave.waveNumber >= 3 && !chainOnChain?.closed && (
+                <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                  <p className="text-xs font-bold" style={{ color: "#24315f" }}>3. Record OpenSea Auction Listing</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label style={labelStyle}>OpenSea Listing ID</label>
+                      <input type="text" value={auctionListingId} onChange={e => setAuctionListingId(e.target.value)}
+                        style={inputStyle} placeholder="listing-id from OpenSea" />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Start Price (ETH)</label>
+                      <input type="number" step="0.001" value={auctionStartPrice} onChange={e => setAuctionStartPrice(e.target.value)}
+                        style={inputStyle} placeholder="0.0303" />
+                    </div>
+                  </div>
+                  <button onClick={handleSaveAuctionListing} disabled={chainSaving === "auction"}
+                    className="px-4 py-2 text-xs font-bold text-white rounded-lg"
+                    style={{ background: chainSaving === "auction" ? "#9bafc5" : "#7c3aed" }}>
+                    {chainSaving === "auction" ? "Saving…" : "Save Auction Listing"}
+                  </button>
+                </div>
+              )}
+
+              {/* 4 — Mint & Transfer (Waves 3–7) */}
+              {editWave.waveNumber >= 3 && !chainOnChain?.closed && (
+                <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                  <p className="text-xs font-bold" style={{ color: "#24315f" }}>4. Mint & Transfer to Auction Winner</p>
+                  <p className="text-xs" style={{ color: "#9bafc5" }}>After OpenSea auction settles — mints the NFT directly to the winner.</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
+                      <label style={labelStyle}>Winner Address</label>
+                      <input type="text" value={auctionTo} onChange={e => setAuctionTo(e.target.value)}
+                        style={inputStyle} placeholder="0x..." />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Qty</label>
+                      <input type="number" min="1" value={auctionQty} onChange={e => setAuctionQty(e.target.value)}
+                        style={inputStyle} />
+                    </div>
+                  </div>
+                  <button onClick={handleMintTransfer} disabled={chainSaving === "mint-transfer"}
+                    className="px-4 py-2 text-xs font-bold text-white rounded-lg"
+                    style={{ background: chainSaving === "mint-transfer" ? "#9bafc5" : "#41afeb" }}>
+                    {chainSaving === "mint-transfer" ? "Submitting tx…" : "Mint & Transfer On-Chain"}
+                  </button>
+                </div>
+              )}
+
+              {/* 5 — Move Unsold to Wallet */}
+              {editWave.waveClosed && editWave.waveRevealed ? (
+                <div className="space-y-3 p-4 rounded-xl" style={{ background: "rgba(22,163,74,0.03)", border: "1px solid rgba(22,163,74,0.3)" }}>
+                  <p className="text-xs font-bold" style={{ color: "#16a34a" }}>5. Move Unsold NFTs to Wallet</p>
+                  <p className="text-xs" style={{ color: "#9bafc5" }}>
+                    Wave is closed and revealed. Transfer{" "}
+                    {(editWave.treasuryPendingCount ?? 0) > 0
+                      ? `${(editWave.treasuryPendingCount ?? 0).toLocaleString()} unsold NFTs`
+                      : "unsold NFTs"}{" "}
+                    to the treasury wallet or a custom wallet address.
+                  </p>
+                  <button
+                    onClick={() => {
+                      const wave = waves.find(w => w.waveNumber === editWave.waveNumber);
+                      if (wave) { closeManage(); setTreasuryMoveWave(wave); }
+                    }}
+                    disabled={(editWave.treasuryPendingCount ?? 0) === 0}
+                    className="px-4 py-2 text-xs font-bold rounded-xl"
+                    style={{
+                      background: (editWave.treasuryPendingCount ?? 0) === 0 ? "rgba(156,163,175,0.1)" : "rgba(22,163,74,0.08)",
+                      color: (editWave.treasuryPendingCount ?? 0) === 0 ? "#9bafc5" : "#16a34a",
+                      border: `1px solid ${(editWave.treasuryPendingCount ?? 0) === 0 ? "#e5e7eb" : "rgba(22,163,74,0.3)"}`,
+                      cursor: (editWave.treasuryPendingCount ?? 0) === 0 ? "not-allowed" : "pointer",
+                    }}>
+                    {(editWave.treasuryPendingCount ?? 0) === 0 ? "No Unsold NFTs" : "Move Unsold → Wallet"}
+                  </button>
+                </div>
+              ) : editWave.waveClosed && !editWave.waveRevealed ? (
+                <div className="px-4 py-3 rounded-xl text-xs"
+                  style={{ background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.25)", color: "#92400e" }}>
+                  Wave is closed but not yet revealed. Complete the reveal first before moving NFTs to wallet.
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                  <p className="text-xs font-bold" style={{ color: "#9bafc5" }}>5. Move Unsold NFTs to Wallet</p>
+                  <p className="text-xs mt-1" style={{ color: "#d1d5db" }}>Available after wave is closed and revealed.</p>
+                </div>
+              )}
+
+              {/* Reveal status */}
+              {editWave.waveRevealed ? (
+                <div className="px-4 py-3 rounded-xl text-xs flex items-center gap-2"
+                  style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.3)", color: "#16a34a" }}>
+                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  This wave has been revealed
+                </div>
+              ) : (
+                <div className="px-4 py-3 rounded-xl text-xs flex items-center gap-2"
+                  style={{ background: "rgba(124,58,237,0.05)", border: "1px solid rgba(124,58,237,0.2)", color: "#7c3aed" }}>
+                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {editWave.revealScheduledAt
+                    ? `Reveal scheduled for ${new Date(editWave.revealScheduledAt).toLocaleString()} — system will auto-reveal`
+                    : `No reveal date set — use the "Set Date" button in the Waves table`}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-3 px-6 py-4 flex-shrink-0" style={{ borderTop: "1px solid #e5e7eb" }}>
+              <button onClick={closeManage} className="px-4 py-2 text-sm font-medium rounded-lg"
+                style={{ border: "1px solid #e5e7eb", color: "#6b7280" }}>Close</button>
+              <button onClick={handleSave} disabled={saving}
+                className="px-4 py-2 text-sm font-bold text-white rounded-lg"
+                style={{ background: saving ? "#9bafc5" : "#41afeb" }}>
+                {saving ? "Saving…" : "Save Settings"}
+              </button>
+            </div>
           </div>
         </div>
       )}

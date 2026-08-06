@@ -252,7 +252,7 @@ test.describe("Phase 2.5 — Customer Minting (All 7 Waves)", () => {
 
   // ─── P25-03: CW1 — whitelist free mint in Wave 1 ─────────────────────────
   test("P25-03: CW1 whitelistMint — 1 free NFT in Wave 1", async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(600_000); // 10 min — Wave 1 may still be opening (starts T0+5 from Phase 02)
     const CW1_KEY = process.env.CW1_PRIVATE_KEY;
     expect(CW1_KEY, "CW1_PRIVATE_KEY must be set in tests/.env.test").toBeTruthy();
 
@@ -261,6 +261,7 @@ test.describe("Phase 2.5 — Customer Minting (All 7 Waves)", () => {
       await cwPage.goto(`${CUSTOMER_URL}/mint`);
       await cwPage.waitForLoadState("networkidle");
       await connectWalletViaPrivy(cwPage);
+      await waitForWaveActive(cwPage, 1, 600_000); // Wave 1 starts T0+5 min from Phase 02 load
       await mintViaUI(cwPage, 1, "free");
       console.log("P25-03: CW1 minted 1 free NFT (Wave 1) ✓");
     } finally {

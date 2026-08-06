@@ -558,21 +558,44 @@ export default function DashboardPage() {
         </div>
       ) : stats ? (
         <div className="space-y-5">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {/* Current Phase */}
             <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
               <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Current Phase</p>
               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-semibold ${PHASE_COLORS[stats.phase ?? 0] ?? "bg-slate-100 text-slate-600"}`}>
                 {stats.phaseName ?? PHASE_LABELS[stats.phase ?? 0] ?? "Unknown"}
               </span>
             </div>
-            <StatCard label="Total Minted" value={`${stats.totalMinted} / ${stats.maxSupply}`}
-              sub={`${stats.mintProgress}% · ${stats.remaining} remaining`} />
-            <StatCard label="Whitelist Mint (Wave 1)" value={stats.whitelistMint.soldCount}
-              sub={`of ${stats.whitelistMint.quantity} allocated${stats.whitelistMint.closed ? " · Closed" : ""}`} />
-            <StatCard label="Whitelist Size" value={wlCount !== null ? wlCount.toLocaleString() : "—"}
-              sub="Addresses in DB (Wave 1 free)" />
-            <StatCard label="Paid Mint (Waves 2–7)" value={stats.paidMint.soldCount}
-              sub={`of ${stats.paidMint.quantity} allocated${stats.paidMint.priceEth ? ` · ${stats.paidMint.priceEth} ETH` : ""}`} />
+
+            {/* Total Minted — with progress bar */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Total Minted</p>
+              <p className="text-2xl font-bold text-slate-900">
+                {stats.totalMinted.toLocaleString()}
+                <span className="text-sm font-medium text-slate-400"> / {stats.maxSupply.toLocaleString()}</span>
+              </p>
+              <div className="mt-2.5 h-1.5 rounded-full overflow-hidden bg-slate-100">
+                <div className="h-full rounded-full" style={{ width: `${Math.min(100, stats.mintProgress)}%`, background: "#41afeb" }} />
+              </div>
+              <p className="text-xs text-slate-400 mt-1">{stats.mintProgress}% · {stats.remaining.toLocaleString()} remaining</p>
+            </div>
+
+            {/* Wave 1 Whitelist — merged */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Wave 1 Whitelist</p>
+              <p className="text-2xl font-bold text-slate-900">{stats.whitelistMint.soldCount.toLocaleString()}</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                minted of {stats.whitelistMint.quantity.toLocaleString()}{stats.whitelistMint.closed ? " · Closed" : ""}
+              </p>
+              {wlCount !== null && (
+                <p className="text-xs mt-1.5 font-semibold" style={{ color: "#41afeb" }}>
+                  {wlCount.toLocaleString()} addresses in whitelist
+                </p>
+              )}
+            </div>
+
+            <StatCard label="Paid Mint (Waves 2–7)" value={stats.paidMint.soldCount.toLocaleString()}
+              sub={`of ${stats.paidMint.quantity.toLocaleString()} allocated${stats.paidMint.priceEth ? ` · ${stats.paidMint.priceEth} ETH` : ""}`} />
             <StatCard label="Reveal Status"
               value={stats.isRevealed ? "Revealed" : `${stats.revealed} Waves`}
               accent={stats.isRevealed || stats.revealed > 0 ? "text-emerald-700" : "text-slate-500"}
@@ -622,11 +645,32 @@ export default function DashboardPage() {
 
       {/* ── Minted NFTs ── */}
       <div className="space-y-5">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <h2 className="text-base font-bold text-slate-900">
-            Minted NFTs{totalTokens > 0 ? ` (${totalTokens})` : ""}
-          </h2>
-          <div className="flex items-center gap-2">
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">
+              Minted NFTs{totalTokens > 0 ? ` (${totalTokens.toLocaleString()})` : ""}
+            </h2>
+            {tokenStats.total > 0 && (
+              <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                {([
+                  { label: "WL Free",   value: tokenStats.wave1,     color: "#2e9fd8", filter: () => { setWaveFilter("1");    setRevealFilter("all"); setRarityFilter("all"); setSearch(""); setPage(1); } },
+                  { label: "Paid",      value: tokenStats.paid,      color: "#7c3aed", filter: () => { setWaveFilter("paid"); setRevealFilter("all"); setRarityFilter("all"); setSearch(""); setPage(1); } },
+                  { label: "Admin",     value: tokenStats.admin,     color: "#6b7280", filter: () => { setWaveFilter("0");    setRevealFilter("all"); setRarityFilter("all"); setSearch(""); setPage(1); } },
+                  { label: "Legendary", value: tokenStats.legendary, color: "#d97706", filter: () => { setRarityFilter("Legendary"); setWaveFilter("all"); setRevealFilter("all"); setSearch(""); setPage(1); } },
+                  { label: "Epic",      value: tokenStats.epic,      color: "#7c3aed", filter: () => { setRarityFilter("Epic");  setWaveFilter("all"); setRevealFilter("all"); setSearch(""); setPage(1); } },
+                  { label: "Rare",      value: tokenStats.rare,      color: "#3b82f6", filter: () => { setRarityFilter("Rare");  setWaveFilter("all"); setRevealFilter("all"); setSearch(""); setPage(1); } },
+                  { label: "Common",    value: tokenStats.common,    color: "#9bafc5", filter: () => { setRarityFilter("Common"); setWaveFilter("all"); setRevealFilter("all"); setSearch(""); setPage(1); } },
+                ] as const).map(c => (
+                  <button key={c.label} onClick={c.filter}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold transition-all"
+                    style={{ background: `${c.color}12`, color: c.color, border: `1px solid ${c.color}30` }}>
+                    {c.label} <span className="font-bold">{c.value}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
             {tokens.length > 0 && (
               <button onClick={exportCSV}
                 className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg"
@@ -643,27 +687,6 @@ export default function DashboardPage() {
               Refresh
             </button>
           </div>
-        </div>
-
-        {/* Summary filter cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-          {([
-            { label: "Total",     value: tokenStats.total,     color: "#24315f", active: !hasActiveFilter,         onClick: clearFilters },
-            { label: "WL Free",   value: tokenStats.wave1,     color: "#2e9fd8", active: waveFilter === "1",       onClick: () => { setWaveFilter("1");    setRevealFilter("all"); setRarityFilter("all"); setSearch(""); setPage(1); } },
-            { label: "Paid",      value: tokenStats.paid,      color: "#7c3aed", active: waveFilter === "paid",    onClick: () => { setWaveFilter("paid"); setRevealFilter("all"); setRarityFilter("all"); setSearch(""); setPage(1); } },
-            { label: "Admin",     value: tokenStats.admin,     color: "#6b7280", active: waveFilter === "0",       onClick: () => { setWaveFilter("0");    setRevealFilter("all"); setRarityFilter("all"); setSearch(""); setPage(1); } },
-            { label: "Revealed",  value: tokenStats.revealed,  color: "#059669", active: revealFilter === "revealed", onClick: () => { setRevealFilter("revealed"); setWaveFilter("all"); setRarityFilter("all"); setSearch(""); setPage(1); } },
-            { label: "Legendary", value: tokenStats.legendary, color: "#d97706", active: rarityFilter === "Legendary", onClick: () => { setRarityFilter("Legendary"); setWaveFilter("all"); setRevealFilter("all"); setSearch(""); setPage(1); } },
-            { label: "Epic",      value: tokenStats.epic,      color: "#7c3aed", active: rarityFilter === "Epic",  onClick: () => { setRarityFilter("Epic");  setWaveFilter("all"); setRevealFilter("all"); setSearch(""); setPage(1); } },
-            { label: "Rare",      value: tokenStats.rare,      color: "#3b82f6", active: rarityFilter === "Rare",  onClick: () => { setRarityFilter("Rare");  setWaveFilter("all"); setRevealFilter("all"); setSearch(""); setPage(1); } },
-          ] as const).map(c => (
-            <button key={c.label} onClick={c.onClick}
-              className="bg-white rounded-xl p-3 shadow-sm text-left transition-all"
-              style={{ border: c.active ? `2px solid ${c.color}` : "1px solid #e5e7eb" }}>
-              <p className="text-xs mb-1 font-medium" style={{ color: c.active ? c.color : "#9bafc5" }}>{c.label}</p>
-              <p className="text-xl font-bold" style={{ color: c.color }}>{c.value}</p>
-            </button>
-          ))}
         </div>
 
         {nftError && (

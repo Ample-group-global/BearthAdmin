@@ -14,21 +14,37 @@
 import { FullConfig, chromium } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
+import http from 'http';
+import https from 'https';
 
 const EMAIL     = 'amplecapitalholding@gmail.com';
 const PASS      = 'amplecapitalholding@123';
 const TECH_AUTH = path.join(process.cwd(), 'tests', '.auth', 'tech.json');
 
+function httpGet(url: string, timeoutMs: number): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const lib = url.startsWith('https') ? https : http;
+    const req = lib.get(url, { timeout: timeoutMs }, (res) => {
+      res.resume();
+      resolve(res.statusCode ?? 0);
+    });
+    req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    req.on('error', reject);
+  });
+}
+
 async function waitForService(url: string, label: string, timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-      if (res.status < 600) {
-        console.log(`[phases-setup] ${label} ready (HTTP ${res.status})`);
+      const status = await httpGet(url, 5000);
+      if (status > 0 && status < 600) {
+        console.log(`[phases-setup] ${label} ready (HTTP ${status})`);
         return;
       }
-    } catch { /* not ready yet */ }
+    } catch (e: any) {
+      console.log(`[phases-setup] ${label} not ready yet: ${e.message}`);
+    }
     await new Promise(r => setTimeout(r, 2000));
   }
   throw new Error(`[phases-setup] ${label} did not become ready within ${timeoutMs / 1000}s. URL: ${url}`);
@@ -36,6 +52,18 @@ async function waitForService(url: string, label: string, timeoutMs = 60_000): P
 
 export default async function globalSetupPhases(config: FullConfig): Promise<void> {
   const baseURL = config.projects[0]?.use?.baseURL ?? 'http://localhost:3000';
+
+  // If a valid session already exists (from a prior run), skip service wait + re-login.
+  // The phase tests reuse this session; no need to recreate it each run.
+  if (fs.existsSync(TECH_AUTH)) {
+    try {
+      const stored = JSON.parse(fs.readFileSync(TECH_AUTH, 'utf8'));
+      if (Array.isArray(stored.cookies) && stored.cookies.length > 0) {
+        console.log('[phases-setup] Valid session found in tech.json — skipping re-login');
+        return;
+      }
+    } catch { /* invalid JSON — fall through to full setup */ }
+  }
 
   console.log(`[phases-setup] Checking BearthAdmin at ${baseURL}...`);
   await waitForService(`${baseURL}/login`, 'BearthAdmin');

@@ -20,23 +20,42 @@ DELETE FROM nft_wave_pool;
 
 -- 2. Reset wave scheduling (keep wave_number, qty, name — clear timing + reveal state)
 UPDATE nft_waves SET
-  status              = 'upcoming',
-  scheduled_start     = NULL,
-  scheduled_end       = NULL,
-  reveal_scheduled_at = NULL,
-  is_revealed         = FALSE,
-  wave_starting_index = NULL,
-  sold_count          = 0,
-  treasury_count      = 0,
-  wave_closed         = FALSE;
+  status                = 'upcoming',
+  scheduled_start       = NULL,
+  scheduled_end         = NULL,
+  reveal_scheduled_at   = NULL,
+  is_revealed           = FALSE,
+  wave_revealed         = FALSE,
+  wave_revealed_at      = NULL,
+  wave_starting_index   = NULL,
+  starting_index        = NULL,
+  sold_count            = 0,
+  treasury_minted_count = 0,
+  price_locked          = FALSE,
+  wave_closed           = FALSE,
+  wave_start_triggered  = FALSE,
+  wave_end_triggered    = FALSE,
+  wave_reveal_triggered = FALSE,
+  vrf_request_id        = NULL,
+  vrf_requested_at      = NULL,
+  vrf_fulfilled_at      = NULL,
+  last_tx_hash          = NULL;
 
 -- 3. Reset nft_records to pre-mint state
---    wave_number stays (serials are pre-assigned to waves in Filebase sync)
---    token_id, assigned_wallet, delivery_status all reset
+--    wave_id/serial_number stay (pre-assigned); mint + reveal state cleared
 UPDATE nft_records SET
-  delivery_status = 'pending',
-  token_id        = NULL,
-  assigned_wallet = NULL;
+  delivery_status_id = 'ba0b4232-c75f-4e22-8fa8-b85ec0ee6515', -- delivery_status: pending
+  token_id           = NULL,
+  owner_address      = NULL,
+  mint_tx_hash       = NULL,
+  minted_at          = NULL,
+  is_revealed        = FALSE,
+  revealed_at        = NULL,
+  on_chain_wave_num  = NULL,
+  token_wave         = NULL,
+  last_tx_hash       = NULL,
+  synced_at          = NULL,
+  mint_type          = 'paid';
 
 -- 4. Ensure contract address is correct in collection config
 UPDATE nft_collection_config

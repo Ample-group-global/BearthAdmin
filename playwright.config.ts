@@ -14,9 +14,9 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3000",
     actionTimeout: 5000,
-    trace: "off",
-    screenshot: "off",
-    video: "off",
+    trace: "on",
+    screenshot: "on",
+    video: "on",
     headless: false,
   },
   outputDir: path.join("tests", "results"),

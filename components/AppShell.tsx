@@ -81,6 +81,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [ctx, setCtx] = useState<UserCtx | null>(null);
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
 
@@ -122,6 +123,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       clearInterval(interval);
     };
   }, [router]);
+
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
 
   const toggleSection = (mod: string) => {
     setOpenSections(prev => {
@@ -171,10 +174,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen" style={{ background: "#f0f2f7", fontFamily: "'hoss-round', 'Figtree', system-ui, sans-serif" }}>
 
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 md:hidden"
+          style={{ background: "rgba(0,0,0,0.5)" }}
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside
-        className="flex-shrink-0 flex flex-col transition-all duration-200 ease-in-out overflow-hidden"
-        style={{ background: "#182035", width: collapsed ? "48px" : "210px", boxShadow: "2px 0 8px rgba(0,0,0,0.2)" }}
+        className={`
+          fixed inset-y-0 left-0 z-50
+          md:relative md:z-auto md:inset-auto md:translate-x-0
+          flex flex-col transition-transform duration-200 ease-in-out overflow-hidden
+          ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
+        `}
+        style={{ background: "#182035", width: collapsed ? "48px" : "210px", boxShadow: "2px 0 8px rgba(0,0,0,0.2)", flexShrink: 0 }}
       >
         {/* Brand */}
         {collapsed ? (
@@ -311,24 +328,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <header
-          className="flex-shrink-0 flex items-center justify-between px-5 bg-white"
+          className="flex-shrink-0 flex items-center justify-between px-3 sm:px-5 bg-white"
           style={{ height: "44px", borderBottom: "1px solid #e4e7ed", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
         >
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="font-bold" style={{ color: "#24315f" }}>Bearth NFT</span>
-            <svg className="w-3 h-3" style={{ color: "#c4c9d4" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-            </svg>
-            <span className="font-semibold" style={{ color: "#6b7280" }}>{currentLabel}</span>
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Hamburger — mobile only */}
+            <button
+              className="md:hidden flex-shrink-0 p-1.5 rounded-lg"
+              onClick={() => setMobileOpen(o => !o)}
+              style={{ color: "#6b7280" }}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <div className="flex items-center gap-1.5 text-xs min-w-0">
+              <span className="font-bold hidden sm:inline flex-shrink-0" style={{ color: "#24315f" }}>Bearth NFT</span>
+              <svg className="w-3 h-3 hidden sm:inline flex-shrink-0" style={{ color: "#c4c9d4" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+              </svg>
+              <span className="font-semibold truncate" style={{ color: "#6b7280" }}>{currentLabel}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            {hasDashboard && <><ChainSelector /><WalletButton /></>}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {hasDashboard && (
+              <>
+                <div className="hidden sm:flex"><ChainSelector /></div>
+                <div className="hidden sm:flex"><WalletButton /></div>
+              </>
+            )}
             <span
               className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-bold"
               style={{ background: "rgba(65,175,235,0.08)", color: "#41afeb", border: "1px solid rgba(65,175,235,0.2)" }}
             >
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#41afeb" }} />
-              {ctx.roleName}
+              <span className="hidden sm:inline">{ctx.roleName}</span>
             </span>
           </div>
         </header>
