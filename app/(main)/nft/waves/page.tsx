@@ -1531,14 +1531,14 @@ export default function WavesPage() {
                 </div>
               </div>
 
-              {/* Price + Sale Method — price hidden for Wave 1 (always free) */}
-              <div className={editWave.waveNumber === 1 ? "" : "ba-form-2"}>
-                {editWave.waveNumber === 1 ? (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
-                    style={{ background: "rgba(65,175,235,0.07)", border: "1px solid rgba(65,175,235,0.2)" }}>
-                    <span className="text-xs font-semibold" style={{ color: "#41afeb" }}>Free Mint — no price applies to Wave 1</span>
-                  </div>
-                ) : (
+              {/* Price + Sale Method — Wave 1 = free (no price/method inputs); Waves 2-7 = fixed price only */}
+              {editWave.waveNumber === 1 ? (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                  style={{ background: "rgba(65,175,235,0.07)", border: "1px solid rgba(65,175,235,0.2)" }}>
+                  <span className="text-xs font-semibold" style={{ color: "#41afeb" }}>Free Mint — no price applies to Wave 1</span>
+                </div>
+              ) : (
+                <div className="ba-form-2">
                   <div>
                     <label style={labelStyle}>Default Price (ETH)</label>
                     <input type="number" step="0.0001" min="0"
@@ -1546,20 +1546,15 @@ export default function WavesPage() {
                       onChange={e => setForm({ ...form, defaultPriceEth: e.target.value })}
                       style={inputStyle} placeholder="0 = Free" />
                   </div>
-                )}
-                {editWave.waveNumber > 1 && (
                   <div>
                     <label style={labelStyle}>Sale Method</label>
-                    <select value={form.saleMethod}
-                      onChange={e => setForm({ ...form, saleMethod: e.target.value })}
-                      style={inputStyle}>
-                      {saleMethods.filter(s => s.is_active && s.code !== "dutch_auction").map(s => (
-                        <option key={s.code} value={s.code}>{s.label}</option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                      style={{ background: "rgba(65,175,235,0.07)", border: "1px solid rgba(65,175,235,0.2)", height: "38px" }}>
+                      <span className="text-xs font-semibold" style={{ color: "#41afeb" }}>Fixed Price</span>
+                    </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Emergency Pause — only admin override; upcoming/active/closed are auto-managed */}
               <div className="flex items-center justify-between p-3 rounded-xl"
