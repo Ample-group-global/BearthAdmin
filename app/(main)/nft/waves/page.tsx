@@ -1094,8 +1094,8 @@ export default function WavesPage() {
                 <table className="w-full text-sm min-w-max">
                   <thead>
                     <tr>
-                      {["Wave", "Qty", "Price (ETH)", "Minted", "Sale Method", "Schedule", "Reveal Date", "Status", "Reveal", ""].map(h => (
-                        <th key={h} style={{ ...thStyle, textAlign: ["Qty", "Minted", "Reveal"].includes(h) ? "center" : "left" }}>{h}</th>
+                      {["Wave No.", "Image", "Wave", "Qty", "Price (ETH)", "Minted", "Sale Method", "Schedule", "Reveal Date", "Status", "Reveal", ""].map(h => (
+                        <th key={h} style={{ ...thStyle, textAlign: ["Qty", "Minted", "Reveal", "Image"].includes(h) ? "center" : "left" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1109,29 +1109,31 @@ export default function WavesPage() {
                           onMouseEnter={e => (e.currentTarget.style.background = "#fafbff")}
                           onMouseLeave={e => (e.currentTarget.style.background = "")}>
 
-                          <td style={{ padding: "10px 14px" }}>
-                            <div className="flex items-center gap-2">
-                              {blindBoxUrl ? (
-                                <img
-                                  src={blindBoxUrl}
-                                  alt="NFT"
-                                  className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
-                                  style={{ border: isClosed ? "2px solid #16a34a" : w.status === "active" ? "2px solid #41afeb" : "2px solid #e5e7eb" }}
-                                />
-                              ) : (
-                                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0"
-                                  style={{ background: "#f4f6fb", border: isClosed ? "2px solid #16a34a" : w.status === "active" ? "2px solid #41afeb" : "2px solid #e5e7eb" }}>
-                                  🐻
-                                </div>
-                              )}
-                              <div>
-                                <span className="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded mb-0.5"
-                                  style={{ background: "rgba(65,175,235,0.1)", color: "#41afeb" }}>
-                                  W{w.waveNumber}
-                                </span>
-                                <div className="font-semibold text-xs" style={{ color: "#111827" }}>{w.name}</div>
+                          {/* Wave Number */}
+                          <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
+                            <span className="text-xs font-bold" style={{ color: "#24315f" }}>Wave {w.waveNumber}</span>
+                          </td>
+
+                          {/* Image */}
+                          <td style={{ padding: "10px 14px", textAlign: "center" }}>
+                            {blindBoxUrl ? (
+                              <img
+                                src={blindBoxUrl}
+                                alt="NFT"
+                                className="w-8 h-8 rounded-lg object-cover mx-auto"
+                                style={{ border: isClosed ? "2px solid #16a34a" : w.status === "active" ? "2px solid #41afeb" : "2px solid #e5e7eb" }}
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm mx-auto"
+                                style={{ background: "#f4f6fb", border: isClosed ? "2px solid #16a34a" : w.status === "active" ? "2px solid #41afeb" : "2px solid #e5e7eb" }}>
+                                🐻
                               </div>
-                            </div>
+                            )}
+                          </td>
+
+                          {/* Wave Name */}
+                          <td style={{ padding: "10px 14px" }}>
+                            <div className="font-semibold text-xs" style={{ color: "#111827" }}>{w.name}</div>
                           </td>
 
                           <td style={{ padding: "10px 14px", textAlign: "center" }}>
