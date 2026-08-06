@@ -1547,16 +1547,18 @@ export default function WavesPage() {
                       style={inputStyle} placeholder="0 = Free" />
                   </div>
                 )}
-                <div>
-                  <label style={labelStyle}>Sale Method</label>
-                  <select value={form.saleMethod}
-                    onChange={e => setForm({ ...form, saleMethod: e.target.value })}
-                    style={inputStyle}>
-                    {saleMethods.filter(s => s.is_active && s.code !== "dutch_auction").map(s => (
-                      <option key={s.code} value={s.code}>{s.label}</option>
-                    ))}
-                  </select>
-                </div>
+                {editWave.waveNumber > 1 && (
+                  <div>
+                    <label style={labelStyle}>Sale Method</label>
+                    <select value={form.saleMethod}
+                      onChange={e => setForm({ ...form, saleMethod: e.target.value })}
+                      style={inputStyle}>
+                      {saleMethods.filter(s => s.is_active && s.code !== "dutch_auction").map(s => (
+                        <option key={s.code} value={s.code}>{s.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Emergency Pause — only admin override; upcoming/active/closed are auto-managed */}
