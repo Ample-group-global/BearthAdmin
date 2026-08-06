@@ -1105,8 +1105,8 @@ export default function WavesPage() {
                 <table className="w-full text-sm min-w-max">
                   <thead>
                     <tr>
-                      {["Sr.", "Wave No.", "Image", "Wave", "Qty", "Price (ETH)", "Minted", "Sale Method", "Schedule", "Reveal Date", "Status", "Reveal", ""].map(h => (
-                        <th key={h} style={{ ...thStyle, textAlign: ["Qty", "Minted", "Reveal", "Image", "Sr."].includes(h) ? "center" : "left" }}>{h}</th>
+                      {["Sr.", "Wave No.", "Wave Symbol", "Wave", "Qty", "Price (ETH)", "Minted", "Sale Method", "Schedule", "Reveal Date", "Status", "Reveal", ""].map(h => (
+                        <th key={h} style={{ ...thStyle, textAlign: ["Qty", "Minted", "Reveal", "Wave Symbol", "Sr."].includes(h) ? "center" : "left" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
