@@ -66,6 +66,17 @@ interface SaleMethod { code: string; label: string; is_active: boolean; sort_ord
 // Only "paused" is a legitimate admin override — upcoming/active are managed by auto-trigger
 const PAUSE_TOGGLE = "paused";
 
+// Per-wave thematic icons — each name has an NFT-relevant symbol + unique gradient
+const WAVE_ICONS: Record<number, { symbol: string; gradient: string; shadow: string }> = {
+  1: { symbol: "✦",  gradient: "linear-gradient(135deg, #0f2027, #203a43, #2c5364)", shadow: "#2c5364" }, // Genesis Free — deep cosmos origin
+  2: { symbol: "◈",  gradient: "linear-gradient(135deg, #1a1a2e, #16213e, #0f3460)", shadow: "#0f3460" }, // Genesis Paid — blueprint/diamond
+  3: { symbol: "↑",  gradient: "linear-gradient(135deg, #093028, #237a57)",           shadow: "#237a57" }, // Ascension — rising green
+  4: { symbol: "⊛",  gradient: "linear-gradient(135deg, #0d0d0d, #434343)",           shadow: "#434343" }, // Odyssey — dark exploration
+  5: { symbol: "⚡",  gradient: "linear-gradient(135deg, #f7971e, #ffd200)",           shadow: "#f7971e" }, // Awakening — electric gold
+  6: { symbol: "∞",  gradient: "linear-gradient(135deg, #4776e6, #8e54e9)",           shadow: "#8e54e9" }, // Continuum — infinite violet
+  7: { symbol: "✦✦", gradient: "linear-gradient(135deg, #c6426e, #642b73)",           shadow: "#c6426e" }, // Eternity — royal crimson
+};
+
 // ─── Types (Reveal tab) ───────────────────────────────────────────────────────
 
 interface WaveSchedule {
@@ -1119,21 +1130,26 @@ export default function WavesPage() {
                             <span className="text-xs font-bold" style={{ color: "#24315f" }}>Wave {w.waveNumber}</span>
                           </td>
 
-                          {/* Image */}
+                          {/* Image — thematic per-wave icon */}
                           <td style={{ padding: "10px 14px", textAlign: "center" }}>
-                            {blindBoxUrl ? (
-                              <img
-                                src={blindBoxUrl}
-                                alt="NFT"
-                                className="w-12 h-12 rounded-xl object-cover mx-auto"
-                                style={{ border: isClosed ? "2px solid #16a34a" : w.status === "active" ? "2px solid #41afeb" : "2px solid #e5e7eb" }}
-                              />
-                            ) : (
-                              <div className="w-12 h-12 rounded-xl flex items-center justify-center text-lg mx-auto"
-                                style={{ background: "#f4f6fb", border: isClosed ? "2px solid #16a34a" : w.status === "active" ? "2px solid #41afeb" : "2px solid #e5e7eb" }}>
-                                🐻
-                              </div>
-                            )}
+                            {(() => {
+                              const icon = WAVE_ICONS[w.waveNumber];
+                              const borderColor = isClosed ? "#16a34a" : w.status === "active" ? "#41afeb" : "transparent";
+                              return (
+                                <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto select-none"
+                                  style={{
+                                    background: icon?.gradient ?? "#f4f6fb",
+                                    border: `2px solid ${borderColor}`,
+                                    boxShadow: icon ? `0 2px 10px ${icon.shadow}55` : undefined,
+                                    fontSize: "18px",
+                                    color: "#ffffff",
+                                    fontWeight: 700,
+                                    letterSpacing: "-1px",
+                                  }}>
+                                  {icon?.symbol ?? "◆"}
+                                </div>
+                              );
+                            })()}
                           </td>
 
                           {/* Wave Name */}
