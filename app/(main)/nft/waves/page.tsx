@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useInterval } from "@/lib/useInterval";
-import { ErrBanner, OkBanner, TxBanner as SharedTxBanner } from "@/components/nft/Banner";
+import { ErrBanner, TxBanner as SharedTxBanner } from "@/components/nft/Banner";
 import { StatusBadge } from "@/components/nft/StatusBadge";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
 import WhitelistTab from "@/components/nft/tabs/WhitelistTab";
@@ -597,16 +597,6 @@ export default function WavesPage() {
     scheduledEnd: "", status: "",
   });
 
-  // Tier prices form
-  const [tierLegendary, setTierLegendary] = useState("");
-  const [tierEpic, setTierEpic]           = useState("");
-  const [tierRare, setTierRare]           = useState("");
-  const [tierCommon, setTierCommon]       = useState("");
-  const [tierSaving, setTierSaving]       = useState(false);
-  const [tierOk, setTierOk]               = useState<string | null>(null);
-  const [tierErr, setTierErr]             = useState<string | null>(null);
-
-
   // On-chain action modal
   const [chainWave, setChainWave]         = useState<Wave | null>(null);
   const [chainOnChain, setChainOnChain]   = useState<OnChainWaveInfo | null>(null);
@@ -749,34 +739,7 @@ export default function WavesPage() {
       scheduledEnd:       w.scheduledEnd       ? toLocalDateTimeInput(new Date(w.scheduledEnd))   : "",
       status:             w.status ?? "upcoming",
     });
-    setTierLegendary(w.tierPrices?.legendary != null ? String(w.tierPrices.legendary) : "");
-    setTierEpic(w.tierPrices?.epic           != null ? String(w.tierPrices.epic)       : "");
-    setTierRare(w.tierPrices?.rare           != null ? String(w.tierPrices.rare)       : "");
-    setTierCommon(w.tierPrices?.common       != null ? String(w.tierPrices.common)     : "");
-    setTierOk(null); setTierErr(null);
     setSaveError(null);
-  };
-
-  const saveTierPrices = async () => {
-    if (!editWave) return;
-    setTierSaving(true); setTierOk(null); setTierErr(null);
-    try {
-      const tier_prices: Record<string, number> = {};
-      if (tierLegendary !== "") tier_prices.legendary = parseFloat(tierLegendary);
-      if (tierEpic      !== "") tier_prices.epic      = parseFloat(tierEpic);
-      if (tierRare      !== "") tier_prices.rare      = parseFloat(tierRare);
-      if (tierCommon    !== "") tier_prices.common    = parseFloat(tierCommon);
-
-      const r = await fetch(`/api/nft-sell/waves/${editWave.waveNumber}/tier-prices`, {
-        method: "PUT", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier_prices }),
-      });
-      const d = await r.json();
-      if (!r.ok) { setTierErr(d.error ?? "Save failed"); return; }
-      setTierOk("Tier prices saved");
-    } catch { setTierErr("Network error"); }
-    finally { setTierSaving(false); }
   };
 
   const handleSave = async () => {
@@ -1187,9 +1150,6 @@ export default function WavesPage() {
                                   style={{ background: "rgba(220,38,38,0.1)", color: "#dc2626" }}>
                                   Locked
                                 </span>
-                              )}
-                              {w.tierPrices && Object.keys(w.tierPrices).length > 0 && (
-                                <span className="text-xs" style={{ color: "#7c3aed" }}>Tier-priced</span>
                               )}
                             </div>
                           </td>
@@ -1649,44 +1609,6 @@ export default function WavesPage() {
                 </div>
               </div>
 
-              {/* Optional Tier Prices — only for paid waves (2-7); Wave 1 is always free */}
-              {editWave.waveNumber > 1 && <div className="pt-2" style={{ borderTop: "1px solid #e5e7eb" }}>
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs font-bold" style={{ color: "#9bafc5", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                    Tier Prices (Optional)
-                  </p>
-                </div>
-                <p className="text-xs mb-3" style={{ color: "#9bafc5" }}>
-                  Set per-rarity prices to override the default wave price. Leave blank to use the default price for all tiers.
-                </p>
-
-                {tierOk  && <OkBanner  msg={tierOk}  onDismiss={() => setTierOk(null)}  />}
-                {tierErr && <ErrBanner msg={tierErr} onDismiss={() => setTierErr(null)} />}
-
-                <div className="p-3 rounded-xl" style={{ background: "#fafafa", border: "1px solid #e5e7eb" }}>
-                  <div className="ba-form-2">
-                    {([
-                      ["Legendary", tierLegendary, setTierLegendary],
-                      ["Epic",      tierEpic,      setTierEpic],
-                      ["Rare",      tierRare,      setTierRare],
-                      ["Common",    tierCommon,    setTierCommon],
-                    ] as [string, string, (v: string) => void][]).map(([label, val, setter]) => (
-                      <div key={label}>
-                        <label style={{ ...labelStyle, marginBottom: 2 }}>{label} (ETH)</label>
-                        <input type="number" step="0.001" min="0"
-                          value={val} onChange={e => setter(e.target.value)}
-                          style={{ ...inputStyle, padding: "6px 10px" }} placeholder="leave blank = default" />
-                      </div>
-                    ))}
-                  </div>
-                  <button onClick={saveTierPrices} disabled={tierSaving}
-                    className="mt-3 w-full py-1.5 rounded-lg text-xs font-semibold text-white"
-                    style={{ background: tierSaving ? "#9bafc5" : "#41afeb" }}>
-                    {tierSaving ? "Saving…" : "Save Tier Prices"}
-                  </button>
-                </div>
-              </div>}
-
               {/* ── On-Chain Actions ── */}
               <div className="flex items-start gap-3 px-4 py-3 rounded-xl"
                 style={{ background: "rgba(217,119,6,0.07)", border: "1px solid rgba(217,119,6,0.25)" }}>
@@ -1726,6 +1648,47 @@ export default function WavesPage() {
                   ))}
                 </div>
               )}
+
+              {/* DB ↔ On-Chain price sync indicator — shows when the price buyers actually pay differs from the DB record */}
+              {chainOnChain && editWave.waveNumber > 1 && (() => {
+                const onChainPrice = parseFloat(chainOnChain.price);
+                const dbPrice = editWave.defaultPriceEth;
+                if (dbPrice == null) return null;
+                const outOfSync = Math.abs(onChainPrice - dbPrice) > 0.000001;
+                return outOfSync ? (
+                  <div className="flex items-start gap-3 p-3 rounded-xl text-xs"
+                    style={{ background: "rgba(220,38,38,0.06)", border: "1px solid #fecaca" }}>
+                    <svg className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "#dc2626" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div style={{ color: "#dc2626" }}>
+                      <p className="font-bold">Price out of sync</p>
+                      <p className="mt-0.5">
+                        On-chain: <strong>{chainOnChain.price} ETH</strong> · DB: <strong>{dbPrice} ETH</strong>
+                      </p>
+                      {!editWave.waveClosed && !editWave.priceLocked && (
+                        <p className="mt-0.5" style={{ color: "#92400e" }}>
+                          Use &quot;Set Wave Price On-Chain&quot; below to sync the on-chain price to match DB.
+                        </p>
+                      )}
+                      {editWave.priceLocked && (
+                        <p className="mt-0.5" style={{ color: "#92400e" }}>
+                          Price is locked (first sale occurred) — on-chain and DB are now permanently diverged.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
+                    style={{ background: "rgba(22,163,74,0.06)", border: "1px solid rgba(22,163,74,0.3)", color: "#16a34a" }}>
+                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    On-chain price matches DB ({dbPrice} ETH)
+                  </div>
+                );
+              })()}
 
               {chainTx    && <SharedTxBanner txHash={chainTx} />}
               {chainError && <ErrBanner msg={chainError} onDismiss={() => setChainError(null)} />}
@@ -1784,42 +1747,6 @@ export default function WavesPage() {
                         {chainSaving === "price" ? "Submitting…" : "Set Price"}
                       </button>
                     </div>
-                  </div>
-                )
-              )}
-
-              {/* Treasury Transfer — only after wave closes */}
-              {editWave.waveClosed && (
-                editWave.waveRevealed ? (
-                  <div className="space-y-3 p-4 rounded-xl" style={{ background: "rgba(22,163,74,0.03)", border: "1px solid rgba(22,163,74,0.3)" }}>
-                    <p className="text-xs font-bold" style={{ color: "#16a34a" }}>Move Unsold NFTs to Wallet</p>
-                    <p className="text-xs" style={{ color: "#9bafc5" }}>
-                      Transfer{" "}
-                      {(editWave.treasuryPendingCount ?? 0) > 0
-                        ? `${(editWave.treasuryPendingCount ?? 0).toLocaleString()} unsold NFTs`
-                        : "unsold NFTs"}{" "}
-                      to the treasury wallet or a custom address.
-                    </p>
-                    <button
-                      onClick={() => {
-                        const wave = waves.find(w => w.waveNumber === editWave.waveNumber);
-                        if (wave) { closeManage(); setTreasuryMoveWave(wave); }
-                      }}
-                      disabled={(editWave.treasuryPendingCount ?? 0) === 0}
-                      className="px-4 py-2 text-xs font-bold rounded-xl"
-                      style={{
-                        background: (editWave.treasuryPendingCount ?? 0) === 0 ? "rgba(156,163,175,0.1)" : "rgba(22,163,74,0.08)",
-                        color:      (editWave.treasuryPendingCount ?? 0) === 0 ? "#9bafc5" : "#16a34a",
-                        border:     `1px solid ${(editWave.treasuryPendingCount ?? 0) === 0 ? "#e5e7eb" : "rgba(22,163,74,0.3)"}`,
-                        cursor:     (editWave.treasuryPendingCount ?? 0) === 0 ? "not-allowed" : "pointer",
-                      }}>
-                      {(editWave.treasuryPendingCount ?? 0) === 0 ? "No Unsold NFTs" : "Move Unsold → Wallet"}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="px-4 py-3 rounded-xl text-xs"
-                    style={{ background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.25)", color: "#92400e" }}>
-                    Wave closed — complete the reveal first before moving NFTs to wallet.
                   </div>
                 )
               )}
