@@ -594,8 +594,7 @@ export default function WavesPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [form, setForm] = useState({
     defaultPriceEth: "", saleMethod: "", scheduledStart: "",
-    scheduledEnd: "", status: "", notes: "",
-    clearSchedule: false,
+    scheduledEnd: "", status: "",
   });
 
   // Tier prices form
@@ -749,8 +748,6 @@ export default function WavesPage() {
       scheduledStart:     w.scheduledStart     ? toLocalDateTimeInput(new Date(w.scheduledStart)) : "",
       scheduledEnd:       w.scheduledEnd       ? toLocalDateTimeInput(new Date(w.scheduledEnd))   : "",
       status:             w.status ?? "upcoming",
-      notes:              w.notes  ?? "",
-      clearSchedule:      false,
     });
     setTierLegendary(w.tierPrices?.legendary != null ? String(w.tierPrices.legendary) : "");
     setTierEpic(w.tierPrices?.epic           != null ? String(w.tierPrices.epic)       : "");
@@ -789,11 +786,9 @@ export default function WavesPage() {
       const body: Record<string, unknown> = {
         defaultPriceEth:   form.defaultPriceEth !== "" ? Number(form.defaultPriceEth) : null,
         saleMethod:        form.saleMethod   || null,
-        scheduledStart:    form.clearSchedule ? null : (form.scheduledStart ? new Date(form.scheduledStart).toISOString() : null),
-        scheduledEnd:      form.clearSchedule ? null : (form.scheduledEnd   ? new Date(form.scheduledEnd).toISOString()   : null),
+        scheduledStart:    form.scheduledStart ? new Date(form.scheduledStart).toISOString() : null,
+        scheduledEnd:      form.scheduledEnd   ? new Date(form.scheduledEnd).toISOString()   : null,
         status:            form.status       || null,
-        notes:             form.notes        || null,
-        clearSchedule:     form.clearSchedule,
       };
       const res = await fetch(`/api/waves/${editWave.id}`, {
         method: "PUT", credentials: "include",
@@ -1639,35 +1634,19 @@ export default function WavesPage() {
 
               {/* Schedule */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label style={{ ...labelStyle, marginBottom: 0 }}>Wave Schedule</label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={form.clearSchedule}
-                      onChange={e => setForm({ ...form, clearSchedule: e.target.checked, scheduledStart: "", scheduledEnd: "" })} />
-                    <span className="text-xs" style={{ color: "#9bafc5" }}>Clear all dates</span>
-                  </label>
-                </div>
-                {!form.clearSchedule && (
-                  <div className="ba-form-2">
-                    <div>
-                      <label style={labelStyle}>Start Date</label>
-                      <input type="datetime-local" value={form.scheduledStart}
-                        onChange={e => setForm({ ...form, scheduledStart: e.target.value })} style={inputStyle} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>End Date</label>
-                      <input type="datetime-local" value={form.scheduledEnd}
-                        onChange={e => setForm({ ...form, scheduledEnd: e.target.value })} style={inputStyle} />
-                    </div>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Wave Schedule</label>
+                <div className="ba-form-2">
+                  <div>
+                    <label style={labelStyle}>Start Date</label>
+                    <input type="datetime-local" value={form.scheduledStart}
+                      onChange={e => setForm({ ...form, scheduledStart: e.target.value })} style={inputStyle} />
                   </div>
-                )}
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label style={labelStyle}>Notes</label>
-                <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
-                  style={{ ...inputStyle, minHeight: 56, resize: "vertical" }} />
+                  <div>
+                    <label style={labelStyle}>End Date</label>
+                    <input type="datetime-local" value={form.scheduledEnd}
+                      onChange={e => setForm({ ...form, scheduledEnd: e.target.value })} style={inputStyle} />
+                  </div>
+                </div>
               </div>
 
               {/* Optional Tier Prices — only for paid waves (2-7); Wave 1 is always free */}
