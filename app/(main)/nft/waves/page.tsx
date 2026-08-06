@@ -1094,8 +1094,8 @@ export default function WavesPage() {
                 <table className="w-full text-sm min-w-max">
                   <thead>
                     <tr>
-                      {["Wave No.", "Image", "Wave", "Qty", "Price (ETH)", "Minted", "Sale Method", "Schedule", "Reveal Date", "Status", "Reveal", ""].map(h => (
-                        <th key={h} style={{ ...thStyle, textAlign: ["Qty", "Minted", "Reveal", "Image"].includes(h) ? "center" : "left" }}>{h}</th>
+                      {["Sr.", "Wave No.", "Image", "Wave", "Qty", "Price (ETH)", "Minted", "Sale Method", "Schedule", "Reveal Date", "Status", "Reveal", ""].map(h => (
+                        <th key={h} style={{ ...thStyle, textAlign: ["Qty", "Minted", "Reveal", "Image", "Sr."].includes(h) ? "center" : "left" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1109,6 +1109,11 @@ export default function WavesPage() {
                           onMouseEnter={e => (e.currentTarget.style.background = "#fafbff")}
                           onMouseLeave={e => (e.currentTarget.style.background = "")}>
 
+                          {/* Sr. No. */}
+                          <td style={{ padding: "10px 14px", textAlign: "center", whiteSpace: "nowrap" }}>
+                            <span className="text-xs font-semibold" style={{ color: "#9bafc5" }}>{(wavePage - 1) * WAVES_PER_PAGE + i + 1}</span>
+                          </td>
+
                           {/* Wave Number */}
                           <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
                             <span className="text-xs font-bold" style={{ color: "#24315f" }}>Wave {w.waveNumber}</span>
@@ -1120,11 +1125,11 @@ export default function WavesPage() {
                               <img
                                 src={blindBoxUrl}
                                 alt="NFT"
-                                className="w-8 h-8 rounded-lg object-cover mx-auto"
+                                className="w-12 h-12 rounded-xl object-cover mx-auto"
                                 style={{ border: isClosed ? "2px solid #16a34a" : w.status === "active" ? "2px solid #41afeb" : "2px solid #e5e7eb" }}
                               />
                             ) : (
-                              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm mx-auto"
+                              <div className="w-12 h-12 rounded-xl flex items-center justify-center text-lg mx-auto"
                                 style={{ background: "#f4f6fb", border: isClosed ? "2px solid #16a34a" : w.status === "active" ? "2px solid #41afeb" : "2px solid #e5e7eb" }}>
                                 🐻
                               </div>
