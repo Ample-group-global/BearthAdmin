@@ -66,15 +66,16 @@ interface SaleMethod { code: string; label: string; is_active: boolean; sort_ord
 // Only "paused" is a legitimate admin override — upcoming/active are managed by auto-trigger
 const PAUSE_TOGGLE = "paused";
 
-// Per-wave thematic icons — each name has an NFT-relevant symbol + unique gradient
+// Per-wave thematic icons — Bearth ecosystem palette (#24315f navy + #41afeb sky-blue)
+// Each wave uses a distinct shade/depth variation within the same brand DNA
 const WAVE_ICONS: Record<number, { symbol: string; gradient: string; shadow: string }> = {
-  1: { symbol: "✦",  gradient: "linear-gradient(135deg, #0f2027, #203a43, #2c5364)", shadow: "#2c5364" }, // Genesis Free — deep cosmos origin
-  2: { symbol: "◈",  gradient: "linear-gradient(135deg, #1a1a2e, #16213e, #0f3460)", shadow: "#0f3460" }, // Genesis Paid — blueprint/diamond
-  3: { symbol: "↑",  gradient: "linear-gradient(135deg, #093028, #237a57)",           shadow: "#237a57" }, // Ascension — rising green
-  4: { symbol: "⊛",  gradient: "linear-gradient(135deg, #0d0d0d, #434343)",           shadow: "#434343" }, // Odyssey — dark exploration
-  5: { symbol: "⚡",  gradient: "linear-gradient(135deg, #f7971e, #ffd200)",           shadow: "#f7971e" }, // Awakening — electric gold
-  6: { symbol: "∞",  gradient: "linear-gradient(135deg, #4776e6, #8e54e9)",           shadow: "#8e54e9" }, // Continuum — infinite violet
-  7: { symbol: "✦✦", gradient: "linear-gradient(135deg, #c6426e, #642b73)",           shadow: "#c6426e" }, // Eternity — royal crimson
+  1: { symbol: "✦",  gradient: "linear-gradient(135deg, #24315f, #41afeb)",           shadow: "#41afeb" }, // Genesis Free  — full brand gradient
+  2: { symbol: "◈",  gradient: "linear-gradient(135deg, #1a2347, #2e9fd8)",           shadow: "#2e9fd8" }, // Genesis Paid  — deeper navy to mid-blue
+  3: { symbol: "↑",  gradient: "linear-gradient(135deg, #24315f, #0ea5e9)",           shadow: "#0ea5e9" }, // Ascension     — navy to bright cyan-blue
+  4: { symbol: "⊛",  gradient: "linear-gradient(135deg, #0f172a, #24315f)",           shadow: "#24315f" }, // Odyssey       — darkest — deep-space navy
+  5: { symbol: "⚡",  gradient: "linear-gradient(135deg, #41afeb, #93d3f8)",           shadow: "#41afeb" }, // Awakening     — light blue dawn
+  6: { symbol: "∞",  gradient: "linear-gradient(135deg, #1e3a5f, #4a62a8)",           shadow: "#4a62a8" }, // Continuum     — navy to brand indigo
+  7: { symbol: "✦✦", gradient: "linear-gradient(135deg, #24315f, #6b85c4)",           shadow: "#6b85c4" }, // Eternity      — navy to muted periwinkle
 };
 
 // ─── Types (Reveal tab) ───────────────────────────────────────────────────────
