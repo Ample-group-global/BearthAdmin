@@ -594,10 +594,6 @@ export default function WavesPage() {
 
   // Chain form fields
   const [chainPrice, setChainPrice]   = useState("");
-  const [auctionTo, setAuctionTo]     = useState("");
-  const [auctionQty, setAuctionQty]   = useState("1");
-  const [auctionListingId, setAuctionListingId]     = useState("");
-  const [auctionStartPrice, setAuctionStartPrice]   = useState("");
 
   // ── Treasury move modal state ──
   const [treasuryMoveWave,    setTreasuryMoveWave]    = useState<Wave | null>(null);
@@ -842,24 +838,6 @@ export default function WavesPage() {
     }));
   };
 
-
-  const handleMintTransfer = () => {
-    if (!auctionTo) { setChainError("Recipient address required."); return; }
-    chainOp("mint-transfer", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/auction-mint`, {
-      method: "POST", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ to: auctionTo, qty: parseInt(auctionQty, 10) }),
-    }));
-  };
-
-  const handleSaveAuctionListing = () => {
-    if (!auctionListingId) { setChainError("Listing ID required."); return; }
-    chainOp("auction", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/auction-listing`, {
-      method: "POST", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ listingId: auctionListingId, startPriceEth: auctionStartPrice }),
-    }));
-  };
 
   // ── Reveal tab handlers ──
 
@@ -1755,59 +1733,10 @@ export default function WavesPage() {
                 </div>
               )}
 
-              {/* 3 — Auction Listing (Waves 3–7) */}
-              {editWave.waveNumber >= 3 && !chainOnChain?.closed && (
-                <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                  <p className="text-xs font-bold" style={{ color: "#24315f" }}>3. Record OpenSea Auction Listing</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label style={labelStyle}>OpenSea Listing ID</label>
-                      <input type="text" value={auctionListingId} onChange={e => setAuctionListingId(e.target.value)}
-                        style={inputStyle} placeholder="listing-id from OpenSea" />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Start Price (ETH)</label>
-                      <input type="number" step="0.001" value={auctionStartPrice} onChange={e => setAuctionStartPrice(e.target.value)}
-                        style={inputStyle} placeholder="0.0303" />
-                    </div>
-                  </div>
-                  <button onClick={handleSaveAuctionListing} disabled={chainSaving === "auction"}
-                    className="px-4 py-2 text-xs font-bold text-white rounded-lg"
-                    style={{ background: chainSaving === "auction" ? "#9bafc5" : "#7c3aed" }}>
-                    {chainSaving === "auction" ? "Saving…" : "Save Auction Listing"}
-                  </button>
-                </div>
-              )}
-
-              {/* 4 — Mint & Transfer (Waves 3–7) */}
-              {editWave.waveNumber >= 3 && !chainOnChain?.closed && (
-                <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                  <p className="text-xs font-bold" style={{ color: "#24315f" }}>4. Mint & Transfer to Auction Winner</p>
-                  <p className="text-xs" style={{ color: "#9bafc5" }}>After OpenSea auction settles — mints the NFT directly to the winner.</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="col-span-2">
-                      <label style={labelStyle}>Winner Address</label>
-                      <input type="text" value={auctionTo} onChange={e => setAuctionTo(e.target.value)}
-                        style={inputStyle} placeholder="0x..." />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Qty</label>
-                      <input type="number" min="1" value={auctionQty} onChange={e => setAuctionQty(e.target.value)}
-                        style={inputStyle} />
-                    </div>
-                  </div>
-                  <button onClick={handleMintTransfer} disabled={chainSaving === "mint-transfer"}
-                    className="px-4 py-2 text-xs font-bold text-white rounded-lg"
-                    style={{ background: chainSaving === "mint-transfer" ? "#9bafc5" : "#41afeb" }}>
-                    {chainSaving === "mint-transfer" ? "Submitting tx…" : "Mint & Transfer On-Chain"}
-                  </button>
-                </div>
-              )}
-
-              {/* 5 — Move Unsold to Wallet */}
+              {/* 3 — Move Unsold to Wallet */}
               {editWave.waveClosed && editWave.waveRevealed ? (
                 <div className="space-y-3 p-4 rounded-xl" style={{ background: "rgba(22,163,74,0.03)", border: "1px solid rgba(22,163,74,0.3)" }}>
-                  <p className="text-xs font-bold" style={{ color: "#16a34a" }}>5. Move Unsold NFTs to Wallet</p>
+                  <p className="text-xs font-bold" style={{ color: "#16a34a" }}>3. Move Unsold NFTs to Wallet</p>
                   <p className="text-xs" style={{ color: "#9bafc5" }}>
                     Wave is closed and revealed. Transfer{" "}
                     {(editWave.treasuryPendingCount ?? 0) > 0
@@ -1838,7 +1767,7 @@ export default function WavesPage() {
                 </div>
               ) : (
                 <div className="p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                  <p className="text-xs font-bold" style={{ color: "#9bafc5" }}>5. Move Unsold NFTs to Wallet</p>
+                  <p className="text-xs font-bold" style={{ color: "#9bafc5" }}>3. Move Unsold NFTs to Wallet</p>
                   <p className="text-xs mt-1" style={{ color: "#d1d5db" }}>Available after wave is closed and revealed.</p>
                 </div>
               )}
