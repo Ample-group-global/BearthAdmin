@@ -63,7 +63,8 @@ interface OnChainWaveInfo {
 
 interface SaleMethod { code: string; label: string; is_active: boolean; sort_order: number; }
 
-const STATUS_OPTS = ["upcoming", "active", "paused"];
+// Only "paused" is a legitimate admin override — upcoming/active are managed by auto-trigger
+const PAUSE_TOGGLE = "paused";
 
 // ─── Types (Reveal tab) ───────────────────────────────────────────────────────
 
@@ -1530,15 +1531,22 @@ export default function WavesPage() {
                 </div>
               </div>
 
-              {/* Price + Sale Method */}
-              <div className="ba-form-2">
-                <div>
-                  <label style={labelStyle}>Default Price (ETH)</label>
-                  <input type="number" step="0.0001" min="0"
-                    value={form.defaultPriceEth}
-                    onChange={e => setForm({ ...form, defaultPriceEth: e.target.value })}
-                    style={inputStyle} placeholder="0 = Free" />
-                </div>
+              {/* Price + Sale Method — price hidden for Wave 1 (always free) */}
+              <div className={editWave.waveNumber === 1 ? "" : "ba-form-2"}>
+                {editWave.waveNumber === 1 ? (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                    style={{ background: "rgba(65,175,235,0.07)", border: "1px solid rgba(65,175,235,0.2)" }}>
+                    <span className="text-xs font-semibold" style={{ color: "#41afeb" }}>Free Mint — no price applies to Wave 1</span>
+                  </div>
+                ) : (
+                  <div>
+                    <label style={labelStyle}>Default Price (ETH)</label>
+                    <input type="number" step="0.0001" min="0"
+                      value={form.defaultPriceEth}
+                      onChange={e => setForm({ ...form, defaultPriceEth: e.target.value })}
+                      style={inputStyle} placeholder="0 = Free" />
+                  </div>
+                )}
                 <div>
                   <label style={labelStyle}>Sale Method</label>
                   <select value={form.saleMethod}
@@ -1551,22 +1559,43 @@ export default function WavesPage() {
                 </div>
               </div>
 
-              {/* Status */}
-              <div>
-                <label style={labelStyle}>Status</label>
-                <div className="flex gap-2 flex-wrap">
-                  {STATUS_OPTS.map(s => (
-                    <button key={s} onClick={() => setForm({ ...form, status: s })}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold capitalize"
-                      style={{
-                        border: "1px solid", borderColor: form.status === s ? "#41afeb" : "#e5e7eb",
-                        background: form.status === s ? "rgba(65,175,235,0.1)" : "white",
-                        color: form.status === s ? "#41afeb" : "#6b7280",
-                      }}>
-                      {s}
-                    </button>
-                  ))}
+              {/* Emergency Pause — only admin override; upcoming/active/closed are auto-managed */}
+              <div className="flex items-center justify-between p-3 rounded-xl"
+                style={{
+                  background: form.status === PAUSE_TOGGLE ? "rgba(217,119,6,0.07)" : "#f9fafb",
+                  border: `1px solid ${form.status === PAUSE_TOGGLE ? "rgba(217,119,6,0.3)" : "#e5e7eb"}`,
+                }}>
+                <div>
+                  <p className="text-xs font-bold" style={{ color: form.status === PAUSE_TOGGLE ? "#d97706" : "#374151" }}>
+                    Emergency Pause
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
+                    Halts minting for this wave. Auto-trigger will not override this at wave start.
+                  </p>
                 </div>
+                <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
+                  <input type="checkbox" className="sr-only"
+                    checked={form.status === PAUSE_TOGGLE}
+                    onChange={e => {
+                      if (e.target.checked) {
+                        setForm({ ...form, status: "paused" });
+                      } else {
+                        // Derive correct auto-managed status from schedule
+                        const now = new Date();
+                        let autoStatus = "upcoming";
+                        if (editWave.scheduledEnd && new Date(editWave.scheduledEnd) <= now) {
+                          autoStatus = "closed";
+                        } else if (editWave.scheduledStart && new Date(editWave.scheduledStart) <= now) {
+                          autoStatus = "active";
+                        }
+                        setForm({ ...form, status: autoStatus });
+                      }
+                    }} />
+                  <div className="w-10 h-6 rounded-full transition-colors"
+                    style={{ background: form.status === PAUSE_TOGGLE ? "#d97706" : "#d1d5db" }} />
+                  <div className="absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform"
+                    style={{ left: 4, transform: form.status === PAUSE_TOGGLE ? "translateX(16px)" : "translateX(0)" }} />
+                </label>
               </div>
 
               {/* Schedule */}
@@ -1602,8 +1631,8 @@ export default function WavesPage() {
                   style={{ ...inputStyle, minHeight: 56, resize: "vertical" }} />
               </div>
 
-              {/* Optional Tier Prices */}
-              <div className="pt-2" style={{ borderTop: "1px solid #e5e7eb" }}>
+              {/* Optional Tier Prices — only for paid waves (2-7); Wave 1 is always free */}
+              {editWave.waveNumber > 1 && <div className="pt-2" style={{ borderTop: "1px solid #e5e7eb" }}>
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-xs font-bold" style={{ color: "#9bafc5", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                     Tier Prices (Optional)
@@ -1638,7 +1667,7 @@ export default function WavesPage() {
                     {tierSaving ? "Saving…" : "Save Tier Prices"}
                   </button>
                 </div>
-              </div>
+              </div>}
 
               {/* ── On-Chain Actions ── */}
               <div className="flex items-start gap-3 px-4 py-3 rounded-xl"
