@@ -79,14 +79,14 @@ const WAVE_ICONS: Record<number, { symbol: string; gradient: string; shadow: str
 };
 
 // Per-wave purpose descriptions shown in the Purpose column
-const WAVE_PURPOSE: Record<number, { emoji: string; text: string }> = {
-  1: { emoji: "🌱", text: "Launch 10,000 Genesis NFTs." },
-  2: { emoji: "🌱", text: "Launch 10,000 Genesis NFTs." },
-  3: { emoji: "🚀", text: "The community grows and NFT demand increases." },
-  4: { emoji: "🛡️", text: "Holders complete quests, receive airdrops, and unlock new experiences." },
-  5: { emoji: "👁️", text: "Holders gain staking, DAO voting, and exclusive access." },
-  6: { emoji: "♾️", text: "The ecosystem expands with games, new collections, and partnerships." },
-  7: { emoji: "✨", text: "The project becomes an iconic NFT brand with lasting value and history." },
+const WAVE_PURPOSE: Record<number, string> = {
+  1: "Launch 10,000 Genesis NFTs.",
+  2: "Launch 10,000 Genesis NFTs.",
+  3: "The community grows and NFT demand increases.",
+  4: "Holders complete quests, receive airdrops, and unlock new experiences.",
+  5: "Holders gain staking, DAO voting, and exclusive access.",
+  6: "The ecosystem expands with games, new collections, and partnerships.",
+  7: "The project becomes an iconic NFT brand with lasting value and history.",
 };
 
 // ─── Types (Reveal tab) ───────────────────────────────────────────────────────
@@ -1171,12 +1171,9 @@ export default function WavesPage() {
 
                           {/* Purpose */}
                           <td style={{ padding: "10px 14px", minWidth: 220, maxWidth: 260 }}>
-                            {(() => {
-                              const p = WAVE_PURPOSE[w.waveNumber];
-                              return p ? (
-                                <span className="text-xs leading-relaxed" style={{ color: "#6b7280" }}>{p.text}</span>
-                              ) : <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
-                            })()}
+                            {WAVE_PURPOSE[w.waveNumber]
+                              ? <span className="text-xs leading-relaxed" style={{ color: "#6b7280" }}>{WAVE_PURPOSE[w.waveNumber]}</span>
+                              : <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>}
                           </td>
 
                           <td style={{ padding: "10px 14px", textAlign: "center" }}>
