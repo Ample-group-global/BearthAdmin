@@ -203,6 +203,10 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
         if (!groups[layerName]) groups[layerName] = [];
         groups[layerName].push({ file, subpath });
       }
+      if (Object.keys(groups).length > 0) {
+        // Clear bearth-layers bucket before uploading new collection layers
+        await fetch('/api/nft-gen/layers/clear-bucket', { method: 'POST' }).catch(() => {});
+      }
       for (const [layer, entries] of Object.entries(groups)) {
         const form = new FormData();
         form.append('layer', layer);
