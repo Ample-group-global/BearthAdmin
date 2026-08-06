@@ -103,6 +103,11 @@ function fmtFull(dt: string | null): string {
   return new Date(dt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
+function toLocalDateTimeInput(d: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function waveState(w: WaveSchedule): "revealed" | "ready_reveal" | "reveal_scheduled" | "active" | "ended" | "upcoming" | "not_scheduled" {
   const now = Date.now();
   if (w.is_revealed) return "revealed";
@@ -130,19 +135,26 @@ const STATE_META: Record<string, { label: string; color: string; bg: string }> =
 // ─── Sub-components (Waves tab) ───────────────────────────────────────────────
 
 const WAVE_COLORS = {
-  completed: { bg: "rgba(22,163,74,0.1)",    color: "#16a34a", label: "Completed" },
-  revealed:  { bg: "rgba(124,58,237,0.1)",   color: "#7c3aed", label: "Revealed"  },
-  active:    { bg: "rgba(65,175,235,0.12)",  color: "#41afeb", label: "Active"    },
-  upcoming:  { bg: "rgba(156,163,175,0.12)", color: "#9ca3af", label: "Upcoming"  },
-  paused:    { bg: "rgba(217,119,6,0.1)",    color: "#d97706", label: "Paused"    },
-  closed:    { bg: "rgba(22,163,74,0.1)",    color: "#16a34a", label: "Closed"    },
-  ended:     { bg: "rgba(107,114,128,0.1)",  color: "#6b7280", label: "Ended"     },
-  sold_out:  { bg: "rgba(124,58,237,0.1)",   color: "#7c3aed", label: "Sold Out"  },
+  completed:        { bg: "rgba(22,163,74,0.1)",    color: "#16a34a", label: "Completed"       },
+  revealed:         { bg: "rgba(124,58,237,0.1)",   color: "#7c3aed", label: "Revealed"         },
+  reveal_scheduled: { bg: "rgba(124,58,237,0.08)",  color: "#7c3aed", label: "Reveal Scheduled" },
+  ready_reveal:     { bg: "rgba(217,119,6,0.1)",    color: "#d97706", label: "Ready to Reveal"  },
+  active:           { bg: "rgba(65,175,235,0.12)",  color: "#41afeb", label: "Active"           },
+  upcoming:         { bg: "rgba(156,163,175,0.12)", color: "#9ca3af", label: "Upcoming"         },
+  paused:           { bg: "rgba(217,119,6,0.1)",    color: "#d97706", label: "Paused"           },
+  closed:           { bg: "rgba(22,163,74,0.1)",    color: "#16a34a", label: "Closed"           },
+  ended:            { bg: "rgba(107,114,128,0.1)",  color: "#6b7280", label: "Ended"            },
+  sold_out:         { bg: "rgba(124,58,237,0.1)",   color: "#7c3aed", label: "Sold Out"         },
 };
 
 function deriveWaveDisplayStatus(w: Wave): string {
   if (w.waveRevealed) return "revealed";
-  if (w.waveClosed)   return "closed";
+  if (w.waveClosed) {
+    const now = Date.now();
+    if (w.revealScheduledAt && new Date(w.revealScheduledAt).getTime() <= now) return "ready_reveal";
+    if (w.revealScheduledAt && new Date(w.revealScheduledAt).getTime() > now)  return "reveal_scheduled";
+    return "closed";
+  }
   if (w.status === "active" && w.scheduledEnd && new Date(w.scheduledEnd) < new Date()) return "ended";
   return w.status;
 }
@@ -716,8 +728,8 @@ export default function WavesPage() {
     setForm({
       defaultPriceEth:    w.defaultPriceEth != null ? String(w.defaultPriceEth) : "",
       saleMethod:         w.saleMethod ?? "fixed_price",
-      scheduledStart:     w.scheduledStart     ? w.scheduledStart.slice(0, 16)     : "",
-      scheduledEnd:       w.scheduledEnd       ? w.scheduledEnd.slice(0, 16)       : "",
+      scheduledStart:     w.scheduledStart     ? toLocalDateTimeInput(new Date(w.scheduledStart)) : "",
+      scheduledEnd:       w.scheduledEnd       ? toLocalDateTimeInput(new Date(w.scheduledEnd))   : "",
       status:             w.status ?? "upcoming",
       notes:              w.notes  ?? "",
       clearSchedule:      false,
@@ -1285,7 +1297,7 @@ export default function WavesPage() {
                                 <button
                                   onClick={() => {
                                     setScheduleEditWave(makeWS());
-                                    setScheduleEditDate(w.revealScheduledAt ? new Date(w.revealScheduledAt).toISOString().slice(0, 16) : "");
+                                    setScheduleEditDate(w.revealScheduledAt ? toLocalDateTimeInput(new Date(w.revealScheduledAt)) : "");
                                     setScheduleEditErr(null);
                                   }}
                                   className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg"
