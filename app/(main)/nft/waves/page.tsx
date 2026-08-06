@@ -1730,93 +1730,98 @@ export default function WavesPage() {
               {chainTx    && <SharedTxBanner txHash={chainTx} />}
               {chainError && <ErrBanner msg={chainError} onDismiss={() => setChainError(null)} />}
 
-              {/* 1 — Push Schedule */}
-              <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                <p className="text-xs font-bold" style={{ color: "#24315f" }}>1. Push Wave Schedule On-Chain</p>
-                <p className="text-xs" style={{ color: "#9bafc5" }}>Manually push wave start/end to the contract. The system auto-does this when the scheduled date arrives.</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-2.5 rounded-lg" style={{ background: "#f3f4f6", border: "1px solid #e5e7eb" }}>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#9bafc5" }}>Start (from DB)</p>
-                    <p className="text-xs font-semibold" style={{ color: "#374151" }}>
-                      {editWave?.scheduledStart ? new Date(editWave.scheduledStart).toLocaleString() : <span style={{ color: "#d1d5db" }}>Not set</span>}
+              {/* Schedule Push — only before wave has started (upcoming only) */}
+              {(() => {
+                const waveStarted = editWave.waveClosed || editWave.status === "active";
+                return !waveStarted ? (
+                  <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                    <p className="text-xs font-bold" style={{ color: "#24315f" }}>Push Wave Schedule On-Chain</p>
+                    <p className="text-xs" style={{ color: "#9bafc5" }}>
+                      The system auto-pushes when the scheduled date arrives. Use this only if you need to push early or re-sync.
                     </p>
-                  </div>
-                  <div className="p-2.5 rounded-lg" style={{ background: "#f3f4f6", border: "1px solid #e5e7eb" }}>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#9bafc5" }}>End (from DB)</p>
-                    <p className="text-xs font-semibold" style={{ color: "#374151" }}>
-                      {editWave?.scheduledEnd ? new Date(editWave.scheduledEnd).toLocaleString() : <span style={{ color: "#d1d5db" }}>Not set</span>}
-                    </p>
-                  </div>
-                </div>
-                <button onClick={handleSetScheduleOnChain} disabled={chainSaving === "schedule"}
-                  className="px-4 py-2 text-xs font-bold text-white rounded-lg"
-                  style={{ background: chainSaving === "schedule" ? "#9bafc5" : "#41afeb" }}>
-                  {chainSaving === "schedule" ? "Submitting…" : "Push Schedule to Chain"}
-                </button>
-              </div>
-
-              {/* 2 — Set Price */}
-              {!editWave.priceLocked && editWave.waveNumber > 1 && (
-                <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                  <p className="text-xs font-bold" style={{ color: "#24315f" }}>2. Update Wave Price On-Chain</p>
-                  <p className="text-xs" style={{ color: "#9bafc5" }}>Only allowed before first sale in this wave.</p>
-                  <div className="flex gap-2 items-end">
-                    <div className="flex-1">
-                      <label style={labelStyle}>Price (ETH)</label>
-                      <input type="number" step="0.0001" min="0" value={chainPrice}
-                        onChange={e => setChainPrice(e.target.value)} style={inputStyle} />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-2.5 rounded-lg" style={{ background: "#f3f4f6", border: "1px solid #e5e7eb" }}>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#9bafc5" }}>Start Date</p>
+                        <p className="text-xs font-semibold" style={{ color: "#374151" }}>
+                          {editWave.scheduledStart ? new Date(editWave.scheduledStart).toLocaleString() : <span style={{ color: "#d1d5db" }}>Not set</span>}
+                        </p>
+                      </div>
+                      <div className="p-2.5 rounded-lg" style={{ background: "#f3f4f6", border: "1px solid #e5e7eb" }}>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#9bafc5" }}>End Date</p>
+                        <p className="text-xs font-semibold" style={{ color: "#374151" }}>
+                          {editWave.scheduledEnd ? new Date(editWave.scheduledEnd).toLocaleString() : <span style={{ color: "#d1d5db" }}>Not set</span>}
+                        </p>
+                      </div>
                     </div>
-                    <button onClick={handleSetPriceOnChain} disabled={chainSaving === "price"}
-                      className="px-4 py-2 text-xs font-bold text-white rounded-lg flex-shrink-0"
-                      style={{ background: chainSaving === "price" ? "#9bafc5" : "#41afeb" }}>
-                      {chainSaving === "price" ? "Submitting…" : "Set Price"}
+                    <button onClick={handleSetScheduleOnChain} disabled={chainSaving === "schedule" || !editWave.scheduledStart || !editWave.scheduledEnd}
+                      className="px-4 py-2 text-xs font-bold text-white rounded-lg"
+                      style={{ background: chainSaving === "schedule" || !editWave.scheduledStart || !editWave.scheduledEnd ? "#9bafc5" : "#41afeb" }}>
+                      {chainSaving === "schedule" ? "Submitting…" : "Push Schedule to Chain"}
                     </button>
                   </div>
-                </div>
-              )}
-              {editWave.priceLocked && (
-                <div className="px-4 py-3 rounded-xl text-xs" style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
-                  Price is locked — first sale has already occurred in this wave.
-                </div>
+                ) : null;
+              })()}
+
+              {/* Set Price — paid waves only, only before wave closes, only if not locked */}
+              {editWave.waveNumber > 1 && !editWave.waveClosed && (
+                editWave.priceLocked ? (
+                  <div className="px-4 py-3 rounded-xl text-xs" style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
+                    Price locked — first sale has already occurred. No further price changes allowed.
+                  </div>
+                ) : (
+                  <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                    <p className="text-xs font-bold" style={{ color: "#24315f" }}>Set Wave Price On-Chain</p>
+                    <p className="text-xs" style={{ color: "#9bafc5" }}>Only allowed before the first sale in this wave.</p>
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <label style={labelStyle}>Price (ETH)</label>
+                        <input type="number" step="0.0001" min="0" value={chainPrice}
+                          onChange={e => setChainPrice(e.target.value)} style={inputStyle} />
+                      </div>
+                      <button onClick={handleSetPriceOnChain} disabled={chainSaving === "price"}
+                        className="px-4 py-2 text-xs font-bold text-white rounded-lg flex-shrink-0"
+                        style={{ background: chainSaving === "price" ? "#9bafc5" : "#41afeb" }}>
+                        {chainSaving === "price" ? "Submitting…" : "Set Price"}
+                      </button>
+                    </div>
+                  </div>
+                )
               )}
 
-              {/* 3 — Move Unsold to Wallet */}
-              {editWave.waveClosed && editWave.waveRevealed ? (
-                <div className="space-y-3 p-4 rounded-xl" style={{ background: "rgba(22,163,74,0.03)", border: "1px solid rgba(22,163,74,0.3)" }}>
-                  <p className="text-xs font-bold" style={{ color: "#16a34a" }}>3. Move Unsold NFTs to Wallet</p>
-                  <p className="text-xs" style={{ color: "#9bafc5" }}>
-                    Wave is closed and revealed. Transfer{" "}
-                    {(editWave.treasuryPendingCount ?? 0) > 0
-                      ? `${(editWave.treasuryPendingCount ?? 0).toLocaleString()} unsold NFTs`
-                      : "unsold NFTs"}{" "}
-                    to the treasury wallet or a custom wallet address.
-                  </p>
-                  <button
-                    onClick={() => {
-                      const wave = waves.find(w => w.waveNumber === editWave.waveNumber);
-                      if (wave) { closeManage(); setTreasuryMoveWave(wave); }
-                    }}
-                    disabled={(editWave.treasuryPendingCount ?? 0) === 0}
-                    className="px-4 py-2 text-xs font-bold rounded-xl"
-                    style={{
-                      background: (editWave.treasuryPendingCount ?? 0) === 0 ? "rgba(156,163,175,0.1)" : "rgba(22,163,74,0.08)",
-                      color: (editWave.treasuryPendingCount ?? 0) === 0 ? "#9bafc5" : "#16a34a",
-                      border: `1px solid ${(editWave.treasuryPendingCount ?? 0) === 0 ? "#e5e7eb" : "rgba(22,163,74,0.3)"}`,
-                      cursor: (editWave.treasuryPendingCount ?? 0) === 0 ? "not-allowed" : "pointer",
-                    }}>
-                    {(editWave.treasuryPendingCount ?? 0) === 0 ? "No Unsold NFTs" : "Move Unsold → Wallet"}
-                  </button>
-                </div>
-              ) : editWave.waveClosed && !editWave.waveRevealed ? (
-                <div className="px-4 py-3 rounded-xl text-xs"
-                  style={{ background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.25)", color: "#92400e" }}>
-                  Wave is closed but not yet revealed. Complete the reveal first before moving NFTs to wallet.
-                </div>
-              ) : (
-                <div className="p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                  <p className="text-xs font-bold" style={{ color: "#9bafc5" }}>3. Move Unsold NFTs to Wallet</p>
-                  <p className="text-xs mt-1" style={{ color: "#d1d5db" }}>Available after wave is closed and revealed.</p>
-                </div>
+              {/* Treasury Transfer — only after wave closes */}
+              {editWave.waveClosed && (
+                editWave.waveRevealed ? (
+                  <div className="space-y-3 p-4 rounded-xl" style={{ background: "rgba(22,163,74,0.03)", border: "1px solid rgba(22,163,74,0.3)" }}>
+                    <p className="text-xs font-bold" style={{ color: "#16a34a" }}>Move Unsold NFTs to Wallet</p>
+                    <p className="text-xs" style={{ color: "#9bafc5" }}>
+                      Transfer{" "}
+                      {(editWave.treasuryPendingCount ?? 0) > 0
+                        ? `${(editWave.treasuryPendingCount ?? 0).toLocaleString()} unsold NFTs`
+                        : "unsold NFTs"}{" "}
+                      to the treasury wallet or a custom address.
+                    </p>
+                    <button
+                      onClick={() => {
+                        const wave = waves.find(w => w.waveNumber === editWave.waveNumber);
+                        if (wave) { closeManage(); setTreasuryMoveWave(wave); }
+                      }}
+                      disabled={(editWave.treasuryPendingCount ?? 0) === 0}
+                      className="px-4 py-2 text-xs font-bold rounded-xl"
+                      style={{
+                        background: (editWave.treasuryPendingCount ?? 0) === 0 ? "rgba(156,163,175,0.1)" : "rgba(22,163,74,0.08)",
+                        color:      (editWave.treasuryPendingCount ?? 0) === 0 ? "#9bafc5" : "#16a34a",
+                        border:     `1px solid ${(editWave.treasuryPendingCount ?? 0) === 0 ? "#e5e7eb" : "rgba(22,163,74,0.3)"}`,
+                        cursor:     (editWave.treasuryPendingCount ?? 0) === 0 ? "not-allowed" : "pointer",
+                      }}>
+                      {(editWave.treasuryPendingCount ?? 0) === 0 ? "No Unsold NFTs" : "Move Unsold → Wallet"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="px-4 py-3 rounded-xl text-xs"
+                    style={{ background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.25)", color: "#92400e" }}>
+                    Wave closed — complete the reveal first before moving NFTs to wallet.
+                  </div>
+                )
               )}
 
               {/* Reveal status */}
