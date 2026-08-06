@@ -46,6 +46,7 @@ interface NftRecord {
   traits: Record<string, string> | null;
   mintTxHash: string | null;
   lastTxHash: string | null;
+  mintType: string | null;
   createdAt: string;
   updatedAt: string;
   totalCount: number;
@@ -211,6 +212,7 @@ export default function NftPage() {
   const [stageFilter, setStageFilter]     = useState("");
   const [revealFilter, setRevealFilter]   = useState("");
   const [waveFilter, setWaveFilter]       = useState("");
+  const [mintTypeFilter, setMintTypeFilter] = useState("");
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
   const [master, setMaster]           = useState<Master | null>(null);
@@ -230,7 +232,7 @@ export default function NftPage() {
   const loadRecords = useCallback((
     q: string, off: number, status: string, stage: string, revealed: string, wave: string,
     sk?: string, sd?: "asc" | "desc",
-    mFrom?: string, mTo?: string,
+    mFrom?: string, mTo?: string, mintType?: string,
   ) => {
     setLoading(true); setError(null);
     const params = new URLSearchParams({ search: q, limit: String(PAGE_SIZE), offset: String(off) });
@@ -246,10 +248,11 @@ export default function NftPage() {
     } else if (revealed === "true") {
       params.set("revealed", "true");
     }
-    if (wave)    params.set("wave_number", wave);
-    if (mFrom)   params.set("minted_from", mFrom);
-    if (mTo)     params.set("minted_to",   mTo);
-    if (sk)      params.set("sort_by", sk);
+    if (wave)     params.set("wave_number", wave);
+    if (mFrom)    params.set("minted_from", mFrom);
+    if (mTo)      params.set("minted_to",   mTo);
+    if (mintType) params.set("mint_type",   mintType);
+    if (sk)       params.set("sort_by", sk);
     if (sk && sd) params.set("sort_dir", sd);
     fetch(`/api/nfts?${params}`, { credentials: "include" })
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
@@ -280,8 +283,8 @@ export default function NftPage() {
   }, []);
 
   useEffect(() => {
-    loadRecords(search, offset, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir);
-  }, [offset, statusFilter, stageFilter, revealFilter, waveFilter]);
+    loadRecords(search, offset, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter);
+  }, [offset, statusFilter, stageFilter, revealFilter, waveFilter, mintTypeFilter]);
 
   // ── Watchdog: silent 30s poll on stats ───────────────────────────────────
   const [recWatchAlert, setRecWatchAlert] = useState<string | null>(null);
@@ -310,18 +313,18 @@ export default function NftPage() {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
       setOffset(0);
-      loadRecords(v, 0, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo);
+      loadRecords(v, 0, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter);
     }, 300);
   };
 
-  const applyFilter = (status = statusFilter, stage = stageFilter, revealed = revealFilter, wave = waveFilter, mFrom = mintedFrom, mTo = mintedTo) => {
+  const applyFilter = (status = statusFilter, stage = stageFilter, revealed = revealFilter, wave = waveFilter, mFrom = mintedFrom, mTo = mintedTo, mintType = mintTypeFilter) => {
     setOffset(0);
-    loadRecords(search, 0, status, stage, revealed, wave, sortKey, sortDir, mFrom, mTo);
+    loadRecords(search, 0, status, stage, revealed, wave, sortKey, sortDir, mFrom, mTo, mintType);
   };
 
   const handleSort = (key: string, dir: "asc" | "desc") => {
     setSortKey(key); setSortDir(dir); setOffset(0);
-    loadRecords(search, 0, statusFilter, stageFilter, revealFilter, waveFilter, key, dir, mintedFrom, mintedTo);
+    loadRecords(search, 0, statusFilter, stageFilter, revealFilter, waveFilter, key, dir, mintedFrom, mintedTo, mintTypeFilter);
   };
 
   // ── Records columns ───────────────────────────────────────────────────────
@@ -671,6 +674,17 @@ export default function NftPage() {
               <option value="true">✦ Revealed</option>
             </select>
 
+            <select value={mintTypeFilter}
+              onChange={e => { setMintTypeFilter(e.target.value); applyFilter(statusFilter, stageFilter, revealFilter, waveFilter, mintedFrom, mintedTo, e.target.value); }}
+              className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
+              style={{ border: "1px solid #e5e7eb", color: mintTypeFilter ? "#111827" : "#9bafc5" }}>
+              <option value="">All Mint Types</option>
+              <option value="free">Free</option>
+              <option value="paid">Paid</option>
+              <option value="admin">Admin</option>
+              <option value="treasury">Treasury</option>
+            </select>
+
             <input type="date" value={mintedFrom}
               onChange={e => { setMintedFrom(e.target.value); applyFilter(statusFilter, stageFilter, revealFilter, waveFilter, e.target.value, mintedTo); }}
               className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
@@ -682,11 +696,11 @@ export default function NftPage() {
               style={{ border: "1px solid #e5e7eb", color: mintedTo ? "#111827" : "#9bafc5" }}
               title="Minted to date" />
 
-            {(statusFilter || revealFilter || waveFilter || stageFilter || mintedFrom || mintedTo) && (
+            {(statusFilter || revealFilter || waveFilter || stageFilter || mintedFrom || mintedTo || mintTypeFilter) && (
               <button onClick={() => {
                 setStatusFilter(""); setRevealFilter(""); setWaveFilter(""); setStageFilter("");
-                setMintedFrom(""); setMintedTo("");
-                applyFilter("", "", "", "", "", "");
+                setMintedFrom(""); setMintedTo(""); setMintTypeFilter("");
+                applyFilter("", "", "", "", "", "", "");
               }} className="px-3 py-2 rounded-xl text-xs font-semibold"
                 style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
                 Clear filters
@@ -846,6 +860,18 @@ export default function NftPage() {
                         <p className="text-sm font-semibold leading-tight" style={{ color: viewRecord.effectivePriceEth != null ? "#0f172a" : "#15803d" }}>
                           {viewRecord.effectivePriceEth != null ? `${Number(viewRecord.effectivePriceEth)} ETH` : "Free"}
                         </p>
+                      </div>
+                      {/* Mint Type */}
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#94a3b8" }}>Mint Type</p>
+                        {(() => {
+                          const mt = viewRecord.mintType;
+                          if (mt === "free")     return <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#dcfce7", color: "#15803d" }}>Free</span>;
+                          if (mt === "paid")     return <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#eff6ff", color: "#2563eb" }}>Paid</span>;
+                          if (mt === "admin")    return <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#f5f3ff", color: "#7c3aed" }}>Admin</span>;
+                          if (mt === "treasury") return <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#fffbeb", color: "#d97706" }}>Treasury</span>;
+                          return <span style={{ color: "#94a3b8" }}>—</span>;
+                        })()}
                       </div>
                       {/* Wave */}
                       <div>

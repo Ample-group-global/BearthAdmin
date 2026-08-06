@@ -1,0 +1,7 @@
+{
+  "phase-01":   { "status": "pending", "locked": false, "completedAt": null, "passCount": 0, "failCount": 0 },
+  "phase-02":   { "status": "pending", "locked": false, "completedAt": null, "passCount": 0, "failCount": 0 },
+  "phase-02.5": { "status": "pending", "locked": false, "completedAt": null, "passCount": 0, "failCount": 0 },
+  "phase-03":   { "status": "pending", "locked": false, "completedAt": null, "passCount": 0, "failCount": 0 },
+  "phase-04":   { "status": "pending", "locked": false, "completedAt": null, "passCount": 0, "failCount": 0 }
+}

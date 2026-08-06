@@ -49,6 +49,8 @@ export default function WhitelistTab() {
   const [bulkText, setBulkText] = useState("");
   const [merkleInput, setMerkleInput] = useState("");
   const [testAddr, setTestAddr] = useState("");
+  const [pushChainLoading, setPushChainLoading] = useState(false);
+  const [pushChainTxHash, setPushChainTxHash] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ isWhitelisted: boolean; proof?: string[] } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -76,6 +78,26 @@ export default function WhitelistTab() {
 
   const handleSetRoot = () =>
     wrap(async () => { await setMerkleRoot(merkleInput.trim()); setMerkleInput(""); }, "Merkle root set");
+
+  const handlePushToChain = async () => {
+    setPushChainLoading(true);
+    setPushChainTxHash(null);
+    try {
+      const res = await fetch("/api/whitelist/push-chain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const data = await res.json() as { success?: boolean; txHash?: string; error?: string };
+      if (!res.ok || !data.success) throw new Error(data.error ?? "Push failed");
+      setPushChainTxHash(data.txHash ?? null);
+      showToast("Allowlist root pushed to contract ✓", "success");
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Push failed", "error");
+    } finally {
+      setPushChainLoading(false);
+    }
+  };
 
   const handleClearRoot = () =>
     wrap(clearMerkleRootOverride, "Override cleared, root recomputed");
@@ -322,6 +344,25 @@ export default function WhitelistTab() {
                     {clearMerkleRootOverrideLoading ? "Clearing..." : "Clear Override"}
                   </button>
                 </div>
+              </div>
+              <div className="pt-4 mt-2" style={{ borderTop: "1px solid #e5e7eb" }}>
+                <h3 className="text-sm font-semibold mb-1" style={{ color: "#24315f" }}>Push to Blockchain</h3>
+                <p className="text-xs mb-3" style={{ color: "#9bafc5" }}>
+                  Submit the current merkle root to the smart contract on-chain. Requires gas from the operations wallet.
+                </p>
+                <button
+                  onClick={handlePushToChain}
+                  disabled={pushChainLoading}
+                  data-testid="push-allowlist-chain"
+                  className="px-4 py-2.5 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40"
+                  style={{ background: "#16a34a" }}>
+                  {pushChainLoading ? "Pushing..." : "Push to Contract"}
+                </button>
+                {pushChainTxHash && (
+                  <p className="text-xs mt-2 font-mono break-all" style={{ color: "#16a34a" }}>
+                    Tx: {pushChainTxHash}
+                  </p>
+                )}
               </div>
             </div>
           )}
