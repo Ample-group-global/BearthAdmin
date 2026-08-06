@@ -63,18 +63,21 @@ async function snap(page: Page, label: string) {
 }
 
 async function login(page: Page) {
-  // Fast path: if the browser is already on a valid app page, reuse the existing session.
-  // Do NOT call page.goto("/dashboard") — a full reload triggers all SWR hooks simultaneously
-  // which can flood the connection pool right after blockchain tests.
-  // Do NOT call waitForLoadState("networkidle") — that wait keeps the page alive long enough
-  // for an SWR auth-check to fire, fail due to pool stress, and redirect us to /login.
+  // Fast path 1: already on an authenticated app page — reuse existing session
   const currentUrl = page.url();
   if (currentUrl && currentUrl.includes("localhost:3000") && !currentUrl.includes("/login")) {
-    return; // session cookie is still valid; each test's own goto() will enforce auth
+    return;
   }
 
-  // Fresh login with retries (handles transient API outages from blockchain event bursts)
-  // Auth now uses a dedicated pool (auth-pool.ts, max:3) that is never starved by background work.
+  // Fast path 2: try navigating directly to /dashboard using saved session cookies.
+  // If global-setup saved a valid session, this succeeds without form login.
+  try {
+    await page.goto("/dashboard");
+    await page.waitForURL("**/dashboard**", { timeout: 8000 });
+    return; // session cookie still valid
+  } catch { /* cookies expired or missing — fall through to form login */ }
+
+  // Full form login with retries — needed when saved session has expired
   for (let attempt = 1; attempt <= 15; attempt++) {
     try {
       await page.goto("/login");

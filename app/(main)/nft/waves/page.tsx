@@ -32,6 +32,7 @@ interface Wave {
   notes: string | null;
   nftCount: number;
   soldCount?: number;
+  treasuryPendingCount?: number;
   priceLocked?: boolean;
   waveClosed?: boolean;
   waveRevealed?: boolean;
@@ -355,6 +356,181 @@ function SuccessModal({ txHash, waveNum, onClose }: { txHash: string; waveNum: n
   );
 }
 
+// ─── Treasury Move Modal ─────────────────────────────────────────────────────
+
+function TreasuryMoveModal({
+  wave,
+  onClose,
+  onSuccess,
+}: {
+  wave: Wave;
+  onClose: () => void;
+  onSuccess: (txHash: string) => void;
+}) {
+  const [useCustom, setUseCustom] = useState(false);
+  const [recipient, setRecipient] = useState("");
+  const [saving, setSaving]       = useState(false);
+  const [error, setError]         = useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    if (useCustom && !/^0x[0-9a-fA-F]{40}$/.test(recipient)) {
+      setError("Enter a valid Ethereum address (0x + 40 hex chars)");
+      return;
+    }
+    setSaving(true); setError(null);
+    try {
+      const body = useCustom ? { recipient } : {};
+      const res = await fetch(`/api/nft-sell/waves/${wave.waveNumber}/treasury-close`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await res.json();
+      if (!res.ok) { setError(d.error ?? "Transfer failed"); return; }
+      onSuccess(d.txHash ?? "");
+    } catch { setError("Network error."); }
+    finally { setSaving(false); }
+  };
+
+  const pendingCount = wave.treasuryPendingCount ?? 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" style={{ border: "1px solid #e5e7eb" }}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid #e5e7eb" }}>
+          <div>
+            <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>
+              Move to Wallet — W{wave.waveNumber} {wave.name}
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
+              {pendingCount.toLocaleString()} unsold NFT{pendingCount !== 1 ? "s" : ""} awaiting transfer
+            </p>
+          </div>
+          <button onClick={onClose} style={{ color: "#9bafc5" }}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-3">
+          {error && <ErrBanner msg={error} onDismiss={() => setError(null)} />}
+
+          {/* Option A — default treasury wallet */}
+          <label
+            className="flex items-start gap-3 p-3.5 rounded-xl cursor-pointer transition-colors"
+            style={{ border: `1.5px solid ${!useCustom ? "#41afeb" : "#e5e7eb"}`, background: !useCustom ? "rgba(65,175,235,0.04)" : "white" }}>
+            <input type="radio" checked={!useCustom} onChange={() => setUseCustom(false)} className="mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-bold" style={{ color: "#24315f" }}>Default Treasury Wallet</p>
+              <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
+                Uses the treasury address configured in the smart contract
+              </p>
+            </div>
+          </label>
+
+          {/* Option B — custom wallet */}
+          <label
+            className="flex items-start gap-3 p-3.5 rounded-xl cursor-pointer transition-colors"
+            style={{ border: `1.5px solid ${useCustom ? "#41afeb" : "#e5e7eb"}`, background: useCustom ? "rgba(65,175,235,0.04)" : "white" }}>
+            <input type="radio" checked={useCustom} onChange={() => setUseCustom(true)} className="mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold" style={{ color: "#24315f" }}>Custom Wallet Address</p>
+              <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
+                Send NFTs to any Ethereum wallet you specify
+              </p>
+              {useCustom && (
+                <input
+                  type="text"
+                  value={recipient}
+                  onChange={e => setRecipient(e.target.value)}
+                  placeholder="0x..."
+                  className="mt-2 w-full rounded-lg px-3 py-2 text-xs font-mono"
+                  style={{ border: "1px solid #d1d5db", outline: "none" }}
+                  autoFocus
+                />
+              )}
+            </div>
+          </label>
+
+          {/* Gas warning */}
+          <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs"
+            style={{ background: "rgba(217,119,6,0.07)", border: "1px solid rgba(217,119,6,0.2)", color: "#92400e" }}>
+            <svg className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: "#d97706" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            This submits a blockchain transaction. Gas fees apply and the action cannot be undone.
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+              style={{ border: "1px solid #e5e7eb", color: "#6b7280", background: "white" }}>
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={saving || (useCustom && !recipient.trim())}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white"
+              style={{ background: saving || (useCustom && !recipient.trim()) ? "#9bafc5" : "#16a34a", cursor: saving || (useCustom && !recipient.trim()) ? "not-allowed" : "pointer" }}>
+              {saving ? "Transferring…" : "Confirm Transfer"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Treasury Transfer Success Modal ─────────────────────────────────────────
+
+function TreasurySuccessModal({ txHash, waveNum, onClose }: { txHash: string; waveNum: number; onClose: () => void }) {
+  const etherscan = `https://etherscan.io/tx/${txHash}`;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md text-center" style={{ border: "1px solid #e5e7eb" }}>
+        <div className="px-8 py-8 space-y-4">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ background: "rgba(22,163,74,0.1)" }}>
+            <svg className="w-8 h-8" style={{ color: "#16a34a" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-lg font-extrabold" style={{ color: "#24315f" }}>Wave {waveNum} Transferred!</h2>
+            <p className="text-sm mt-1" style={{ color: "#6b7280" }}>
+              Unsold NFTs from Wave {waveNum} have been minted to the wallet.
+            </p>
+          </div>
+          {txHash && (
+            <>
+              <div className="px-4 py-3 rounded-xl text-left" style={{ background: "#f9fafb", border: "1px solid #f3f4f6" }}>
+                <p className="text-xs font-bold uppercase tracking-wide mb-1" style={{ color: "#9bafc5" }}>Transaction Hash</p>
+                <p className="text-xs font-mono break-all" style={{ color: "#374151" }}>{txHash}</p>
+              </div>
+              <a href={etherscan} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold"
+                style={{ color: "#41afeb" }}>
+                View on Etherscan
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </>
+          )}
+        </div>
+        <div className="px-6 pb-6">
+          <button onClick={onClose} className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
+            style={{ background: "#24315f" }}>
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function WavesPage() {
@@ -412,6 +588,10 @@ export default function WavesPage() {
   const [auctionQty, setAuctionQty]   = useState("1");
   const [auctionListingId, setAuctionListingId]     = useState("");
   const [auctionStartPrice, setAuctionStartPrice]   = useState("");
+
+  // ── Treasury move modal state ──
+  const [treasuryMoveWave,    setTreasuryMoveWave]    = useState<Wave | null>(null);
+  const [treasurySuccessData, setTreasurySuccessData] = useState<{ txHash: string; waveNum: number } | null>(null);
 
   // ── Reveal tab state ──
   const [revealWaves,       setRevealWaves]       = useState<WaveSchedule[]>([]);
@@ -666,10 +846,6 @@ export default function WavesPage() {
     }));
   };
 
-  const handleCloseTreasury = () =>
-    chainOp("treasury", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/treasury-close`, {
-      method: "POST", credentials: "include",
-    }));
 
   const handleMintTransfer = () => {
     if (!auctionTo) { setChainError("Recipient address required."); return; }
@@ -919,6 +1095,7 @@ export default function WavesPage() {
                           <td style={{ padding: "10px 14px", textAlign: "center" }}>
                             {(() => {
                               const minted = w.soldCount ?? w.onChain?.soldCount ?? 0;
+                              const pending = w.treasuryPendingCount ?? 0;
                               return (
                                 <>
                                   <div className="text-xs">
@@ -931,6 +1108,11 @@ export default function WavesPage() {
                                         width: `${Math.min(100, Math.round(minted / (w.quantity || 1) * 100))}%`,
                                         background: "#41afeb",
                                       }} />
+                                    </div>
+                                  )}
+                                  {pending > 0 && (
+                                    <div className="text-[9px] font-bold mt-1" style={{ color: "#d97706" }}>
+                                      {pending.toLocaleString()} unsold
                                     </div>
                                   )}
                                 </>
@@ -1018,14 +1200,28 @@ export default function WavesPage() {
                           </td>
 
                           <td style={{ padding: "10px 14px" }}>
-                            <button onClick={() => openManage(w, "settings")}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
-                              style={{ background: "#24315f" }}>
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              </svg>
-                              Manage
-                            </button>
+                            <div className="flex flex-col gap-1.5 items-start">
+                              <button onClick={() => openManage(w, "settings")}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+                                style={{ background: "#24315f" }}>
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                Manage
+                              </button>
+                              {w.waveClosed && w.waveRevealed && (w.treasuryPendingCount ?? 0) > 0 && (
+                                <button
+                                  onClick={() => setTreasuryMoveWave(w)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                                  style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a", border: "1px solid rgba(22,163,74,0.3)" }}>
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                      d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                  </svg>
+                                  Move to Wallet
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1464,6 +1660,26 @@ export default function WavesPage() {
       {activeTab === "packs"          && <PacksTab />}
       {activeTab === "collaborations" && <CollaborationsTab />}
 
+      {/* ── Treasury Move Modal ─────────────────────────────────────────────── */}
+      {treasuryMoveWave && (
+        <TreasuryMoveModal
+          wave={treasuryMoveWave}
+          onClose={() => setTreasuryMoveWave(null)}
+          onSuccess={(txHash) => {
+            setTreasuryMoveWave(null);
+            setTreasurySuccessData({ txHash, waveNum: treasuryMoveWave.waveNumber });
+            loadWaves();
+          }}
+        />
+      )}
+      {treasurySuccessData && (
+        <TreasurySuccessModal
+          txHash={treasurySuccessData.txHash}
+          waveNum={treasurySuccessData.waveNum}
+          onClose={() => { setTreasurySuccessData(null); }}
+        />
+      )}
+
       {/* ══ Manage Modal (unified Settings + Blockchain tabs) ═══════════════════ */}
       {editWave && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
@@ -1807,25 +2023,46 @@ export default function WavesPage() {
                   </div>
                 )}
 
-                {/* 5 — Close Wave */}
-                {!chainOnChain?.closed && (
-                  <div className="space-y-3 p-4 rounded-xl" style={{ background: "rgba(220,38,38,0.03)", border: "1px solid #fecaca" }}>
-                    <p className="text-xs font-bold" style={{ color: "#dc2626" }}>5. Close Wave (irreversible)</p>
+                {/* 5 — Move Unsold to Wallet (requires wave closed + revealed) */}
+                {editWave.waveClosed && editWave.waveRevealed && (
+                  <div className="space-y-3 p-4 rounded-xl" style={{ background: "rgba(22,163,74,0.03)", border: "1px solid rgba(22,163,74,0.3)" }}>
+                    <p className="text-xs font-bold" style={{ color: "#16a34a" }}>5. Move Unsold NFTs to Wallet</p>
                     <p className="text-xs" style={{ color: "#9bafc5" }}>
-                      Only after wave end time. Mints unsold NFTs to treasury wallet.
+                      Wave is closed and revealed. Transfer{" "}
+                      {(editWave.treasuryPendingCount ?? 0) > 0
+                        ? `${(editWave.treasuryPendingCount ?? 0).toLocaleString()} unsold NFTs`
+                        : "unsold NFTs"}{" "}
+                      to the treasury wallet or a custom wallet address.
                     </p>
-                    <button onClick={handleCloseTreasury} disabled={!!chainSaving}
+                    <button
+                      onClick={() => {
+                        const wave = waves.find(w => w.waveNumber === editWave.waveNumber);
+                        if (wave) { closeManage(); setTreasuryMoveWave(wave); }
+                      }}
+                      disabled={(editWave.treasuryPendingCount ?? 0) === 0}
                       className="px-4 py-2 text-xs font-bold rounded-xl"
-                      style={{ background: "rgba(22,163,74,0.08)", color: "#16a34a", border: "1px solid rgba(22,163,74,0.3)" }}>
-                      {chainSaving === "treasury" ? "Minting…" : "Mint Unsold → Treasury"}
+                      style={{
+                        background: (editWave.treasuryPendingCount ?? 0) === 0 ? "rgba(156,163,175,0.1)" : "rgba(22,163,74,0.08)",
+                        color: (editWave.treasuryPendingCount ?? 0) === 0 ? "#9bafc5" : "#16a34a",
+                        border: `1px solid ${(editWave.treasuryPendingCount ?? 0) === 0 ? "#e5e7eb" : "rgba(22,163,74,0.3)"}`,
+                        cursor: (editWave.treasuryPendingCount ?? 0) === 0 ? "not-allowed" : "pointer",
+                      }}>
+                      {(editWave.treasuryPendingCount ?? 0) === 0 ? "No Unsold NFTs" : "Move Unsold → Wallet"}
                     </button>
                   </div>
                 )}
-
-                {chainOnChain?.closed && (
-                  <div className="px-4 py-3 rounded-xl text-xs text-center"
-                    style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.3)", color: "#16a34a" }}>
-                    Wave {editWave.waveNumber} is closed on-chain. No further actions available.
+                {editWave.waveClosed && !editWave.waveRevealed && (
+                  <div className="px-4 py-3 rounded-xl text-xs"
+                    style={{ background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.25)", color: "#92400e" }}>
+                    Wave is closed but not yet revealed. Complete the reveal first before moving NFTs to wallet.
+                  </div>
+                )}
+                {!editWave.waveClosed && (
+                  <div className="space-y-2 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                    <p className="text-xs font-bold" style={{ color: "#9bafc5" }}>5. Move Unsold NFTs to Wallet</p>
+                    <p className="text-xs" style={{ color: "#d1d5db" }}>
+                      Available after wave is closed and revealed.
+                    </p>
                   </div>
                 )}
 

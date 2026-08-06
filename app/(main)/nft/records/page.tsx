@@ -57,6 +57,7 @@ interface NftRecord {
   waveScheduledStart: string | null;
   waveScheduledEnd: string | null;
   waveRevealScheduledAt: string | null;
+  waveStartingIndex: number | null;
   priceEth: number | null;
   effectivePriceEth: number | null;
   rarityTier: string | null;
@@ -93,6 +94,11 @@ function fmtDate(d: string | null) {
 }
 
 function shortAddr(addr: string) { return addr.slice(0, 6) + "…" + addr.slice(-4); }
+
+function artworkId(r: NftRecord): number | null {
+  if (!r.isRevealed || r.tokenId == null || r.waveQuantity == null || r.waveStartingIndex == null) return null;
+  return ((r.tokenId + r.waveStartingIndex) % r.waveQuantity) + 1;
+}
 function shortHash(h: string)    { return h.slice(0, 8) + "…" + h.slice(-6); }
 
 // ─── Sub-components (Records tab) ─────────────────────────────────────────────
@@ -333,8 +339,13 @@ export default function NftPage() {
           <div>
             <div className="font-mono font-bold text-sm leading-tight" style={{ color: "#0f172a" }}>{r.serialNumber}</div>
             <div className="text-xs mt-0.5" style={{ color: r.tokenId != null ? "#64748b" : "#cbd5e1" }}>
-              {r.tokenId != null ? `Token #${r.tokenId}` : "Not minted"}
+              {r.tokenId != null ? `Token ID #${r.tokenId}` : "Not minted"}
             </div>
+            {artworkId(r) != null && (
+              <div className="text-xs mt-0.5 font-semibold" style={{ color: "#7c3aed" }}>
+                ✦ Artwork ID #{artworkId(r)}
+              </div>
+            )}
             {r.rarityTier && (
               <div className="mt-0.5">
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
@@ -485,9 +496,9 @@ export default function NftPage() {
         {/* Per-tab CSV export */}
         {activeTab === "records" && (
           <button onClick={() => {
-            const headers = ["Serial #", "Token ID", "Wave", "Wave Start", "Wave End", "Reveal Date", "Minted At", "Revealed At", "Sold At", "Delivered At", "Status", "Price (ETH)", "Owner"];
+            const headers = ["NFT #", "Token ID", "Artwork ID", "Wave", "Wave Start", "Wave End", "Reveal Date", "Minted At", "Revealed At", "Sold At", "Delivered At", "Status", "Price (ETH)", "Owner"];
             const rows = records.map(r => [
-              r.serialNumber, r.tokenId ?? "", r.waveNumber ? `W${r.waveNumber}` : "",
+              r.serialNumber, r.tokenId ?? "", artworkId(r) != null ? `#${artworkId(r)}` : "", r.waveNumber ? `W${r.waveNumber}` : "",
               fmt(r.waveScheduledStart), fmt(r.waveScheduledEnd), fmt(r.waveRevealScheduledAt),
               fmt(r.mintedAt), fmt(r.revealedAt), fmt(r.soldAt), fmt(r.deliveredAt),
               r.deliveryStatusName ?? "", r.effectivePriceEth ?? "", r.ownerAddress ?? "",
@@ -737,7 +748,7 @@ export default function NftPage() {
                 <div>
                   <p className="text-sm font-extrabold leading-tight" style={{ color: "#0f172a" }}>
                     NFT {viewRecord.serialNumber}
-                    {viewRecord.tokenId != null && <span style={{ color: "#94a3b8", fontWeight: 500 }}> · Token #{viewRecord.tokenId}</span>}
+                    {viewRecord.tokenId != null && <span style={{ color: "#94a3b8", fontWeight: 500 }}> · Token ID #{viewRecord.tokenId}</span>}
                   </p>
                   <p className="text-xs" style={{ color: "#94a3b8" }}>Full history — generation to delivery</p>
                 </div>
@@ -780,9 +791,9 @@ export default function NftPage() {
                   {/* Details grid */}
                   <div className="flex-1 min-w-0">
                     <div className="grid grid-cols-3 gap-x-4 gap-y-4">
-                      {/* Serial # */}
+                      {/* NFT # */}
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Serial #</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>NFT #</p>
                         <p className="text-sm font-semibold leading-tight" style={{ color: "#0f172a" }}>{viewRecord.serialNumber}</p>
                       </div>
                       {/* Token ID */}
@@ -791,6 +802,14 @@ export default function NftPage() {
                         <p className="text-sm font-semibold leading-tight" style={{ color: viewRecord.tokenId != null ? "#0f172a" : "#94a3b8" }}>
                           {viewRecord.tokenId != null ? `#${viewRecord.tokenId}` : "Not minted"}
                         </p>
+                      </div>
+                      {/* Artwork ID — computed after VRF reveal */}
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Artwork ID</p>
+                        {artworkId(viewRecord) != null
+                          ? <p className="text-sm font-bold leading-tight" style={{ color: "#7c3aed" }}>✦ #{artworkId(viewRecord)}</p>
+                          : <p className="text-sm leading-tight" style={{ color: "#94a3b8" }}>{viewRecord.isRevealed ? "—" : "After reveal"}</p>
+                        }
                       </div>
                       {/* NFT Status — derived from lifecycle, industry-standard */}
                       <div>
