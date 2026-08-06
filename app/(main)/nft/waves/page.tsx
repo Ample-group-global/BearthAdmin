@@ -63,7 +63,7 @@ interface OnChainWaveInfo {
 
 interface SaleMethod { code: string; label: string; is_active: boolean; sort_order: number; }
 
-const STATUS_OPTS = ["upcoming", "active", "completed", "paused"];
+const STATUS_OPTS = ["upcoming", "active", "paused"];
 
 // ─── Types (Reveal tab) ───────────────────────────────────────────────────────
 
@@ -135,7 +135,6 @@ const STATE_META: Record<string, { label: string; color: string; bg: string }> =
 // ─── Sub-components (Waves tab) ───────────────────────────────────────────────
 
 const WAVE_COLORS = {
-  completed:        { bg: "rgba(22,163,74,0.1)",    color: "#16a34a", label: "Completed"       },
   revealed:         { bg: "rgba(124,58,237,0.1)",   color: "#7c3aed", label: "Revealed"         },
   reveal_scheduled: { bg: "rgba(124,58,237,0.08)",  color: "#7c3aed", label: "Reveal Scheduled" },
   ready_reveal:     { bg: "rgba(217,119,6,0.1)",    color: "#d97706", label: "Ready to Reveal"  },
@@ -874,9 +873,9 @@ export default function WavesPage() {
 
   const totalNfts      = waves.reduce((s, w) => s + (w.quantity ?? 0), 0);
   const activeWave     = waves.find(w => deriveWaveDisplayStatus(w) === "active");
-  // Waves whose minting period is over: closed, reveal-scheduled, ready-to-reveal, revealed, or manually marked completed/ended
+  // Waves whose minting period is over: closed, reveal-scheduled, ready-to-reveal, revealed, or transitional ended
   const completedCount = waves.filter(w =>
-    ["revealed", "completed", "closed", "reveal_scheduled", "ready_reveal", "ended"].includes(deriveWaveDisplayStatus(w))
+    ["revealed", "closed", "reveal_scheduled", "ready_reveal", "ended"].includes(deriveWaveDisplayStatus(w))
   ).length;
   const totalSold      = waves.reduce((s, w) => s + (w.soldCount ?? w.onChain?.soldCount ?? 0), 0);
 
