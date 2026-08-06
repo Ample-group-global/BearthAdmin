@@ -144,7 +144,6 @@ const WAVE_COLORS = {
   paused:           { bg: "rgba(217,119,6,0.1)",    color: "#d97706", label: "Paused"           },
   closed:           { bg: "rgba(22,163,74,0.1)",    color: "#16a34a", label: "Closed"           },
   ended:            { bg: "rgba(107,114,128,0.1)",  color: "#6b7280", label: "Ended"            },
-  sold_out:         { bg: "rgba(124,58,237,0.1)",   color: "#7c3aed", label: "Sold Out"         },
 };
 
 function deriveWaveDisplayStatus(w: Wave): string {
@@ -875,7 +874,10 @@ export default function WavesPage() {
 
   const totalNfts      = waves.reduce((s, w) => s + (w.quantity ?? 0), 0);
   const activeWave     = waves.find(w => deriveWaveDisplayStatus(w) === "active");
-  const completedCount = waves.filter(w => ["revealed", "completed", "sold_out", "closed"].includes(deriveWaveDisplayStatus(w))).length;
+  // Waves whose minting period is over: closed, reveal-scheduled, ready-to-reveal, revealed, or manually marked completed/ended
+  const completedCount = waves.filter(w =>
+    ["revealed", "completed", "closed", "reveal_scheduled", "ready_reveal", "ended"].includes(deriveWaveDisplayStatus(w))
+  ).length;
   const totalSold      = waves.reduce((s, w) => s + (w.soldCount ?? w.onChain?.soldCount ?? 0), 0);
 
   const revealNow = Date.now();
