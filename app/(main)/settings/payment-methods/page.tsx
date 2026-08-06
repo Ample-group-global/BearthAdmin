@@ -32,8 +32,7 @@ function Badge({ active }: { active: boolean }) {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div className="bg-white rounded-2xl shadow-xl flex flex-col"
-        style={{ width: "100%", maxWidth: 480, border: "1px solid #e5e7eb" }}>
+      <div className="ba-modal flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
           <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>{title}</h2>
           <button onClick={onClose} style={{ color: "#9bafc5" }}>
@@ -135,7 +134,7 @@ export default function PaymentMethodsPage() {
   const CATEGORIES = Object.keys(CATEGORY_META) as PaymentCategory[];
 
   return (
-    <div className="p-6 space-y-6" style={{ maxWidth: 760, margin: "0 auto" }}>
+    <div className="ba-page-narrow space-y-6">
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -168,7 +167,8 @@ export default function PaymentMethodsPage() {
         ) : methods.length === 0 ? (
           <div className="flex items-center justify-center h-32 text-sm" style={{ color: "#9bafc5" }}>No payment methods found</div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[480px]">
             <thead>
               <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e5e7eb" }}>
                 <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-widest" style={{ color: "#9bafc5" }}>Name</th>
@@ -234,6 +234,7 @@ export default function PaymentMethodsPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

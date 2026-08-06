@@ -34,7 +34,7 @@ const BASE_URL  = process.env.BASE_URL ?? 'http://localhost:3000';
 
 export default defineConfig({
   testDir:     './tests/phases',
-  testMatch:   ['**/phase-0[1-4]*.spec.ts'],
+  testMatch:   ['**/phase-0[1-6]*.spec.ts'],
   globalSetup: './tests/global-setup-phases.ts',
 
   fullyParallel: false,
@@ -47,8 +47,8 @@ export default defineConfig({
     storageState:      TECH_AUTH,
     actionTimeout:     30_000,
     navigationTimeout: 60_000,
-    trace:             'on-first-retry',
-    screenshot:        'only-on-failure',
+    trace:             'off',
+    screenshot:        'off',
     video:             'off',
     headless:          false,
   },
@@ -56,8 +56,7 @@ export default defineConfig({
   outputDir: path.join('tests', 'phase-results'),
 
   reporter: [
-    ['list'],
-    ['html', { outputFolder: path.join('tests', 'phase-report'), open: 'never' }],
+    ['line'],
     ['json', { outputFile: path.join('tests', 'phase-results', 'phase-report.json') }],
   ],
 

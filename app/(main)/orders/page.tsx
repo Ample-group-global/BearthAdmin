@@ -735,18 +735,9 @@ function OrdersPageInner() {
 
       {/* ── Create / Edit Modal ───────────────────────────────────────────────── */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ background: "rgba(0,0,0,0.5)", padding: modalMaximized ? 0 : 16 }}>
-          <div className="bg-white flex flex-col"
-            style={{
-              width: "100%",
-              maxWidth:     modalMaximized ? "100%" : 980,
-              height:       modalMaximized ? "100vh" : "auto",
-              maxHeight:    modalMaximized ? "100vh" : "92vh",
-              borderRadius: modalMaximized ? 0 : 16,
-              border:       "1px solid #e5e7eb",
-              boxShadow:    "0 25px 60px rgba(0,0,0,0.18)",
-            }}>
+        <div className={`fixed inset-0 z-50 flex items-center justify-center ba-modal-orders-wrap${modalMaximized ? " maximized" : ""}`}
+          style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className={`ba-modal-orders flex flex-col${modalMaximized ? " maximized" : ""}`}>
 
             {/* Modal header */}
             <div className="px-6 py-4 flex items-center justify-between flex-shrink-0"

@@ -85,14 +85,7 @@ function ModalShell({
       style={{ background: "rgba(15,23,42,0.55)", backdropFilter: "blur(2px)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div
-        className="bg-white rounded-2xl w-full flex flex-col"
-        style={{
-          maxWidth: wide ? 720 : 480,
-          maxHeight: "90vh",
-          boxShadow: "0 24px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06)",
-        }}
-      >
+      <div className={`${wide ? "ba-modal-wide" : "ba-modal"} flex flex-col`}>
         <div
           className="flex items-start justify-between px-6 py-4 flex-shrink-0 rounded-t-2xl"
           style={{ background: "linear-gradient(135deg,#24315f 0%,#1e4a8a 100%)" }}
@@ -107,10 +100,8 @@ function ModalShell({
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-full transition-colors"
+            className="os-modal-close p-1 rounded-full transition-colors"
             style={{ color: "rgba(255,255,255,0.6)" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
-            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
@@ -125,10 +116,8 @@ function ModalShell({
           {footer}
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+            className="os-modal-footer-close px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors"
             style={{ color: "#64748b", background: "#f1f5f9" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "#e2e8f0")}
-            onMouseLeave={e => (e.currentTarget.style.background = "#f1f5f9")}
           >
             Close
           </button>
@@ -447,14 +436,7 @@ function NftAnalyticsModal({
       style={{ background: "rgba(15,23,42,0.55)", backdropFilter: "blur(2px)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div
-        className="bg-white rounded-xl w-full flex flex-col"
-        style={{
-          maxWidth: 400,
-          maxHeight: "90vh",
-          boxShadow: "0 24px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06)",
-        }}
-      >
+      <div className="ba-modal-400 rounded-xl w-full flex flex-col">
         {/* Header */}
         <div
           className="flex items-start justify-between px-5 py-4 rounded-t-xl flex-shrink-0"
@@ -468,10 +450,8 @@ function NftAnalyticsModal({
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-full transition-colors"
+            className="os-modal-close p-1 rounded-full transition-colors"
             style={{ color: "rgba(255,255,255,0.6)" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
-            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
@@ -507,10 +487,8 @@ function NftAnalyticsModal({
         >
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+            className="os-modal-footer-close px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors"
             style={{ color: "#64748b", background: "#f1f5f9" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "#e2e8f0")}
-            onMouseLeave={e => (e.currentTarget.style.background = "#f1f5f9")}
           >
             Close
           </button>

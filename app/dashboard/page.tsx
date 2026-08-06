@@ -200,8 +200,7 @@ function NFTModal({ token, blockExplorer, waveName, blindBoxImageUrl, onClose }:
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(20,23,38,0.72)", backdropFilter: "blur(6px)" }}
       onClick={onClose}>
-      <div className="relative flex bg-white rounded-2xl shadow-2xl overflow-hidden w-full max-w-3xl max-h-[90vh]"
-        style={{ border: "1px solid #e5e7eb" }}
+      <div className="nft-modal-wrap"
         onClick={e => e.stopPropagation()}>
 
         <button onClick={onClose}
@@ -209,8 +208,7 @@ function NFTModal({ token, blockExplorer, waveName, blindBoxImageUrl, onClose }:
           style={{ background: "#f4f6fb", border: "1px solid #e5e7eb", color: "#6b7280" }}>✕</button>
 
         {/* Left — image */}
-        <div className="flex-shrink-0 flex flex-col items-center justify-center gap-3 p-6"
-          style={{ width: 300, background: "#f4f6fb", borderRight: "1px solid #e5e7eb" }}>
+        <div className="nft-modal-image">
           {imageUrl ? (
             <img src={imageUrl} alt={`Bearth NFT #${token.token_id}`}
               className="w-full aspect-square rounded-xl object-contain"
@@ -482,7 +480,7 @@ export default function DashboardPage() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 space-y-6">
+    <div className="ba-page space-y-6">
 
       {selectedToken && (
         <NFTModal
@@ -697,14 +695,14 @@ export default function DashboardPage() {
         )}
 
         {/* Filters */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex flex-wrap items-center gap-3">
-          <div className="relative">
+        <div className="ba-filters">
+          <div className="ba-search">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
               placeholder="Token ID, wallet, or tx hash…"
-              className="pl-9 pr-3 py-2 rounded-lg text-sm outline-none w-64"
+              className="pl-9 pr-3 py-2 rounded-lg text-sm outline-none"
               style={{ border: "1px solid #e5e7eb" }} />
           </div>
           <select value={waveFilter} onChange={e => { setWaveFilter(e.target.value); setPage(1); }}
@@ -746,7 +744,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="ba-table-wrap bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           {nftLoading ? (
             <div className="p-12 text-center">
               <svg className="w-6 h-6 animate-spin mx-auto mb-3" fill="none" viewBox="0 0 24 24" style={{ color: "#41afeb" }}>

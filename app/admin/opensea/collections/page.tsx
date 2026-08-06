@@ -124,12 +124,7 @@ function ModalShell({
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="bg-white rounded-2xl w-full flex flex-col"
-        style={{
-          maxWidth: extraWide ? 860 : wide ? 680 : 480,
-          maxHeight: "90vh",
-          boxShadow: "0 24px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06)",
-        }}
+        className={`rounded-2xl w-full flex flex-col ${extraWide ? "ba-modal-860" : wide ? "ba-modal-680" : "ba-modal"}`}
       >
         {/* Header */}
         <div

@@ -27,7 +27,7 @@ import { test, expect } from '@playwright/test';
 import { isLocked, isPreviousLocked, lockPhase, PhaseId } from '../helpers/phase-lock';
 
 const PHASE_ID: PhaseId = 'phase-01';
-const CONTRACT = '0xd3b0b081A40a4DF72E20A503Ba7eaE85b2Fb9F66';
+const CONTRACT = '0x52eC59B0e6c381477B134e1b2c9F84bd7c328bE5';
 const TREASURY = '0xA5BfbbB9308F97daBd61E6b43faD391929BFF9a4';
 
 test.describe.configure({ mode: 'serial' });
@@ -41,8 +41,14 @@ test.describe('Phase 1 — Filebase → nft_records Sync (Pre-Mint Foundation)',
     }
   });
 
-  test.afterEach(async ({}, testInfo) => {
-    if (testInfo.status === 'failed') failCount++;
+  test.afterEach(async ({ page }, testInfo) => {
+    if (testInfo.status === 'failed') {
+      failCount++;
+      await page.screenshot({
+        path: `tests/phase-results/screenshots/${PHASE_ID}-${testInfo.title.replace(/[^a-z0-9]/gi, '_')}.png`,
+        fullPage: true,
+      }).catch(() => {});
+    }
   });
 
   test.afterAll(async () => {

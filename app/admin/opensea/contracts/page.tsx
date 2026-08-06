@@ -150,8 +150,8 @@ export default function ContractsPage() {
         </div>
 
         {/* Address input + button */}
-        <div className="flex gap-2">
-          <div className="flex-1 relative">
+        <div className="ba-lookup-form">
+          <div className="ba-lookup-input relative">
             <input
               type="text"
               placeholder="0x… contract address"

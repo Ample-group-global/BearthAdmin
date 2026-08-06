@@ -31,13 +31,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div
-      className="h-screen overflow-hidden flex items-center justify-center px-4 pb-10"
-      style={{
-        background: "linear-gradient(145deg,#131d3b 0%,#24315f 55%,#1e3a70 100%)",
-        fontFamily: "'hoss-round','Figtree',ui-sans-serif,system-ui,sans-serif",
-      }}
-    >
+    <div className="login-bg">
       <div className="w-full max-w-[360px] sm:max-w-md">
 
         {/* ── Logo ── */}
@@ -89,29 +83,11 @@ export default function ForgotPasswordPage() {
                 <div className="flex flex-col gap-2 w-full">
                   <button
                     onClick={() => { setSent(false); setEmail(""); }}
-                    className="w-full text-sm font-semibold rounded-lg transition-all"
-                    style={{
-                      padding: "10px 16px",
-                      background: "#f1f5f9",
-                      color: "#24315f",
-                      border: "1.5px solid #e2e8f0",
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = "#e2e8f0"; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = "#f1f5f9"; }}
+                    className="login-btn-secondary"
                   >
                     Send again
                   </button>
-                  <Link
-                    href="/login"
-                    className="w-full text-white text-sm font-bold rounded-lg text-center transition-all block"
-                    style={{
-                      padding: "10px 16px",
-                      background: "#41afeb",
-                      boxShadow: "0 4px 14px rgba(65,175,235,0.35)",
-                    }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#2b9fd5"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#41afeb"; }}
-                  >
+                  <Link href="/login" className="login-btn">
                     Back to Sign In
                   </Link>
                 </div>
@@ -152,31 +128,11 @@ export default function ForgotPasswordPage() {
                       required
                       autoComplete="email"
                       autoFocus
-                      className="w-full rounded-lg text-sm outline-none transition-all"
-                      style={{
-                        padding: "10px 14px",
-                        border: "1.5px solid #e5e7eb",
-                        color: "#111827",
-                        background: "#f9fafb",
-                      }}
-                      onFocus={e => { e.currentTarget.style.borderColor = "#41afeb"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(65,175,235,0.14)"; e.currentTarget.style.background = "#fff"; }}
-                      onBlur={e => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.background = "#f9fafb"; }}
+                      className="login-input"
                     />
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full text-white text-sm font-bold rounded-lg transition-all"
-                    style={{
-                      padding: "11px 16px",
-                      background: loading ? "#9bafc5" : "#41afeb",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      boxShadow: loading ? "none" : "0 4px 14px rgba(65,175,235,0.35)",
-                    }}
-                    onMouseEnter={e => { if (!loading) e.currentTarget.style.background = "#2b9fd5"; }}
-                    onMouseLeave={e => { if (!loading) e.currentTarget.style.background = "#41afeb"; }}
-                  >
+                  <button type="submit" disabled={loading} className="login-btn">
                     {loading ? (
                       <span className="flex items-center justify-center gap-2">
                         <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -189,15 +145,7 @@ export default function ForgotPasswordPage() {
                   </button>
 
                   <div className="text-center pt-1">
-                    <Link
-                      href="/login"
-                      className="text-[11px] font-medium transition-colors"
-                      style={{ color: "#94a3b8" }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#41afeb"; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#94a3b8"; }}
-                    >
-                      ← Back to Sign In
-                    </Link>
+                    <Link href="/login" className="login-link-muted">← Back to Sign In</Link>
                   </div>
                 </form>
               </>

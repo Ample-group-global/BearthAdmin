@@ -141,7 +141,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (!ctx) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#f0f2f7" }}>
+      <div className="ba-loading-screen">
         <div className="flex flex-col items-center gap-3">
           <svg className="w-7 h-7 animate-spin" style={{ color: "#41afeb" }} fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -186,23 +186,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside
         className={`
+          ba-sidebar
           fixed inset-y-0 left-0 z-50
           md:relative md:z-auto md:inset-auto md:translate-x-0
           flex flex-col transition-transform duration-200 ease-in-out overflow-hidden
           ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
+          ${collapsed ? "ba-sidebar-collapsed" : "ba-sidebar-full"}
         `}
-        style={{ background: "#182035", width: collapsed ? "48px" : "210px", boxShadow: "2px 0 8px rgba(0,0,0,0.2)", flexShrink: 0 }}
       >
         {/* Brand */}
         {collapsed ? (
           <div className="flex-shrink-0 flex items-center justify-center" style={{ height: "44px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
             <button
               onClick={() => setCollapsed(false)}
-              className="w-8 h-8 flex items-center justify-center rounded transition-colors"
-              style={{ color: "rgba(255,255,255,0.4)" }}
+              className="sidebar-expand-btn w-8 h-8 flex items-center justify-center rounded"
               title="Expand"
-              onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "#fff"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
@@ -218,11 +216,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <button
               onClick={() => setCollapsed(true)}
-              className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded transition-colors"
-              style={{ color: "rgba(255,255,255,0.25)" }}
+              className="sidebar-collapse-btn flex-shrink-0 w-6 h-6 flex items-center justify-center rounded"
               title="Collapse"
-              onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "#fff"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 19l-7-7 7-7M19 19l-7-7 7-7" />
@@ -244,10 +239,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {!collapsed && (
                   <button
                     onClick={() => toggleSection(mod)}
-                    className={`w-full flex items-center justify-between px-2.5 mx-1 rounded-md ${idx > 0 ? "mt-3" : "mt-1"} mb-1 py-1 transition-colors duration-150`}
-                    style={{ color: "rgba(255,255,255,0.72)" }}
-                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "#fff"; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.72)"; }}
+                    className={`nav-section-btn w-full flex items-center justify-between px-2.5 mx-1 rounded-md ${idx > 0 ? "mt-3" : "mt-1"} mb-1 py-1`}
                   >
                     <span className="text-[11px] font-semibold uppercase tracking-wide">{sectionLabel}</span>
                     <svg
@@ -265,19 +257,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <div key={item.href} className="relative group px-1.5 mb-0.5">
                       <Link
                         href={item.href}
-                        className="flex items-center gap-2.5 rounded text-xs font-medium transition-all duration-150"
-                        style={{
-                          padding: collapsed ? "7px 0" : "6px 8px",
-                          justifyContent: collapsed ? "center" : undefined,
-                          background: active ? "rgba(65,175,235,0.15)" : "transparent",
-                          color: active ? "#fff" : "rgba(255,255,255,0.68)",
-                          borderLeft: active && !collapsed ? "2px solid #41afeb" : "2px solid transparent",
-                        }}
-                        onMouseEnter={e => { if (!active) { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "#fff"; } }}
-                        onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.68)"; } }}
+                        className={`nav-link${active ? " active" : ""}${collapsed ? " collapsed" : ""}`}
                         title={collapsed ? item.label : undefined}
                       >
-                        <span style={{ color: active ? "#41afeb" : "rgba(255,255,255,0.5)", flexShrink: 0 }}>
+                        <span className="nav-icon">
                           <NavIcon name={item.icon} />
                         </span>
                         {!collapsed && <span className="truncate">{item.label}</span>}
@@ -304,11 +287,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="relative group">
             <button
               onClick={logout}
-              className="w-full flex items-center gap-2.5 rounded text-xs font-medium transition-colors duration-150"
-              style={{ padding: collapsed ? "7px 0" : "6px 8px", justifyContent: collapsed ? "center" : undefined, color: "rgba(255,255,255,0.35)" }}
+              className={`nav-sign-out w-full flex items-center gap-2.5 rounded text-xs font-medium${collapsed ? " justify-center" : ""}`}
+              style={{ padding: collapsed ? "7px 0" : "6px 8px" }}
               title={collapsed ? "Sign Out" : undefined}
-              onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.12)"; e.currentTarget.style.color = "#f87171"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.35)"; }}
             >
               <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

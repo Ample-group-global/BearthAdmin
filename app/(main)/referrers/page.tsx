@@ -38,7 +38,7 @@ type SortDir = "asc" | "desc";
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div className="bg-white rounded-2xl shadow-xl flex flex-col" style={{ width: "100%", maxWidth: 480, maxHeight: "90vh", border: "1px solid #e5e7eb" }}>
+      <div className="ba-modal flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
           <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>{title}</h2>
           <button onClick={onClose} style={{ color: "#9bafc5" }}>
@@ -77,7 +77,7 @@ function ReferredModal({ referrer, onClose }: { referrer: Referrer; onClose: () 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div className="bg-white rounded-2xl shadow-xl flex flex-col" style={{ width: "100%", maxWidth: 560, maxHeight: "80vh", border: "1px solid #e5e7eb" }}>
+      <div className="ba-modal-560 flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
           <div>
             <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Referred by {referrer.name}</h2>

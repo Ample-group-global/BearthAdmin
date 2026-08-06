@@ -1289,11 +1289,7 @@ export default function ProductsPage() {
             src={lightboxUrl}
             alt="Product"
             onClick={e => e.stopPropagation()}
-            style={{
-              maxWidth: "88vw", maxHeight: "88vh",
-              borderRadius: 16, boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
-              objectFit: "contain",
-            }} />
+            className="ba-lightbox-img" />
         </div>
       )}
 
@@ -1375,8 +1371,7 @@ function Modal({ children, onClose, title, small, wide }:
   { children: React.ReactNode; onClose: () => void; title: string; small?: boolean; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div className="bg-white rounded-2xl shadow-xl flex flex-col"
-        style={{ width: "100%", maxWidth: wide ? 780 : small ? 400 : 560, maxHeight: "90vh", border: "1px solid #e5e7eb" }}>
+      <div className={`flex flex-col ${wide ? "ba-modal-780" : small ? "ba-modal-400" : "ba-modal-560"}`}>
         <div className="flex items-center justify-between px-6 py-4 flex-shrink-0"
           style={{ borderBottom: "1px solid #e5e7eb" }}>
           <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>{title}</h2>

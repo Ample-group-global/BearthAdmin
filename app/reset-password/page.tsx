@@ -63,10 +63,7 @@ export default function ResetPasswordPage() {
     <button
       type="button"
       onClick={onToggle}
-      className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors"
-      style={{ color: "#b0c0ce" }}
-      onMouseEnter={e => { e.currentTarget.style.color = "#41afeb"; }}
-      onMouseLeave={e => { e.currentTarget.style.color = "#b0c0ce"; }}
+      className="login-toggle-pw"
       aria-label={label}
     >
       {show ? (
@@ -83,13 +80,7 @@ export default function ResetPasswordPage() {
   );
 
   return (
-    <div
-      className="h-screen overflow-hidden flex items-center justify-center px-4 pb-10"
-      style={{
-        background: "linear-gradient(145deg,#131d3b 0%,#24315f 55%,#1e3a70 100%)",
-        fontFamily: "'hoss-round','Figtree',ui-sans-serif,system-ui,sans-serif",
-      }}
-    >
+    <div className="login-bg">
       <div className="w-full max-w-[360px] sm:max-w-md">
 
         {/* ── Logo ── */}
@@ -135,13 +126,7 @@ export default function ResetPasswordPage() {
                 <p className="text-xs leading-relaxed mb-5" style={{ color: "#64748b" }}>
                   This password reset link is missing or has expired. Please request a new one.
                 </p>
-                <Link
-                  href="/forgot-password"
-                  className="w-full text-white text-sm font-bold rounded-lg text-center transition-all block"
-                  style={{ padding: "10px 16px", background: "#41afeb", boxShadow: "0 4px 14px rgba(65,175,235,0.35)" }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#2b9fd5"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#41afeb"; }}
-                >
+                <Link href="/forgot-password" className="login-btn">
                   Request New Link
                 </Link>
               </div>
@@ -199,15 +184,7 @@ export default function ResetPasswordPage() {
                         placeholder="Min. 8 characters"
                         required
                         autoFocus
-                        className="w-full rounded-lg text-sm outline-none transition-all"
-                        style={{
-                          padding: "10px 44px 10px 14px",
-                          border: "1.5px solid #e5e7eb",
-                          color: "#111827",
-                          background: "#f9fafb",
-                        }}
-                        onFocus={e => { e.currentTarget.style.borderColor = "#41afeb"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(65,175,235,0.14)"; e.currentTarget.style.background = "#fff"; }}
-                        onBlur={e => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.background = "#f9fafb"; }}
+                        className="login-input login-input-pw"
                       />
                       <EyeBtn show={showPw} onToggle={() => setShowPw(v => !v)} label={showPw ? "Hide password" : "Show password"} />
                     </div>
@@ -240,15 +217,7 @@ export default function ResetPasswordPage() {
                         onChange={e => setConfirm(e.target.value)}
                         placeholder="Re-enter your password"
                         required
-                        className="w-full rounded-lg text-sm outline-none transition-all"
-                        style={{
-                          padding: "10px 44px 10px 14px",
-                          border: confirm && confirm !== password ? "1.5px solid #fca5a5" : "1.5px solid #e5e7eb",
-                          color: "#111827",
-                          background: "#f9fafb",
-                        }}
-                        onFocus={e => { e.currentTarget.style.borderColor = "#41afeb"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(65,175,235,0.14)"; e.currentTarget.style.background = "#fff"; }}
-                        onBlur={e => { e.currentTarget.style.borderColor = confirm && confirm !== password ? "#fca5a5" : "#e5e7eb"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.background = "#f9fafb"; }}
+                        className={`login-input login-input-pw${confirm && confirm !== password ? " login-input-error" : ""}`}
                       />
                       <EyeBtn show={showCf} onToggle={() => setShowCf(v => !v)} label={showCf ? "Hide password" : "Show password"} />
                     </div>
@@ -260,15 +229,7 @@ export default function ResetPasswordPage() {
                   <button
                     type="submit"
                     disabled={loading || (!!confirm && confirm !== password)}
-                    className="w-full text-white text-sm font-bold rounded-lg transition-all"
-                    style={{
-                      padding: "11px 16px",
-                      background: loading ? "#9bafc5" : "#41afeb",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      boxShadow: loading ? "none" : "0 4px 14px rgba(65,175,235,0.35)",
-                    }}
-                    onMouseEnter={e => { if (!loading) e.currentTarget.style.background = "#2b9fd5"; }}
-                    onMouseLeave={e => { if (!loading) e.currentTarget.style.background = "#41afeb"; }}
+                    className="login-btn"
                   >
                     {loading ? (
                       <span className="flex items-center justify-center gap-2">
@@ -282,15 +243,7 @@ export default function ResetPasswordPage() {
                   </button>
 
                   <div className="text-center pt-1">
-                    <Link
-                      href="/login"
-                      className="text-[11px] font-medium transition-colors"
-                      style={{ color: "#94a3b8" }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#41afeb"; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#94a3b8"; }}
-                    >
-                      ← Back to Sign In
-                    </Link>
+                    <Link href="/login" className="login-link-muted">← Back to Sign In</Link>
                   </div>
                 </form>
               </>

@@ -180,7 +180,7 @@ export default function OverviewPage() {
   );
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl">
+    <div className="ba-page space-y-6 max-w-6xl">
 
       <div>
         <h1 className="text-xl font-extrabold" style={{ color: "#24315f" }}>Bearth Overview</h1>

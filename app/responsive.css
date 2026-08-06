@@ -1,0 +1,716 @@
+/* ============================================================
+   BEARTH ADMIN — RESPONSIVE DESIGN SYSTEM
+   Breakpoints:
+     Mobile  : ≤ 767px  (designed for 375px)
+     Tablet  : 768px – 1279px
+     Desktop : ≥ 1280px (default — no media query needed)
+   ============================================================ */
+
+/* ── Design tokens ─────────────────────────────────────────── */
+:root {
+  --ba-pad-desktop : 24px;
+  --ba-pad-tablet  : 16px;
+  --ba-pad-mobile  : 12px;
+  --ba-sidebar-w   : 210px;
+  --ba-sidebar-w-c : 48px;
+  --ba-header-h    : 44px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LAYOUT — AppShell
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Loading screen */
+.ba-loading-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f2f7;
+}
+
+/* Sidebar */
+.ba-sidebar {
+  background: #182035;
+  box-shadow: 2px 0 8px rgba(0,0,0,.2);
+  flex-shrink: 0;
+}
+.ba-sidebar-full      { width: var(--ba-sidebar-w); }
+.ba-sidebar-collapsed { width: var(--ba-sidebar-w-c); }
+
+/* Brand / collapse buttons */
+.sidebar-collapse-btn {
+  color: rgba(255,255,255,.25);
+  transition: background .15s, color .15s;
+}
+.sidebar-collapse-btn:hover {
+  background: rgba(255,255,255,.08) !important;
+  color: #fff !important;
+}
+
+.sidebar-expand-btn {
+  color: rgba(255,255,255,.4);
+  transition: background .15s, color .15s;
+}
+.sidebar-expand-btn:hover {
+  background: rgba(255,255,255,.08) !important;
+  color: #fff !important;
+}
+
+/* Section header buttons */
+.nav-section-btn {
+  color: rgba(255,255,255,.72);
+  transition: background .15s, color .15s;
+}
+.nav-section-btn:hover {
+  background: rgba(255,255,255,.07) !important;
+  color: #fff !important;
+}
+
+/* Nav links — replaces all inline style + JS hover handlers */
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 8px;
+  justify-content: flex-start;
+  background: transparent;
+  color: rgba(255,255,255,.68);
+  border-left: 2px solid transparent;
+  transition: background .15s, color .15s;
+  text-decoration: none;
+}
+.nav-link.collapsed {
+  padding: 7px 0;
+  justify-content: center;
+  border-left: 2px solid transparent !important;
+}
+.nav-link.active {
+  background: rgba(65,175,235,.15);
+  color: #fff;
+  border-left: 2px solid #41afeb;
+}
+.nav-link:not(.active):hover {
+  background: rgba(255,255,255,.07) !important;
+  color: #fff !important;
+}
+
+/* Nav icon */
+.nav-icon {
+  color: rgba(255,255,255,.5);
+  flex-shrink: 0;
+  transition: color .15s;
+}
+.nav-link.active .nav-icon {
+  color: #41afeb;
+}
+.nav-link:not(.active):hover .nav-icon {
+  color: rgba(255,255,255,.7) !important;
+}
+
+/* Sign-out button */
+.nav-sign-out {
+  color: rgba(255,255,255,.35);
+  transition: background .15s, color .15s;
+}
+.nav-sign-out:hover {
+  background: rgba(239,68,68,.12) !important;
+  color: #f87171 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGE CONTAINERS
+   ═══════════════════════════════════════════════════════════════ */
+.ba-page {
+  padding: var(--ba-pad-desktop);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODALS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Small  — max 420px */
+.ba-modal-sm {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  border: 1px solid #e5e7eb;
+}
+
+/* Medium — max 480px */
+.ba-modal {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 80px rgba(0,0,0,.18), 0 0 0 1px rgba(0,0,0,.06);
+}
+
+/* Wide  — max 720px */
+.ba-modal-wide {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 720px;
+  max-height: 90vh;
+  overflow-y: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,.18), 0 0 0 1px rgba(0,0,0,.06);
+}
+
+/* Manage — max 580px, can maximize */
+.ba-modal-manage {
+  background: white;
+  width: 100%;
+  max-width: 580px;
+  max-height: 92vh;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+.ba-modal-manage.maximized {
+  max-width: 98vw;
+  max-height: 97vh;
+  height: 97vh;
+  border-radius: 12px;
+}
+
+/* 400px */
+.ba-modal-400 {
+  background: white; border-radius: 16px; width: 100%; max-width: 400px;
+  max-height: 90vh; overflow-y: auto; border: 1px solid #e5e7eb;
+  box-shadow: 0 25px 60px rgba(0,0,0,.18);
+}
+
+/* 560px */
+.ba-modal-560 {
+  background: white; border-radius: 16px; width: 100%; max-width: 560px;
+  max-height: 90vh; overflow-y: hidden; border: 1px solid #e5e7eb;
+  box-shadow: 0 25px 60px rgba(0,0,0,.18);
+}
+
+/* 680px — OpenSea Collections wide */
+.ba-modal-680 {
+  background: white; border-radius: 16px; width: 100%; max-width: 680px;
+  max-height: 90vh; overflow-y: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,.18), 0 0 0 1px rgba(0,0,0,.06);
+}
+
+/* 780px — Products wide */
+.ba-modal-780 {
+  background: white; border-radius: 16px; width: 100%; max-width: 780px;
+  max-height: 90vh; overflow-y: hidden; border: 1px solid #e5e7eb;
+  box-shadow: 0 25px 60px rgba(0,0,0,.18);
+}
+
+/* 860px — Fulfillment/Inventory/OpenSea extra-wide */
+.ba-modal-860 {
+  background: white; border-radius: 16px; width: 100%; max-width: 860px;
+  max-height: 90vh; overflow-y: hidden; border: 1px solid #e5e7eb;
+  box-shadow: 0 25px 60px rgba(0,0,0,.18);
+}
+
+/* Customers modal — 3-state (normal / minimized / maximized) */
+.ba-modal-customers {
+  background: white; border-radius: 16px; width: 100%; max-width: 672px;
+  max-height: 90vh; box-shadow: 0 25px 60px rgba(0,0,0,.18);
+}
+.ba-modal-customers.minimized {
+  width: 320px; max-width: 320px; max-height: none; border-radius: 16px;
+}
+.ba-modal-customers.maximized {
+  max-width: 100%; max-height: 100vh; height: 100vh; border-radius: 0;
+}
+
+/* NFT Records modal — maximizable */
+.ba-modal-records {
+  background: white; border-radius: 16px; width: 100%; max-width: 800px;
+  max-height: 92vh; overflow: hidden; border: 1px solid #e2e8f0;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,.25);
+  transition: max-width .2s ease, height .2s ease, border-radius .2s ease;
+}
+.ba-modal-records.maximized {
+  max-width: 100vw; max-height: 100vh; height: 100vh; border-radius: 0;
+}
+
+/* Orders modal — maximizable */
+.ba-modal-orders-wrap { padding: 16px; }
+.ba-modal-orders-wrap.maximized { padding: 0; }
+.ba-modal-orders {
+  background: white; border-radius: 16px; width: 100%; max-width: 980px;
+  max-height: 92vh; overflow: hidden; border: 1px solid #e5e7eb;
+  box-shadow: 0 25px 60px rgba(0,0,0,.18);
+}
+.ba-modal-orders.maximized {
+  max-width: 100%; max-height: 100vh; height: 100vh; border-radius: 0;
+}
+
+/* Product image lightbox */
+.ba-lightbox-img {
+  max-width: 88vw; max-height: 88vh; border-radius: 16px;
+  box-shadow: 0 24px 80px rgba(0,0,0,.6); object-fit: contain;
+}
+
+/* Narrow page container (e.g., settings pages) */
+.ba-page-narrow {
+  padding: var(--ba-pad-desktop);
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+/* ── OpenSea ModalShell close button ── */
+.os-modal-close:hover {
+  background: rgba(255,255,255,.12) !important;
+}
+/* ── OpenSea ModalShell footer close ── */
+.os-modal-footer-close:hover {
+  background: #e2e8f0 !important;
+}
+
+/* ── NFT detail modal (two-column: image + details) ── */
+.nft-modal-wrap {
+  position: relative;
+  display: flex;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,.25);
+  overflow: hidden;
+  width: 100%;
+  max-width: 800px;
+  max-height: 90vh;
+  border: 1px solid #e5e7eb;
+}
+
+.nft-modal-image {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  width: 300px;
+  background: #f4f6fb;
+  border-right: 1px solid #e5e7eb;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TABS
+   ═══════════════════════════════════════════════════════════════ */
+.ba-tabs {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.ba-tabs button {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FILTER BARS
+   ═══════════════════════════════════════════════════════════════ */
+.ba-filters {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  padding: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.ba-search {
+  position: relative;
+  width: 256px;
+}
+.ba-search input { width: 100%; }
+
+/* ═══════════════════════════════════════════════════════════════
+   TABLES
+   ═══════════════════════════════════════════════════════════════ */
+.ba-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GRIDS
+   ═══════════════════════════════════════════════════════════════ */
+.ba-grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 20px; }
+.ba-grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+.ba-grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
+.ba-form-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 12px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGINATION
+   ═══════════════════════════════════════════════════════════════ */
+.ba-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #e5e7eb;
+  color: #9bafc5;
+  font-size: 14px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LOGIN PAGE
+   ═══════════════════════════════════════════════════════════════ */
+.login-bg {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 16px 40px;
+  background: linear-gradient(145deg, #131d3b 0%, #24315f 55%, #1e3a70 100%);
+  font-family: 'hoss-round', 'Figtree', ui-sans-serif, system-ui, sans-serif;
+}
+
+.login-input {
+  width: 100%;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s, background .15s;
+  padding: 10px 14px;
+  border: 1.5px solid #e5e7eb;
+  color: #111827;
+  background: #f9fafb;
+}
+.login-input:focus {
+  border-color: #41afeb;
+  box-shadow: 0 0 0 3px rgba(65,175,235,.14);
+  background: #fff;
+}
+.login-input-pw {
+  padding-right: 44px;
+}
+.login-input-error {
+  border-color: #fca5a5 !important;
+}
+
+.login-btn {
+  display: block;
+  width: 100%;
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 11px 16px;
+  background: #41afeb;
+  cursor: pointer;
+  letter-spacing: .025em;
+  box-shadow: 0 4px 14px rgba(65,175,235,.35);
+  margin-top: 8px;
+  transition: background .15s, box-shadow .15s;
+  border: none;
+  text-align: center;
+}
+.login-btn:hover:not(:disabled) {
+  background: #2b9fd5;
+}
+.login-btn:disabled {
+  background: #9bafc5 !important;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.login-link {
+  color: #41afeb;
+  font-size: 11px;
+  font-weight: 500;
+  transition: color .15s;
+}
+.login-link:hover {
+  color: #2b9fd5;
+}
+
+.login-toggle-pw {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px;
+  border-radius: 4px;
+  transition: color .15s;
+  color: #b0c0ce;
+  cursor: pointer;
+  background: none;
+  border: none;
+  line-height: 0;
+}
+.login-toggle-pw:hover {
+  color: #41afeb;
+}
+
+/* Secondary (ghost) button on auth pages */
+.login-btn-secondary {
+  display: block;
+  width: 100%;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: #f1f5f9;
+  color: #24315f;
+  border: 1.5px solid #e2e8f0;
+  cursor: pointer;
+  transition: background .15s;
+  text-align: center;
+}
+.login-btn-secondary:hover {
+  background: #e2e8f0;
+}
+
+/* Muted back link on auth pages */
+.login-link-muted {
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+  transition: color .15s;
+}
+.login-link-muted:hover {
+  color: #41afeb;
+}
+
+.login-divider {
+  width: 32px;
+  height: 1px;
+  background: rgba(255,255,255,.18);
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.login-footer {
+  font-size: 11px;
+  color: rgba(255,255,255,.55);
+  letter-spacing: .06em;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CONTRACT LOOKUP PAGE
+   ═══════════════════════════════════════════════════════════════ */
+.ba-lookup-form {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.ba-lookup-input { flex: 1; }
+
+/* ═══════════════════════════════════════════════════════════════
+   GENERIC — Catch-all for pages not explicitly tagged ba-page
+   These selectors target the direct child of AppShell <main>
+   and all modal overlays across the whole admin.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Table scroll touch support (global) */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TABLET  768px – 1279px
+   ═══════════════════════════════════════════════════════════════ */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .ba-page { padding: var(--ba-pad-tablet); }
+
+  /* Generic page containers */
+  main > [class~="p-6"] { padding: var(--ba-pad-tablet) !important; }
+
+  .ba-grid-4 { grid-template-columns: repeat(2,1fr); }
+  .ba-grid-3 { grid-template-columns: repeat(2,1fr); }
+
+  .ba-modal        { max-width: min(480px, 95vw); }
+  .ba-modal-wide   { max-width: min(720px, 95vw); }
+  .ba-modal-sm     { max-width: min(420px, 95vw); }
+  .ba-modal-manage { max-width: min(580px, 95vw); }
+  .ba-modal-400    { max-width: min(400px, 95vw); }
+  .ba-modal-560    { max-width: min(560px, 95vw); }
+  .ba-modal-680    { max-width: min(680px, 95vw); }
+  .ba-modal-780    { max-width: min(780px, 95vw); }
+  .ba-modal-860    { max-width: min(860px, 95vw); }
+  .ba-modal-customers { max-width: min(672px, 95vw); }
+  .ba-modal-records   { max-width: min(800px, 95vw); }
+  .ba-modal-orders    { max-width: min(980px, 95vw); }
+
+  .nft-modal-wrap { max-width: 95vw; }
+  .nft-modal-image { width: 240px; }
+
+  .ba-page-narrow { padding: var(--ba-pad-tablet); }
+
+  /* Studio: hide summary panel, narrow sidebar */
+  .studio-wrap .layout {
+    grid-template-columns: 180px 1fr !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE  ≤ 767px  (designed for 375px)
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  /* Page padding */
+  .ba-page { padding: var(--ba-pad-mobile); }
+
+  /* Generic: direct children of AppShell <main> with large padding */
+  main > [class~="p-6"] { padding: var(--ba-pad-mobile) !important; }
+  main > [class~="p-5"] { padding: var(--ba-pad-mobile) !important; }
+
+  /* Generic: all modal overlays (fixed inset-0 z-50 pattern) — cap width on mobile */
+  .fixed.inset-0.z-50.flex.items-center.justify-center > div,
+  .fixed.inset-0.z-50.flex.items-end.justify-center > div {
+    max-width: 95vw !important;
+    max-height: 92vh !important;
+  }
+
+  /* Generic: filter-like flex bars in pages */
+  main .flex.flex-wrap.gap-3,
+  main .flex.flex-wrap.gap-2 {
+    gap: 8px;
+  }
+
+  /* Modals */
+  .ba-modal,
+  .ba-modal-wide,
+  .ba-modal-sm,
+  .ba-modal-manage,
+  .ba-modal-manage.maximized,
+  .ba-modal-400,
+  .ba-modal-560,
+  .ba-modal-680,
+  .ba-modal-780,
+  .ba-modal-860,
+  .ba-modal-customers,
+  .ba-modal-customers.minimized,
+  .ba-modal-customers.maximized,
+  .ba-modal-records,
+  .ba-modal-records.maximized,
+  .ba-modal-orders,
+  .ba-modal-orders.maximized {
+    max-width : 95vw !important;
+    max-height: 92vh !important;
+    height    : auto !important;
+    border-radius: 12px !important;
+  }
+
+  .ba-modal-orders-wrap { padding: 8px; }
+  .ba-page-narrow { padding: var(--ba-pad-mobile); }
+  .ba-lightbox-img { max-width: 95vw; max-height: 85vh; }
+
+  /* NFT modal — column layout */
+  .nft-modal-wrap {
+    flex-direction: column;
+    max-width : 95vw;
+    max-height: 95vh;
+  }
+  .nft-modal-image {
+    width: 100%;
+    border-right : none;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 12px;
+  }
+  .nft-modal-image img {
+    max-width : 140px;
+    max-height: 140px;
+  }
+
+  /* Grids */
+  .ba-grid-4 { grid-template-columns: repeat(2,1fr); gap: 10px; }
+  .ba-grid-3 { grid-template-columns: 1fr; gap: 10px; }
+  .ba-grid-2 { grid-template-columns: 1fr; gap: 10px; }
+  .ba-form-2 { grid-template-columns: 1fr; gap: 8px;  }
+
+  /* Filter bars */
+  .ba-filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 12px;
+  }
+  .ba-filters select,
+  .ba-filters button { width: 100%; min-width: 0; }
+  .ba-search { width: 100%; }
+
+  /* Pagination */
+  .ba-pagination {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 10px 12px;
+  }
+
+  /* Contract lookup stacks */
+  .ba-lookup-form {
+    flex-direction: column;
+  }
+  .ba-lookup-form button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Login */
+  .login-bg {
+    align-items: flex-start;
+    padding-top: 32px;
+  }
+
+  /* Studio — collapse to single scrollable column */
+  .studio-wrap {
+    height: auto !important;
+    overflow: auto !important;
+    min-height: calc(100vh - 108px);
+  }
+  .studio-wrap .layout {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EXTRA SMALL  ≤ 374px
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 374px) {
+  .ba-page { padding: 8px; }
+
+  .ba-grid-4,
+  .ba-grid-2 { grid-template-columns: 1fr; }
+
+  .ba-modal,
+  .ba-modal-wide,
+  .ba-modal-sm,
+  .ba-modal-manage,
+  .ba-modal-manage.maximized,
+  .ba-modal-400,
+  .ba-modal-560,
+  .ba-modal-680,
+  .ba-modal-780,
+  .ba-modal-860,
+  .ba-modal-customers,
+  .ba-modal-customers.minimized,
+  .ba-modal-customers.maximized,
+  .ba-modal-records,
+  .ba-modal-records.maximized,
+  .ba-modal-orders,
+  .ba-modal-orders.maximized {
+    max-width    : 100vw !important;
+    border-radius: 0 !important;
+    max-height   : 100vh !important;
+  }
+  .nft-modal-wrap {
+    max-width    : 100vw;
+    border-radius: 0 !important;
+    max-height   : 100vh;
+  }
+}

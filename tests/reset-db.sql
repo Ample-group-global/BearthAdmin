@@ -59,7 +59,7 @@ UPDATE nft_records SET
 
 -- 4. Ensure contract address is correct in collection config
 UPDATE nft_collection_config
-SET contract_address = '0xd3b0b081A40a4DF72E20A503Ba7eaE85b2Fb9F66'
+SET contract_address = '0x52eC59B0e6c381477B134e1b2c9F84bd7c328bE5'
 WHERE TRUE;
 
 -- 5. Clear whitelist (Phase 2.5 re-adds CW1/CW2/CW4 programmatically before minting)

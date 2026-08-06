@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Figtree } from "next/font/google";
 import "./globals.css";
+import "./responsive.css";
 import { Providers } from "./providers";
 
 export const dynamic = "force-dynamic";

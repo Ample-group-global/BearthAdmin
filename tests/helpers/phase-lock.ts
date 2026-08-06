@@ -12,7 +12,7 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
-export type PhaseId = 'phase-01' | 'phase-02' | 'phase-02.5' | 'phase-03' | 'phase-04';
+export type PhaseId = 'phase-01' | 'phase-02' | 'phase-02.5' | 'phase-03' | 'phase-04' | 'phase-05' | 'phase-06';
 
 export interface PhaseState {
   status: 'pending' | 'passed' | 'failed';
@@ -26,7 +26,7 @@ export type LockFile = Record<PhaseId, PhaseState>;
 
 const LOCK_FILE = join(process.cwd(), 'tests', 'phase-lock.json');
 
-const PHASE_ORDER: PhaseId[] = ['phase-01', 'phase-02', 'phase-02.5', 'phase-03', 'phase-04'];
+const PHASE_ORDER: PhaseId[] = ['phase-01', 'phase-02', 'phase-02.5', 'phase-03', 'phase-04', 'phase-05', 'phase-06'];
 
 const DEFAULT_STATE: LockFile = {
   'phase-01':   { status: 'pending', locked: false, completedAt: null, passCount: 0, failCount: 0 },
@@ -34,6 +34,8 @@ const DEFAULT_STATE: LockFile = {
   'phase-02.5': { status: 'pending', locked: false, completedAt: null, passCount: 0, failCount: 0 },
   'phase-03':   { status: 'pending', locked: false, completedAt: null, passCount: 0, failCount: 0 },
   'phase-04':   { status: 'pending', locked: false, completedAt: null, passCount: 0, failCount: 0 },
+  'phase-05':   { status: 'pending', locked: false, completedAt: null, passCount: 0, failCount: 0 },
+  'phase-06':   { status: 'pending', locked: false, completedAt: null, passCount: 0, failCount: 0 },
 };
 
 export function getPhaseLocks(): LockFile {

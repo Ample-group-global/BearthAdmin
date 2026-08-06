@@ -577,14 +577,7 @@ export default function CustomersPage() {
           style={!modalMinimized && !modalMaximized ? { background: "rgba(0,0,0,0.4)" } : {}}
         >
           <div
-            className="bg-white shadow-xl flex flex-col"
-            style={{
-              width: modalMinimized ? "320px" : "100%",
-              maxWidth: modalMinimized ? "320px" : modalMaximized ? "100%" : "672px",
-              maxHeight: modalMinimized ? "none" : modalMaximized ? "100vh" : "90vh",
-              height: modalMaximized && !modalMinimized ? "100vh" : "auto",
-              borderRadius: modalMaximized && !modalMinimized ? 0 : "16px",
-            }}
+            className={`ba-modal-customers flex flex-col${modalMinimized ? " minimized" : ""}${modalMaximized ? " maximized" : ""}`}
           >
             <div className="px-6 py-4 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
               <h2

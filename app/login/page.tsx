@@ -53,13 +53,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div
-      className="h-screen overflow-hidden flex items-center justify-center px-4 pb-10"
-      style={{
-        background: "linear-gradient(145deg,#131d3b 0%,#24315f 55%,#1e3a70 100%)",
-        fontFamily: "'hoss-round','Figtree',ui-sans-serif,system-ui,sans-serif",
-      }}
-    >
+    <div className="login-bg">
       <div className="w-full max-w-[360px] sm:max-w-md">
 
         {/* ── Logo ── */}
@@ -131,15 +125,7 @@ export default function LoginPage() {
                   placeholder="Enter your email"
                   required
                   autoComplete="email"
-                  className="w-full rounded-lg text-sm outline-none transition-all"
-                  style={{
-                    padding: "10px 14px",
-                    border: "1.5px solid #e5e7eb",
-                    color: "#111827",
-                    background: "#f9fafb",
-                  }}
-                  onFocus={e => { e.currentTarget.style.borderColor = "#41afeb"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(65,175,235,0.14)"; e.currentTarget.style.background = "#fff"; }}
-                  onBlur={e => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.background = "#f9fafb"; }}
+                  className="login-input"
                 />
               </div>
 
@@ -149,13 +135,7 @@ export default function LoginPage() {
                   <label className="block text-[11px] font-semibold" style={{ color: "#24315f" }}>
                     Password
                   </label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-[11px] font-medium transition-colors"
-                    style={{ color: "#41afeb" }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#2b9fd5"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#41afeb"; }}
-                  >
+                  <Link href="/forgot-password" className="login-link">
                     Forgot password?
                   </Link>
                 </div>
@@ -167,23 +147,12 @@ export default function LoginPage() {
                     placeholder="Enter your password"
                     required
                     autoComplete="current-password"
-                    className="w-full rounded-lg text-sm outline-none transition-all"
-                    style={{
-                      padding: "10px 44px 10px 14px",
-                      border: "1.5px solid #e5e7eb",
-                      color: "#111827",
-                      background: "#f9fafb",
-                    }}
-                    onFocus={e => { e.currentTarget.style.borderColor = "#41afeb"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(65,175,235,0.14)"; e.currentTarget.style.background = "#fff"; }}
-                    onBlur={e => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.background = "#f9fafb"; }}
+                    className="login-input login-input-pw"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPw(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors"
-                    style={{ color: "#b0c0ce" }}
-                    onMouseEnter={e => { e.currentTarget.style.color = "#41afeb"; }}
-                    onMouseLeave={e => { e.currentTarget.style.color = "#b0c0ce"; }}
+                    className="login-toggle-pw"
                     aria-label={showPw ? "Hide password" : "Show password"}
                   >
                     {showPw ? (
@@ -204,17 +173,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full text-white text-sm font-bold rounded-lg transition-all"
-                style={{
-                  padding: "11px 16px",
-                  background: loading ? "#9bafc5" : "#41afeb",
-                  cursor: loading ? "not-allowed" : "pointer",
-                  letterSpacing: "0.025em",
-                  boxShadow: loading ? "none" : "0 4px 14px rgba(65,175,235,0.35)",
-                  marginTop: "8px",
-                }}
-                onMouseEnter={e => { if (!loading) e.currentTarget.style.background = "#2b9fd5"; }}
-                onMouseLeave={e => { if (!loading) e.currentTarget.style.background = "#41afeb"; }}
+                className="login-btn"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -233,11 +192,9 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="flex items-center justify-center gap-2 mt-5">
-          <span style={{ width: 32, height: 1, background: "rgba(255,255,255,0.18)", display: "inline-block" }} />
-          <p className="text-center" style={{ fontSize: "11px", color: "rgba(255,255,255,0.55)", letterSpacing: "0.06em", fontWeight: 500 }}>
-            Bearth Admin Console · Secure Access
-          </p>
-          <span style={{ width: 32, height: 1, background: "rgba(255,255,255,0.18)", display: "inline-block" }} />
+          <span className="login-divider" />
+          <p className="login-footer">Bearth Admin Console · Secure Access</p>
+          <span className="login-divider" />
         </div>
 
       </div>

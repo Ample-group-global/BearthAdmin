@@ -2,15 +2,15 @@
   "phase-01": {
     "status": "passed",
     "locked": true,
-    "completedAt": "2026-08-06T06:27:20.811Z",
+    "completedAt": "2026-08-06T15:09:30.312Z",
     "passCount": 0,
     "failCount": 0
   },
   "phase-02": {
     "status": "passed",
     "locked": true,
-    "completedAt": "2026-08-06T09:40:19.230Z",
-    "passCount": 0,
+    "completedAt": "2026-08-06T20:00:00.000Z",
+    "passCount": 9,
     "failCount": 0
   },
   "phase-02.5": {
@@ -28,6 +28,20 @@
     "failCount": 0
   },
   "phase-04": {
+    "status": "pending",
+    "locked": false,
+    "completedAt": null,
+    "passCount": 0,
+    "failCount": 0
+  },
+  "phase-05": {
+    "status": "pending",
+    "locked": false,
+    "completedAt": null,
+    "passCount": 0,
+    "failCount": 0
+  },
+  "phase-06": {
     "status": "pending",
     "locked": false,
     "completedAt": null,

@@ -522,7 +522,7 @@ export default function NftPage() {
       </div>
 
       {/* ── Tab Bar ── */}
-      <div style={{ borderBottom: "1px solid #e5e7eb" }}>
+      <div className="ba-tabs" style={{ borderBottom: "1px solid #e5e7eb" }}>
         <div className="flex gap-1">
           {(["records", "otc", "bulk", "gifts", "auctions", "seasons", "events", "burn"] as const).map(tab => {
             const LABELS: Record<string, string> = { records: "Records", otc: "OTC Deals", bulk: "Bulk Ops", gifts: "Gifts", auctions: "Auctions", seasons: "Season Passes", events: "Events", burn: "Burn to Mint" };
@@ -738,16 +738,7 @@ export default function NftPage() {
       {/* ══ Full History Modal ══════════════════════════════════════════════════ */}
       {viewRecord && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.6)", backdropFilter: "blur(6px)" }}>
-          <div className="flex flex-col shadow-2xl overflow-hidden bg-white"
-            style={{
-              width: "100%",
-              maxWidth:     modalMaximized ? "100vw" : 800,
-              height:       modalMaximized ? "100vh" : "auto",
-              maxHeight:    modalMaximized ? "100vh" : "92vh",
-              borderRadius: modalMaximized ? 0 : 16,
-              border: "1px solid #e2e8f0",
-              transition: "max-width 0.2s ease, height 0.2s ease, border-radius 0.2s ease",
-            }}>
+          <div className={`flex flex-col ba-modal-records${modalMaximized ? " maximized" : ""}`}>
 
             {/* ── Title Bar ───────────────────────────────────────────────── */}
             <div className="flex-shrink-0 flex items-center justify-between px-5 py-3"
