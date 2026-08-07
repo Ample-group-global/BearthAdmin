@@ -134,7 +134,7 @@ function toLocalDateTimeInput(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function waveState(w: WaveSchedule): "revealed" | "ready_reveal" | "reveal_scheduled" | "active" | "ended" | "upcoming" | "not_scheduled" {
+function waveState(w: WaveSchedule): "revealed" | "ready_reveal" | "reveal_scheduled" | "active" | "ended" | "ended_zero" | "upcoming" | "not_scheduled" {
   const now = Date.now();
   if (w.is_revealed) return "revealed";
   if (w.wave_start_triggered && !w.wave_end_triggered) return "active";
@@ -142,6 +142,8 @@ function waveState(w: WaveSchedule): "revealed" | "ready_reveal" | "reveal_sched
   if (w.wave_end_triggered) {
     if (w.reveal_scheduled_at && new Date(w.reveal_scheduled_at).getTime() <= now) return "ready_reveal";
     if (w.reveal_scheduled_at && new Date(w.reveal_scheduled_at).getTime() > now)  return "reveal_scheduled";
+    // 0-minted closed wave: nothing to reveal, auto-treasury handles it → treat as complete
+    if ((w.sold_count ?? 0) === 0) return "ended_zero";
     return "ended";
   }
   if (w.scheduled_start && new Date(w.scheduled_start).getTime() > now) return "upcoming";
@@ -154,6 +156,7 @@ const STATE_META: Record<string, { label: string; color: string; bg: string }> =
   reveal_scheduled: { label: "Reveal Scheduled",  color: "#7c3aed", bg: "rgba(124,58,237,0.1)" },
   active:           { label: "Active",             color: "#41afeb", bg: "rgba(65,175,235,0.1)" },
   ended:            { label: "Wave Ended",         color: "#6b7280", bg: "rgba(107,114,128,0.1)" },
+  ended_zero:       { label: "Complete",           color: "#16a34a", bg: "rgba(22,163,74,0.1)"   },
   upcoming:         { label: "Upcoming",           color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
   not_scheduled:    { label: "Not Scheduled",      color: "#9bafc5", bg: "rgba(156,163,175,0.1)" },
 };
@@ -1047,7 +1050,7 @@ export default function WavesPage() {
                       <div className="flex flex-col items-center" style={{ flexShrink: 0 }}>
                         <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold"
                           style={{ background: meta.bg, color: meta.color, border: `2px solid ${meta.color}` }}>
-                          {w.is_revealed ? (
+                          {w.is_revealed || st === "ended_zero" ? (
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                             </svg>
@@ -1067,7 +1070,7 @@ export default function WavesPage() {
                       {!isLast && (
                         <div style={{
                           flex: 1, height: 2, minWidth: 4,
-                          background: w.is_revealed ? "#16a34a" : "#e5e7eb",
+                          background: w.is_revealed || st === "ended_zero" ? "#16a34a" : "#e5e7eb",
                           margin: "0 4px", marginBottom: 28,
                         }} />
                       )}
