@@ -31,7 +31,7 @@
  *   1. Phase 01 is LOCKED
  *   2. DB in clean state (all waves pending, no scheduled dates)
  *   3. Sepolia wallet has enough ETH (≥ 0.05 ETH)
- *   4. Contract deployed at 0xd3b0b081A40a4DF72E20A503Ba7eaE85b2Fb9F66
+ *   4. Contract deployed at 0x52eC59B0e6c381477B134e1b2c9F84bd7c328bE5 (Sepolia)
  */
 
 import { test, expect } from '@playwright/test';
@@ -52,7 +52,7 @@ function unx(deltaMin: number): number {
 // Wave 1: 50-min window (T0+5 → T0+55) — leaves room for Phase 2.5 WL mints
 const W1_START_ISO  = iso(5);
 const W1_END_ISO    = iso(55);
-const W1_REVEAL_ISO = iso(60);   // must be strictly > W1_END
+// W1_REVEAL_ISO is set dynamically in Phase 3 (P3-02) after wave closes — not set here
 const W1_START_UNIX = unx(5);
 const W1_END_UNIX   = unx(55);
 
@@ -155,9 +155,9 @@ test.describe('Phase 2 — Wave Scheduling (DB + On-Chain)', () => {
 
     const res = await page.request.put(`/api/waves/${wave1.id}`, {
       data: {
-        scheduledStart:    W1_START_ISO,
-        scheduledEnd:      W1_END_ISO,
-        revealScheduledAt: W1_REVEAL_ISO,
+        scheduledStart: W1_START_ISO,
+        scheduledEnd:   W1_END_ISO,
+        // revealScheduledAt set in Phase 3 after wave closes (API enforces this rule)
       },
     });
 
@@ -367,11 +367,19 @@ test.describe('Phase 2 — Wave Scheduling (DB + On-Chain)', () => {
         expect(saveRes.ok(), `DB save failed for Wave ${wd.num}: ${saveRes.status()}`).toBe(true);
       }
 
-      // On-chain schedule push
-      const schedRes = await page.request.put(`/api/nft-sell/waves/${wd.num}/schedule`, {
+      // On-chain schedule push — one retry for intermittent Sepolia nonce/RPC 500s
+      let schedRes = await page.request.put(`/api/nft-sell/waves/${wd.num}/schedule`, {
         data: { startUnix: wd.startUnix, endUnix: wd.endUnix },
         timeout: 120_000,
       });
+      if (schedRes.status() === 500) {
+        console.log(`P2-09: Wave ${wd.num} schedule got 500 — waiting 15s and retrying...`);
+        await page.waitForTimeout(15_000);
+        schedRes = await page.request.put(`/api/nft-sell/waves/${wd.num}/schedule`, {
+          data: { startUnix: wd.startUnix, endUnix: wd.endUnix },
+          timeout: 120_000,
+        });
+      }
       if (schedRes.status() === 409) {
         // Locked: verify already on-chain
         const checkRes = await page.request.get(`/api/nft-sell/waves/${wd.num}`, { timeout: 20_000 });

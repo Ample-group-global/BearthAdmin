@@ -45,7 +45,7 @@ const CW5_ADDR = '0x59C5347a9B78C8279Cb6b759AEd143Ec53256A62';
 // ── Contract ABI (minimal) ────────────────────────────────────────────────────
 const CONTRACT_ABI = [
   'function whitelistMint(bytes32[] calldata proof) external',
-  'function publicMint(uint256 qty) external payable',
+  'function publicMint(uint256 waveNum, uint256 qty) external payable',
   'function waveStartTime(uint256 waveNum) external view returns (uint256)',
   'function waveEndTime(uint256 waveNum) external view returns (uint256)',
   'function wavePrice(uint256 waveNum) external view returns (uint256)',
@@ -105,9 +105,15 @@ async function mintFreeWL(key: string, label: string): Promise<string | null> {
     return null;
   }
 
-  const tx      = await contract.whitelistMint(proof);
-  const receipt = await tx.wait();
-  return (receipt?.hash ?? tx.hash) as string;
+  try {
+    const tx      = await contract.whitelistMint(proof);
+    const receipt = await tx.wait();
+    return (receipt?.hash ?? tx.hash) as string;
+  } catch (e: any) {
+    const msg = String(e.message ?? e).slice(0, 120);
+    console.warn(`  ${label}: whitelistMint failed — ${msg}`);
+    return null;
+  }
 }
 
 async function mintPaid(key: string, label: string, qty: number, waveNum: number): Promise<string | null> {
@@ -125,9 +131,15 @@ async function mintPaid(key: string, label: string, qty: number, waveNum: number
     return null;
   }
 
-  const tx      = await contract.publicMint(qty, { value });
-  const receipt = await tx.wait();
-  return (receipt?.hash ?? tx.hash) as string;
+  try {
+    const tx      = await contract.publicMint(waveNum, qty, { value });
+    const receipt = await tx.wait();
+    return (receipt?.hash ?? tx.hash) as string;
+  } catch (e: any) {
+    const msg = String(e.message ?? e).slice(0, 120);
+    console.warn(`  ${label} W${waveNum}: publicMint failed — ${msg}`);
+    return null;
+  }
 }
 
 async function takeScreenshot(page: import('@playwright/test').Page, name: string): Promise<void> {

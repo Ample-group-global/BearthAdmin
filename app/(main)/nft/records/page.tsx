@@ -796,14 +796,9 @@ export default function NftPage() {
                   {/* Details grid */}
                   <div className="flex-1 min-w-0">
                     <div className="grid grid-cols-3 gap-x-4 gap-y-4">
-                      {/* NFT # */}
+                      {/* Minted Token ID */}
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>NFT #</p>
-                        <p className="text-sm font-semibold leading-tight" style={{ color: "#0f172a" }}>{viewRecord.serialNumber}</p>
-                      </div>
-                      {/* Token ID */}
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Token ID</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Minted Token ID</p>
                         <p className="text-sm font-semibold leading-tight" style={{ color: viewRecord.tokenId != null ? "#0f172a" : "#94a3b8" }}>
                           {viewRecord.tokenId != null ? `#${viewRecord.tokenId}` : "Not minted"}
                         </p>

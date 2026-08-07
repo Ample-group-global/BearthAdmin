@@ -25,7 +25,7 @@
  *
  * Pre-conditions:
  *   1. Phase 03 is LOCKED (Wave 1 revealed, treasury_pending > 0)
- *   2. nft_collection_config.treasury_wallet = '0xA5BfbbB9308F97daBd61E6b43faD391929BFF9a4'
+ *   2. nft_collection_config.treasury_wallet = '0x8b98f7EC8Fb6D77C480Af7c98980353c33753EF4' (set in DB reset)
  *   3. Sepolia wallet has ETH for gas
  */
 
@@ -33,7 +33,7 @@ import { test, expect } from '@playwright/test';
 import { isLocked, isPreviousLocked, lockPhase, PhaseId } from '../helpers/phase-lock';
 
 const PHASE_ID: PhaseId = 'phase-04';
-const TREASURY_WALLET = '0xA5BfbbB9308F97daBd61E6b43faD391929BFF9a4';
+const TREASURY_WALLET = '0x8b98f7EC8Fb6D77C480Af7c98980353c33753EF4'; // matches nft_collection_config.treasury_wallet + TREASURY_WALLET env
 const ETHERSCAN_SEPOLIA = 'https://sepolia.etherscan.io/tx/';
 
 test.describe.configure({ mode: 'serial' });
