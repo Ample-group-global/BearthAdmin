@@ -1315,16 +1315,30 @@ export default function WavesPage() {
                                   </span>
                                 </div>
                               ) : null;
-                              // 0-minted closed wave: no reveal date picker needed — backend handles reveal internally during transfer
-                              if (isZeroMinted) return (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded"
-                                  style={isAuto
-                                    ? { background: "rgba(65,175,235,0.08)", color: "#41afeb", border: "1px solid rgba(65,175,235,0.2)" }
-                                    : { background: "rgba(217,119,6,0.08)", color: "#d97706", border: "1px solid rgba(217,119,6,0.2)" }
-                                  }>
-                                  {isAuto ? "Auto → Treasury" : "Manual Transfer"}
-                                </span>
-                              );
+                              // 0-minted closed wave: no reveal date picker needed — backend auto-reveals + transfers
+                              if (isZeroMinted) {
+                                // Auto-treasury + no action taken yet: show trigger button (opens TreasuryMoveModal)
+                                if (isAuto && !w.closeAction) return (
+                                  <button onClick={() => setTreasuryMoveWave(w)}
+                                    className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                                    style={{ background: "rgba(65,175,235,0.1)", color: "#41afeb", border: "1px solid rgba(65,175,235,0.3)", cursor: "pointer" }}>
+                                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    Auto Transfer
+                                  </button>
+                                );
+                                // Already completed or manual strategy: show static badge
+                                return (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                                    style={isAuto
+                                      ? { background: "rgba(22,163,74,0.08)", color: "#16a34a", border: "1px solid rgba(22,163,74,0.2)" }
+                                      : { background: "rgba(217,119,6,0.08)", color: "#d97706", border: "1px solid rgba(217,119,6,0.2)" }
+                                    }>
+                                    {isAuto ? "✓ Transferred" : "Manual Transfer"}
+                                  </span>
+                                );
+                              }
                               const isReady = !w.waveRevealed && !!w.revealScheduledAt && new Date(w.revealScheduledAt).getTime() <= Date.now();
                               const makeWS = (): WaveSchedule => ({
                                 wave_number: w.waveNumber, wave_name: w.name, status: w.status,

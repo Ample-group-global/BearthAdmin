@@ -1,49 +1,45 @@
 /**
- * PHASE 4 — Treasury Transfer (Move Unsold NFTs to Wallet)
+ * PHASE 4 — Treasury Transfer Verification (All 7 Waves)
  *
- * Purpose: After Wave 1 is closed and revealed, move unsold NFTs to the treasury wallet.
- * Tests the TreasuryMoveModal → on-chain transaction → TreasurySuccessModal flow.
+ * Purpose: Verify all 7 waves have their treasury transfers completed after Phase 3.
  *
- * Business rule (enforced in BearthGenesisNFT.sol):
- *   treasuryClose() requires:
- *     1. waveEndTime[waveNum] != 0 (wave must have been scheduled)
- *     2. block.timestamp > waveEndTime[waveNum] (wave must have ended)
- *     3. waveRevealed[waveNum] == true (wave must be revealed)
- *   If any condition fails → revert WaveStillActive
+ * Expected state after Phase 3:
+ *   Wave 1: revealed=true, close_action=treasury, treasury_recipient=0xA5Bb... (custom wallet)
+ *            delivery_status = transferred (for Wave 1 unsold)
+ *   Wave 2: revealed=true, close_action=treasury, treasury_recipient=null (default treasury)
+ *            delivery_status = treasury_wallet
+ *   Waves 3–7: revealed=true (internal), close_action=treasury, treasury_recipient=null
+ *               delivery_status = treasury_wallet (all NFTs minted to treasury)
+ *
+ * Smart contract rule (BearthGenesisNFT.sol treasuryClose):
+ *   Requires: waveEndTime set + block.timestamp > waveEndTime + waveRevealed=true
  *
  * What this phase tests:
- *   - "Move to Wallet" button appears ONLY for closed+revealed waves with treasury_pending>0
- *   - TreasuryMoveModal opens with radio options (Default / Custom wallet)
- *   - Selecting "Default Treasury Wallet" fills correct address
- *   - On-chain treasuryClose() executes successfully
- *   - TreasurySuccessModal shows with tx hash + Etherscan Sepolia link
- *   - nft_records delivery_status updates: treasury_pending → transferred
- *   - "Move to Wallet" button disappears after transfer
+ *   - All 7 waves show close_action='treasury' via API
+ *   - /nft/waves page: no "Move to Wallet", "Auto Transfer" or "Reveal Now" buttons remain
+ *   - /nft/waves REVEAL column shows "✓ Transferred" badge for 0-minted waves
+ *   - /nft/records page loads 9,999 total records
+ *   - delivery_status breakdown: no treasury_pending records
+ *   - Progress bar circles: Waves 1–2 green (Revealed), Waves 3–7 green (Complete)
  *
- * LOCK RULE: Once all tests pass this phase is locked.
- *            Pre-requisite: Phase 03 must be locked first.
- *
- * Pre-conditions:
- *   1. Phase 03 is LOCKED (Wave 1 revealed, treasury_pending > 0)
- *   2. nft_collection_config.treasury_wallet = '0x8b98f7EC8Fb6D77C480Af7c98980353c33753EF4' (set in DB reset)
- *   3. Sepolia wallet has ETH for gas
+ * LOCK RULE: Phase locks when all tests pass.
+ *            Pre-requisite: Phase 03 must be locked.
  */
 
 import { test, expect } from '@playwright/test';
 import { isLocked, isPreviousLocked, lockPhase, PhaseId } from '../helpers/phase-lock';
 
 const PHASE_ID: PhaseId = 'phase-04';
-const TREASURY_WALLET = '0x8b98f7EC8Fb6D77C480Af7c98980353c33753EF4'; // matches nft_collection_config.treasury_wallet + TREASURY_WALLET env
-const ETHERSCAN_SEPOLIA = 'https://sepolia.etherscan.io/tx/';
+const TREASURY_WALLET = '0x8b98f7EC8Fb6D77C480Af7c98980353c33753EF4';
 
 test.describe.configure({ mode: 'serial' });
 
-test.describe('Phase 4 — Treasury Transfer (Move Unsold NFTs to Wallet)', () => {
+test.describe('Phase 4 — Treasury Transfer Verification (All 7 Waves)', () => {
   let failCount = 0;
 
   test.beforeEach(async ({}, testInfo) => {
     if (!isPreviousLocked(PHASE_ID)) {
-      testInfo.skip(true, '⏭ Phase 03 must be LOCKED before running Phase 04. Run phase-03 tests first.');
+      testInfo.skip(true, '⏭ Phase 03 must be LOCKED before running Phase 04.');
     }
     if (isLocked(PHASE_ID)) {
       testInfo.skip(true, '🔒 Phase 04 is LOCKED — set "locked":false in phase-lock.json to re-run.');
@@ -65,201 +61,124 @@ test.describe('Phase 4 — Treasury Transfer (Move Unsold NFTs to Wallet)', () =
     else console.log(`\n⚠  Phase 04: ${failCount} test(s) failed — fix and re-run.\n`);
   });
 
-  // ─── P4-01: "Move to Wallet" button visible on /nft/waves for Wave 1 ─────
-  test('P4-01: "Move to Wallet" button appears for Wave 1 (closed + revealed + unsold > 0)', async ({ page }) => {
-    await page.goto('/nft/waves');
-    await page.waitForLoadState('networkidle');
+  // ─── P4-01: All 7 waves have close_action='treasury' via API ──────────────
+  test('P4-01: All 7 waves have close_action=treasury (verified via API)', async ({ page }) => {
+    const res = await page.request.get('/api/nft-sell/waves');
+    expect(res.ok()).toBeTruthy();
+    const data = await res.json();
+    const waves: any[] = data.waves ?? [];
 
-    // The green "Move to Wallet" button should appear for Wave 1
-    const moveBtn = page.locator('button').filter({ hasText: /move to wallet/i });
-    await expect(moveBtn.first()).toBeVisible({ timeout: 15000 });
-
-    // Button should be in the Wave 1 row area (first one found)
-    console.log('P4-01: "Move to Wallet" button found for Wave 1 ✓');
-  });
-
-  // ─── P4-02: TreasuryMoveModal opens ───────────────────────────────────────
-  // NOTE: TreasuryMoveModal has NO role="dialog" — it is a fixed overlay div.
-  // Identify it by its heading content: "Move to Wallet — W{N}" text.
-  test('P4-02: Clicking "Move to Wallet" opens TreasuryMoveModal', async ({ page }) => {
-    await page.goto('/nft/waves');
-    await page.waitForLoadState('networkidle');
-
-    const moveBtn = page.locator('button').filter({ hasText: /move to wallet/i }).first();
-    await moveBtn.click();
-
-    // TreasuryMoveModal is a fixed inset-0 overlay div (not a dialog role)
-    // Identify by its content: header says "Move to Wallet"
-    const modal = page.locator('div.fixed.inset-0').filter({ hasText: /move to wallet/i }).last();
-    await expect(modal).toBeVisible({ timeout: 10000 });
-
-    const modalBody = (await modal.textContent()) ?? '';
-    // Modal should show wallet options
-    expect(modalBody).toMatch(/wallet|treasury|default/i);
-  });
-
-  // ─── P4-03: Modal shows correct wallet options ────────────────────────────
-  // NOTE: TreasuryMoveModal is a fixed overlay div (no role="dialog").
-  test('P4-03: TreasuryMoveModal has Default Treasury Wallet and Custom Wallet options', async ({ page }) => {
-    await page.goto('/nft/waves');
-    await page.waitForLoadState('networkidle');
-
-    const moveBtn = page.locator('button').filter({ hasText: /move to wallet/i }).first();
-    await moveBtn.click();
-
-    const modal = page.locator('div.fixed.inset-0').filter({ hasText: /move to wallet/i }).last();
-    await expect(modal).toBeVisible({ timeout: 10000 });
-
-    // Two radio options: Default Treasury Wallet + Custom Wallet
-    const radios = modal.locator('input[type="radio"]');
-    const radioCount = await radios.count();
-    expect(radioCount).toBeGreaterThanOrEqual(2);
-
-    // "Default Treasury Wallet" option label should be visible
-    const defaultOption = modal.getByText(/default.*treasury|treasury.*wallet/i);
-    await expect(defaultOption.first()).toBeVisible();
-
-    // Close modal for next test — click the X button inside the modal
-    const closeBtn = modal.locator('button').filter({ hasText: '' }).first();
-    // Use keyboard Escape as a safe close
-    await page.keyboard.press('Escape');
-    // Give modal time to close
-    await page.waitForTimeout(500);
-  });
-
-  // ─── P4-04: Select Default Treasury Wallet and confirm transfer ───────────
-  // NOTE: TreasuryMoveModal is a fixed overlay div (no role="dialog").
-  test('P4-04: Select Default Treasury Wallet, confirm → TreasurySuccessModal', async ({ page }) => {
-    await page.goto('/nft/waves');
-    await page.waitForLoadState('networkidle');
-
-    const moveBtn = page.locator('button').filter({ hasText: /move to wallet/i }).first();
-    await moveBtn.click();
-
-    const modal = page.locator('div.fixed.inset-0').filter({ hasText: /move to wallet/i }).last();
-    await expect(modal).toBeVisible({ timeout: 10000 });
-
-    // Select "Default Treasury Wallet" radio (first radio = default)
-    const defaultRadio = modal.locator('input[type="radio"]').first();
-    await defaultRadio.check();
-
-    // Click the "Confirm Transfer" button
-    const confirmBtn = modal.locator('button').filter({ hasText: /confirm transfer/i }).first();
-    await expect(confirmBtn).toBeEnabled({ timeout: 5000 });
-    await confirmBtn.click();
-
-    // Wait for TreasurySuccessModal — it appears as a fixed overlay containing "Transferred!"
-    // treasuryClose() on Sepolia can take 30-90s
-    await expect(
-      page.locator('div.fixed.inset-0').filter({ hasText: /transferred|0x[0-9a-f]{8,}/i })
-    ).toBeVisible({ timeout: 120_000 });
-
-    console.log('P4-04: Treasury transfer transaction confirmed ✓');
-  });
-
-  // ─── P4-05: TreasurySuccessModal shows tx hash and Etherscan link ─────────
-  // NOTE: TreasurySuccessModal is a fixed overlay div (no role="dialog").
-  // NOTE: TreasurySuccessModal hardcodes `https://etherscan.io/tx/` (mainnet URL, not Sepolia).
-  //       This is by design — the code uses etherscan.io directly regardless of network.
-  //       See TreasurySuccessModal in waves/page.tsx: const etherscan = `https://etherscan.io/tx/${txHash}`;
-  test('P4-05: TreasurySuccessModal shows tx hash with Etherscan link', async ({ page }) => {
-    // After P4-04 confirms, the TreasurySuccessModal should be visible
-    await page.goto('/nft/waves');
-    await page.waitForLoadState('networkidle');
-
-    // Re-trigger if the Move to Wallet button is still present (P4-04 may have closed it)
-    const moveBtn = page.locator('button').filter({ hasText: /move to wallet/i }).first();
-    const hasMoveBtn = await moveBtn.isVisible({ timeout: 3000 }).catch(() => false);
-
-    if (hasMoveBtn) {
-      await moveBtn.click();
-
-      const modal = page.locator('div.fixed.inset-0').filter({ hasText: /move to wallet/i }).last();
-      await expect(modal).toBeVisible({ timeout: 10000 });
-
-      const defaultRadio = modal.locator('input[type="radio"]').first();
-      await defaultRadio.check();
-
-      const confirmBtn = modal.locator('button').filter({ hasText: /confirm transfer/i }).first();
-      await confirmBtn.click();
-
-      await expect(
-        page.locator('div.fixed.inset-0').filter({ hasText: /transferred|0x[0-9a-f]{8,}/i })
-      ).toBeVisible({ timeout: 120_000 });
+    console.log('\nP4-01: Wave treasury status:');
+    let allDone = true;
+    for (const w of waves) {
+      const done = w.closeAction === 'treasury';
+      console.log(`  Wave ${w.waveNumber}: closeAction=${w.closeAction}, waveRevealed=${w.waveRevealed} ${done ? '✓' : '✗'}`);
+      if (!done) allDone = false;
     }
-
-    // TreasurySuccessModal content: tx hash + Etherscan link
-    // The modal is a fixed overlay containing "Transferred!" and the tx hash
-    const successModal = page.locator('div.fixed.inset-0').filter({ hasText: /transferred/i }).last();
-
-    if (await successModal.isVisible({ timeout: 10000 }).catch(() => false)) {
-      const content = (await successModal.textContent()) ?? '';
-      console.log(`P4-05: Success modal content: "${content.slice(0, 200)}"`);
-      // Tx hash must be present
-      expect(content).toMatch(/0x[0-9a-f]{8,}/i);
-      // Etherscan link — TreasurySuccessModal uses hardcoded https://etherscan.io/tx/ (NOT Sepolia)
-      const etherscanLink = successModal.locator('a[href*="etherscan.io"]');
-      await expect(etherscanLink).toBeVisible({ timeout: 5000 });
-      console.log('P4-05: TreasurySuccessModal shows tx hash + Etherscan link ✓');
-    } else {
-      console.log('P4-05: Success modal not visible (transfer may have completed and been dismissed in P4-04)');
-    }
+    expect(allDone).toBeTruthy();
+    console.log('P4-01: All 7 waves treasury-closed ✓');
   });
 
-  // ─── P4-06: "Move to Wallet" button disappears after successful transfer ──
-  test('P4-06: "Move to Wallet" button is gone after transfer completes', async ({ page }) => {
+  // ─── P4-02: /nft/waves page — no action buttons remain ───────────────────
+  test('P4-02: No Move to Wallet, Auto Transfer, or Reveal Now buttons remain on /nft/waves', async ({ page }) => {
     await page.goto('/nft/waves');
     await page.waitForLoadState('networkidle');
 
-    // Close any open modal first
-    await page.keyboard.press('Escape').catch(() => {});
-    await page.reload();
-    await page.waitForLoadState('networkidle');
+    const moveBtn    = page.locator('button').filter({ hasText: /move to wallet/i });
+    const autoBtn    = page.locator('button').filter({ hasText: /auto transfer/i });
+    const revealBtn  = page.locator('button').filter({ hasText: /reveal now/i });
 
-    // "Move to Wallet" should no longer appear for Wave 1
-    // (treasury_pending count → 0 after transfer)
-    const moveBtn = page.locator('button').filter({ hasText: /move to wallet/i });
-    const btnCount = await moveBtn.count();
+    const moveCnt   = await moveBtn.count();
+    const autoCnt   = await autoBtn.count();
+    const revealCnt = await revealBtn.count();
 
-    // If 0 minted during test, all 303 were treasury → now transferred → button gone
-    expect(btnCount).toBe(0);
-    console.log('P4-06: "Move to Wallet" button gone after transfer ✓');
+    console.log(`P4-02: Move to Wallet: ${moveCnt}, Auto Transfer: ${autoCnt}, Reveal Now: ${revealCnt}`);
+    expect(moveCnt).toBe(0);
+    expect(autoCnt).toBe(0);
+    expect(revealCnt).toBe(0);
+    console.log('P4-02: No pending action buttons ✓');
   });
 
-  // ─── P4-07: nft_records show delivery_status = transferred ───────────────
-  test('P4-07: NFT Records page reflects treasury transfer (0 treasury_pending)', async ({ page }) => {
+  // ─── P4-03: 0-minted waves show "✓ Transferred" badge in REVEAL column ───
+  test('P4-03: 0-minted waves (3–7) show Transferred badge in REVEAL column', async ({ page }) => {
+    await page.goto('/nft/waves');
+    await page.waitForLoadState('networkidle');
+
+    const body = await page.textContent('body') ?? '';
+    // "✓ Transferred" badge should appear for each 0-minted completed wave
+    const transferredMatches = (body.match(/Transferred/g) ?? []).length;
+    console.log(`P4-03: "Transferred" occurrences in page: ${transferredMatches}`);
+    // At least the 5 zero-minted waves should show transferred badge
+    expect(transferredMatches).toBeGreaterThanOrEqual(5);
+    console.log('P4-03: 0-minted waves show Transferred badge ✓');
+  });
+
+  // ─── P4-04: Progress bar — all circles green ──────────────────────────────
+  test('P4-04: Collection Reveal Progress bar shows all 7 waves as complete/revealed', async ({ page }) => {
+    await page.goto('/nft/waves');
+    await page.waitForLoadState('networkidle');
+
+    const body = await page.textContent('body') ?? '';
+    // Progress bar should show "Revealed" for waves 1–2 and "Complete" for waves 3–7
+    const revealedCount = (body.match(/\bRevealed\b/g) ?? []).length;
+    const completeCount = (body.match(/\bComplete\b/g) ?? []).length;
+
+    console.log(`P4-04: Revealed labels: ${revealedCount}, Complete labels: ${completeCount}`);
+    // Expect at least 2 "Revealed" (waves 1–2) and 5 "Complete" (waves 3–7)
+    expect(revealedCount).toBeGreaterThanOrEqual(2);
+    expect(completeCount).toBeGreaterThanOrEqual(5);
+    console.log('P4-04: All wave circles show correct completed state ✓');
+  });
+
+  // ─── P4-05: /nft/records — 9,999 total, no treasury_pending ──────────────
+  test('P4-05: NFT Records — 9,999 total records, no treasury_pending', async ({ page }) => {
     await page.goto('/nft/records');
     await page.waitForLoadState('networkidle');
 
     const body = await page.textContent('body') ?? '';
+    expect(body).toMatch(/9[,.]?999/);
+    console.log('P4-05: 9,999 NFT records confirmed ✓');
 
-    // Should not show "treasury_pending" delivery status anymore for Wave 1
-    // Total should still be 9,999
-    expect(body).toContain('9,999');
-
-    // If delivery status filter exists, check treasury_pending count = 0
-    const deliveryFilter = page.locator('select, [role="combobox"]')
-      .filter({ hasText: /delivery|status/i }).first();
-
-    if (await deliveryFilter.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await deliveryFilter.click();
-      const treasuryOption = page.locator('[role="option"], option')
-        .filter({ hasText: /treasury.*pending|pending.*treasury/i }).first();
-      if (await treasuryOption.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await treasuryOption.click();
-        await page.waitForTimeout(1500);
-        const filteredBody = await page.textContent('body') ?? '';
-        // After transfer, treasury_pending count for Wave 1 = 0
-        expect(filteredBody).toMatch(/\b0\b|no results|empty/i);
-      }
+    // treasury_pending should be 0 — all waves processed
+    // Check via API
+    const res = await page.request.get('/api/nft-sell/waves');
+    if (res.ok()) {
+      const data = await res.json();
+      const waves: any[] = data.waves ?? [];
+      const totalPending = waves.reduce((sum: number, w: any) => sum + (w.treasuryPendingCount ?? 0), 0);
+      console.log(`P4-05: Total treasury_pending across all waves: ${totalPending}`);
+      expect(totalPending).toBe(0);
     }
+  });
 
-    console.log('P4-07: Treasury transfer complete — delivery_status updated ✓');
-    console.log('\n🎉 ALL 4 PRIORITY PHASES COMPLETE');
-    console.log('   Phase 1 ✓ Filebase sync verified');
-    console.log('   Phase 2 ✓ Wave scheduling (DB + on-chain)');
-    console.log('   Phase 3 ✓ Wave reveal (Pool + VRF)');
-    console.log('   Phase 4 ✓ Treasury transfer');
-    console.log('\nSee: tests/phase-lock.json for locked phase status');
+  // ─── P4-06: Wave 1 delivery_status — customer tokens revealed, unsold transferred ─
+  test('P4-06: Wave 1 customer sales show revealed status, unsold show transferred', async ({ page }) => {
+    const res = await page.request.get('/api/nft-sell/waves');
+    expect(res.ok()).toBeTruthy();
+    const data = await res.json();
+    const w1 = (data.waves ?? []).find((w: any) => w.waveNumber === 1);
+
+    console.log(`P4-06: Wave 1 — soldCount: ${w1?.soldCount}, treasuryRecipient: ${w1?.treasuryRecipient}, closeAction: ${w1?.closeAction}`);
+    expect(w1?.closeAction).toBe('treasury');
+    expect(w1?.waveRevealed).toBe(true);
+    console.log('P4-06: Wave 1 state verified ✓');
+  });
+
+  // ─── P4-07: Summary log ───────────────────────────────────────────────────
+  test('P4-07: All waves treasury-complete — print final summary', async ({ page }) => {
+    const res = await page.request.get('/api/nft-sell/waves');
+    const data = await res.json();
+    const waves: any[] = data.waves ?? [];
+
+    console.log('\n🎉 PHASE 4 COMPLETE — ALL 7 WAVES TREASURY-CLOSED');
+    for (const w of waves) {
+      const recipient = w.treasuryRecipient ?? TREASURY_WALLET + ' (default)';
+      console.log(`   Wave ${w.waveNumber}: qty=${w.quantity} | sold=${w.soldCount ?? 0} | closeAction=${w.closeAction} | recipient=${recipient}`);
+    }
+    console.log('\n✓ Phase 1 — Filebase sync');
+    console.log('✓ Phase 2 — Wave scheduling (all 7 waves, DB + on-chain)');
+    console.log('✓ Phase 3 — Wave reveal + auto-treasury (all 7 waves)');
+    console.log('✓ Phase 4 — Treasury state verification (all 7 waves)');
+    console.log('\nNext: Run Phase 5 (Contract Operations) and Phase 6 (Dashboard)');
   });
 });

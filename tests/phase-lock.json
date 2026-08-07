@@ -21,18 +21,20 @@
     "failCount": 0
   },
   "phase-03": {
-    "status": "passed",
-    "locked": true,
-    "completedAt": "2026-08-07T00:09:06.622Z",
+    "status": "pending",
+    "locked": false,
+    "completedAt": null,
     "passCount": 0,
-    "failCount": 0
+    "failCount": 0,
+    "note": "Unlocked 2026-08-08: extended to cover all 7 waves; waves 3-7 (0-minted, auto_treasury) need Auto Transfer triggered"
   },
   "phase-04": {
-    "status": "passed",
-    "locked": true,
-    "completedAt": "2026-08-07T06:15:22.451Z",
+    "status": "pending",
+    "locked": false,
+    "completedAt": null,
     "passCount": 0,
-    "failCount": 0
+    "failCount": 0,
+    "note": "Unlocked 2026-08-08: rewritten as state-verification (all 7 waves) after Phase 03 completes all waves"
   },
   "phase-05": {
     "status": "pending",
