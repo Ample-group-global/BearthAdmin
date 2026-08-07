@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useInterval } from "@/lib/useInterval";
@@ -65,6 +65,7 @@ interface NftRecord {
   rarityScore: number | null;
   rarityRank: number | null;
   lastSalePriceEth: number | null;
+  waveRevealTxHash: string | null;
 }
 
 interface Master {
@@ -222,6 +223,7 @@ export default function NftPage() {
   const [modalMaximized, setModalMaximized] = useState(false);
   const [waves, setWaves]             = useState<Array<{ waveNumber: number; name: string }>>([]);
   const [blindBoxImageUrl, setBlindBoxImageUrl] = useState<string | null>(null);
+  const [traitStats, setTraitStats] = useState<{ total: number; stats: Record<string, Record<string, number>> } | null>(null);
 
   const [mintedFrom,   setMintedFrom]   = useState("");
   const [mintedTo,     setMintedTo]     = useState("");
@@ -340,14 +342,24 @@ export default function NftPage() {
             <NftImage hash={r.imageIpfsHash} isRevealed={r.isRevealed} blindBoxUri={blindBoxImageUrl} size={52} />
           </div>
           <div>
-            <div className="font-mono font-bold text-sm leading-tight" style={{ color: "#0f172a" }}>{r.serialNumber}</div>
-            <div className="text-xs mt-0.5" style={{ color: r.tokenId != null ? "#64748b" : "#cbd5e1" }}>
-              {r.tokenId != null ? `Token ID #${r.tokenId}` : "Not minted"}
-            </div>
-            {artworkId(r) != null && (
-              <div className="text-xs mt-0.5 font-semibold" style={{ color: "#7c3aed" }}>
-                ✦ Artwork ID #{artworkId(r)}
-              </div>
+            {r.isRevealed && r.tokenId != null ? (
+              <>
+                <div className="font-mono font-bold text-sm leading-tight" style={{ color: "#0f172a" }}>
+                  Token ID #{r.tokenId}
+                </div>
+                {artworkId(r) != null && (
+                  <div className="text-xs mt-0.5 font-semibold" style={{ color: "#7c3aed" }}>
+                    ✦ Artwork ID #{artworkId(r)}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="font-mono font-bold text-sm leading-tight" style={{ color: "#0f172a" }}>{r.serialNumber}</div>
+                <div className="text-xs mt-0.5" style={{ color: r.tokenId != null ? "#64748b" : "#cbd5e1" }}>
+                  {r.tokenId != null ? `Token ID #${r.tokenId}` : "Not minted"}
+                </div>
+              </>
             )}
             {r.rarityTier && (
               <div className="mt-0.5">
@@ -400,10 +412,11 @@ export default function NftPage() {
       align: "center",
       render: r => {
         const code = r.deliveryStatusCode;
-        if (code === "delivered") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#dcfce7", color: "#15803d" }}>✓ Delivered</span>;
-        if (code === "sold")      return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#fef9c3", color: "#a16207" }}>💰 Sold</span>;
-        if (r.isRevealed)         return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#f5f3ff", color: "#7c3aed" }}>✦ Revealed</span>;
-        if (r.tokenId != null)    return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#eff6ff", color: "#2563eb" }}>⬡ Minted</span>;
+        if (code === "delivered")        return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#dcfce7", color: "#15803d" }}>✓ Delivered</span>;
+        if (code === "sold")             return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#fef9c3", color: "#a16207" }}>💰 Sold</span>;
+        if (code === "treasury_pending") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>◈ Reserved</span>;
+        if (r.isRevealed)                return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#f5f3ff", color: "#7c3aed" }}>✦ Revealed</span>;
+        if (r.tokenId != null)           return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#eff6ff", color: "#2563eb" }}>⬡ Minted</span>;
         return <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: "#f8fafc", color: "#94a3b8", border: "1px solid #e2e8f0" }}>○ Pre-mint</span>;
       },
     },
@@ -411,6 +424,8 @@ export default function NftPage() {
       key: "reveal_date",
       header: "Reveal",
       render: r => {
+        // Reserved (treasury pool): wave already revealed at wave level but this token was never minted — no per-token reveal
+        if (r.deliveryStatusCode === "treasury_pending") return <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
         if (r.isRevealed && r.revealedAt) return (
           <div>
             <div className="text-xs font-semibold" style={{ color: "#7c3aed" }}>Revealed</div>
@@ -453,6 +468,7 @@ export default function NftPage() {
           r.soldAt      ? { label: "Sold",      date: r.soldAt,      color: "#a16207" } :
           r.revealedAt  ? { label: "Revealed",  date: r.revealedAt,  color: "#7c3aed" } :
           r.mintedAt    ? { label: "Minted",    date: r.mintedAt,    color: "#2563eb" } :
+          r.deliveryStatusCode === "treasury_pending" ? { label: "Reserved", date: r.updatedAt, color: "#b45309" } :
           null;
         if (!latest) return <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
         return (
@@ -469,7 +485,16 @@ export default function NftPage() {
       align: "center",
       width: 80,
       render: r => (
-        <button onClick={() => { setViewRecord(r); setModalMaximized(false); }} title="View full history"
+        <button onClick={() => {
+            setViewRecord(r); setModalMaximized(false); setTraitStats(null);
+            if (r.isRevealed && r.traits && Object.keys(r.traits).length > 0) {
+              fetch("/api/nfts/trait-stats", {
+                method: "POST", credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ traits: r.traits }),
+              }).then(res => res.ok ? res.json() : null).then(data => { if (data) setTraitStats(data); }).catch(() => null);
+            }
+          }} title="View full history"
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors"
           style={{ color: "#41afeb", border: "1px solid rgba(65,175,235,0.3)", background: "rgba(65,175,235,0.05)" }}
           onMouseEnter={e => { e.currentTarget.style.background = "rgba(65,175,235,0.12)"; e.currentTarget.style.borderColor = "rgba(65,175,235,0.5)"; }}
@@ -752,8 +777,10 @@ export default function NftPage() {
                 </div>
                 <div>
                   <p className="text-sm font-extrabold leading-tight" style={{ color: "#0f172a" }}>
-                    NFT {viewRecord.serialNumber}
-                    {viewRecord.tokenId != null && <span style={{ color: "#94a3b8", fontWeight: 500 }}> · Token ID #{viewRecord.tokenId}</span>}
+                    {viewRecord.isRevealed && viewRecord.tokenId != null
+                      ? <>Token ID #{viewRecord.tokenId}</>
+                      : <>NFT {viewRecord.serialNumber}{viewRecord.tokenId != null && <span style={{ color: "#94a3b8", fontWeight: 500 }}> · Token ID #{viewRecord.tokenId}</span>}</>
+                    }
                   </p>
                   <p className="text-xs" style={{ color: "#94a3b8" }}>Full history — generation to delivery</p>
                 </div>
@@ -817,9 +844,10 @@ export default function NftPage() {
                         {(() => {
                           const code = viewRecord.deliveryStatusCode;
                           if (code === "delivered") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#dcfce7", color: "#15803d" }}>✓ Delivered</span>;
-                          if (code === "sold")      return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#fef9c3", color: "#a16207" }}>💰 Sold</span>;
-                          if (viewRecord.isRevealed) return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#f5f3ff", color: "#7c3aed" }}>✦ Revealed</span>;
-                          if (viewRecord.tokenId != null) return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#eff6ff", color: "#2563eb" }}>⬡ Minted</span>;
+                          if (code === "sold")             return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#fef9c3", color: "#a16207" }}>💰 Sold</span>;
+                          if (code === "treasury_pending") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>◈ Reserved</span>;
+                          if (viewRecord.isRevealed)       return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#f5f3ff", color: "#7c3aed" }}>✦ Revealed</span>;
+                          if (viewRecord.tokenId != null)  return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#eff6ff", color: "#2563eb" }}>⬡ Minted</span>;
                           return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#f8fafc", color: "#94a3b8", border: "1px solid #e2e8f0" }}>○ Pre-mint</span>;
                         })()}
                       </div>
@@ -1020,8 +1048,9 @@ export default function NftPage() {
                   </div>
                   {[
                     { label: "Generated", date: viewRecord.createdAt,   color: "#6366f1", desc: "NFT created in DB from generator",  txHash: null },
+                    { label: "Reserved",  date: viewRecord.deliveryStatusCode === "treasury_pending" ? viewRecord.updatedAt : null, color: "#b45309", desc: "Added to wave pool — awaiting future mint", txHash: null },
                     { label: "Minted",    date: viewRecord.mintedAt,    color: "#7c3aed", desc: "Minted on-chain to buyer wallet",    txHash: viewRecord.mintTxHash },
-                    { label: "Revealed",  date: viewRecord.revealedAt,  color: "#8b5cf6", desc: "Artwork revealed, blind box opened", txHash: null },
+                    { label: "Revealed",  date: viewRecord.revealedAt,  color: "#8b5cf6", desc: "Artwork revealed, blind box opened", txHash: viewRecord.waveRevealTxHash },
                     { label: "Sold",      date: viewRecord.soldAt,      color: "#f59e0b", desc: viewRecord.lastSalePriceEth != null ? `Sold for ${Number(viewRecord.lastSalePriceEth).toFixed(4)} ETH` : "Ownership transferred on-chain",     txHash: viewRecord.lastTxHash },
                     { label: "Delivered", date: viewRecord.deliveredAt, color: "#10b981", desc: "Delivered to customer wallet",        txHash: null },
                   ].filter(step => step.date).map((step, i, arr) => (
@@ -1085,23 +1114,62 @@ export default function NftPage() {
                   </div>
                 )}
 
-                {/* Traits */}
+                {/* Traits — OpenSea style with rarity % */}
                 {viewRecord.isRevealed && viewRecord.traits && Object.keys(viewRecord.traits).length > 0 && (
                   <div className="rounded-2xl overflow-hidden bg-white" style={{ border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-                    <div className="flex items-center gap-2 px-5 py-3" style={{ borderBottom: "1px solid #f1f5f9" }}>
-                      <svg className="w-4 h-4" style={{ color: "#7c3aed" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
-                      </svg>
-                      <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#7c3aed" }}>Attributes</span>
+                    <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: "1px solid #f1f5f9" }}>
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4" style={{ color: "#7c3aed" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                        <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#7c3aed" }}>Attributes</span>
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "#f5f3ff", color: "#7c3aed" }}>
+                          {Object.keys(viewRecord.traits).length} traits
+                        </span>
+                      </div>
+                      {!traitStats && (
+                        <span className="text-[10px] font-semibold animate-pulse" style={{ color: "#a78bfa" }}>Loading rarity…</span>
+                      )}
                     </div>
-                    <div className="p-4 flex flex-wrap gap-2">
-                      {Object.entries(viewRecord.traits).map(([trait, value]) => (
-                        <div key={trait} className="px-3 py-2 rounded-xl text-center"
-                          style={{ background: "#faf5ff", border: "1px solid #e9d5ff", minWidth: 80 }}>
-                          <div className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#a78bfa" }}>{trait}</div>
-                          <div className="text-sm font-bold" style={{ color: "#3b0764" }}>{value}</div>
-                        </div>
-                      ))}
+                    <div className="p-4 grid grid-cols-2 gap-3">
+                      {Object.entries(viewRecord.traits).map(([traitType, traitValue]) => {
+                        const count = traitStats?.stats?.[traitType]?.[traitValue] ?? null;
+                        const total = traitStats?.total ?? null;
+                        const pct   = count != null && total ? (count / total) * 100 : null;
+                        const isRare = pct != null && pct < 10;
+                        return (
+                          <div key={traitType} className="rounded-xl p-3"
+                            style={{
+                              background: isRare ? "linear-gradient(135deg,#fdf4ff,#f5f3ff)" : "#faf5ff",
+                              border: isRare ? "1px solid #d8b4fe" : "1px solid #e9d5ff",
+                            }}>
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#a78bfa" }}>{traitType}</p>
+                              {isRare && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#7c3aed", color: "#fff" }}>✦ Rare</span>
+                              )}
+                            </div>
+                            <p className="text-sm font-bold leading-tight mb-2" style={{ color: "#3b0764" }}>{traitValue}</p>
+                            {pct != null ? (
+                              <>
+                                <div className="h-1.5 rounded-full overflow-hidden mb-1" style={{ background: "#ede9fe" }}>
+                                  <div className="h-full rounded-full transition-all duration-700"
+                                    style={{
+                                      width: `${Math.min(pct, 100)}%`,
+                                      background: pct < 5 ? "#7c3aed" : pct < 15 ? "#8b5cf6" : pct < 30 ? "#a78bfa" : "#c4b5fd",
+                                    }} />
+                                </div>
+                                <p className="text-[10px] font-semibold" style={{ color: "#7c3aed" }}>
+                                  {pct.toFixed(1)}% have this trait
+                                  <span className="font-normal ml-1" style={{ color: "#a78bfa" }}>({count!.toLocaleString()} of {total!.toLocaleString()})</span>
+                                </p>
+                              </>
+                            ) : (
+                              <div className="h-1.5 rounded-full animate-pulse" style={{ background: "#ede9fe", width: "60%" }} />
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
