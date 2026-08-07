@@ -36,7 +36,9 @@ interface Wave {
   priceLocked?: boolean;
   waveClosed?: boolean;
   waveRevealed?: boolean;
+  waveRevealUri?: string | null;
   closeAction?: string | null;
+  unsoldStrategy?: 'auto_treasury' | 'manual';
   syncedAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -80,8 +82,8 @@ const WAVE_ICONS: Record<number, { symbol: string; gradient: string; shadow: str
 
 // Per-wave purpose descriptions shown in the Purpose column
 const WAVE_PURPOSE: Record<number, string> = {
-  1: "Launch 10,000 Genesis NFTs.",
-  2: "Launch 10,000 Genesis NFTs.",
+  1: "Launch 9,999 Genesis NFTs.",
+  2: "Launch 9,999 Genesis NFTs.",
   3: "The community grows and NFT demand increases.",
   4: "Holders complete quests, receive airdrops, and unlock new experiences.",
   5: "Holders gain staking, DAO voting, and exclusive access.",
@@ -406,30 +408,53 @@ function TreasuryMoveModal({
 }) {
   const [useCustom, setUseCustom] = useState(false);
   const [recipient, setRecipient] = useState("");
+  const [revealUri, setRevealUri] = useState(wave.waveRevealUri ?? "");
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState<string | null>(null);
+
+  // 0-minted wave that hasn't been revealed yet needs a reveal URI to proceed
+  const needsRevealUri = (wave.soldCount ?? 0) === 0 && !wave.waveRevealed;
 
   const handleSubmit = async () => {
     if (useCustom && !/^0x[0-9a-fA-F]{40}$/.test(recipient)) {
       setError("Enter a valid Ethereum address (0x + 40 hex chars)");
       return;
     }
+    if (needsRevealUri && !revealUri.trim().startsWith("ipfs://")) {
+      setError("Enter a valid IPFS reveal URI (must start with ipfs://)");
+      return;
+    }
     setSaving(true); setError(null);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 360_000);
     try {
-      const body = useCustom ? { recipient } : {};
+      const body: Record<string, string> = {};
+      if (useCustom) body.recipient = recipient;
+      if (needsRevealUri && revealUri.trim()) body.revealUri = revealUri.trim();
       const res = await fetch(`/api/nft-sell/waves/${wave.waveNumber}/treasury-close`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error ?? "Transfer failed"); return; }
       onSuccess(d.txHash ?? "");
-    } catch { setError("Network error."); }
-    finally { setSaving(false); }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") {
+        setError("Transaction submitted but is taking longer than expected. Refresh the page in a few minutes to confirm the transfer completed.");
+      } else {
+        setError("Something went wrong on the server. Please try again.");
+      }
+    } finally {
+      clearTimeout(timer);
+      setSaving(false);
+    }
   };
 
-  const pendingCount = wave.treasuryPendingCount ?? 0;
+  const pendingCount  = wave.treasuryPendingCount ?? 0;
+  const canSubmit     = !saving && (!useCustom || !!recipient.trim()) && (!needsRevealUri || revealUri.trim().startsWith("ipfs://"));
+  const actionLabel   = saving ? "Transferring…" : "Confirm Transfer";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
@@ -452,6 +477,31 @@ function TreasuryMoveModal({
 
         <div className="px-6 py-5 space-y-3">
           {error && <ErrBanner msg={error} onDismiss={() => setError(null)} />}
+
+          {/* Reveal URI — only for 0-minted unrevealed waves */}
+          {needsRevealUri && (
+            <div className="px-3.5 py-3 rounded-xl space-y-2"
+              style={{ background: "rgba(65,175,235,0.05)", border: "1px solid rgba(65,175,235,0.2)" }}>
+              <div className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#41afeb" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-[11px] font-semibold" style={{ color: "#24315f" }}>Reveal URI Required</p>
+              </div>
+              <p className="text-[10px]" style={{ color: "#9bafc5" }}>
+                No customers minted in this wave — reveal will run automatically during the transfer. Enter the IPFS metadata base URI to use for this wave&apos;s artwork.
+              </p>
+              <input
+                type="text"
+                value={revealUri}
+                onChange={e => setRevealUri(e.target.value)}
+                placeholder="ipfs://Qm.../metadata"
+                className="w-full rounded-lg px-3 py-2 text-xs font-mono"
+                style={{ border: "1px solid #d1d5db", outline: "none" }}
+              />
+            </div>
+          )}
 
           {/* Option A — default treasury wallet */}
           <label
@@ -509,10 +559,10 @@ function TreasuryMoveModal({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={saving || (useCustom && !recipient.trim())}
+              disabled={!canSubmit}
               className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white"
-              style={{ background: saving || (useCustom && !recipient.trim()) ? "#9bafc5" : "#16a34a", cursor: saving || (useCustom && !recipient.trim()) ? "not-allowed" : "pointer" }}>
-              {saving ? "Transferring…" : "Confirm Transfer"}
+              style={{ background: !canSubmit ? "#9bafc5" : "#16a34a", cursor: !canSubmit ? "not-allowed" : "pointer" }}>
+              {actionLabel}
             </button>
           </div>
         </div>
@@ -524,7 +574,9 @@ function TreasuryMoveModal({
 // ─── Treasury Transfer Success Modal ─────────────────────────────────────────
 
 function TreasurySuccessModal({ txHash, waveNum, onClose }: { txHash: string; waveNum: number; onClose: () => void }) {
-  const etherscan = `https://etherscan.io/tx/${txHash}`;
+  const etherscan = process.env.NEXT_PUBLIC_NETWORK === "mainnet"
+    ? `https://etherscan.io/tx/${txHash}`
+    : `https://sepolia.etherscan.io/tx/${txHash}`;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md text-center" style={{ border: "1px solid #e5e7eb" }}>
@@ -594,7 +646,7 @@ export default function WavesPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [form, setForm] = useState({
     defaultPriceEth: "", saleMethod: "", scheduledStart: "",
-    scheduledEnd: "", status: "",
+    scheduledEnd: "", status: "", unsoldStrategy: "auto_treasury" as 'auto_treasury' | 'manual',
   });
 
   // On-chain action modal
@@ -738,6 +790,7 @@ export default function WavesPage() {
       scheduledStart:     w.scheduledStart     ? toLocalDateTimeInput(new Date(w.scheduledStart)) : "",
       scheduledEnd:       w.scheduledEnd       ? toLocalDateTimeInput(new Date(w.scheduledEnd))   : "",
       status:             w.status ?? "upcoming",
+      unsoldStrategy:     (w.unsoldStrategy ?? "auto_treasury") as 'auto_treasury' | 'manual',
     });
     setSaveError(null);
   };
@@ -752,6 +805,7 @@ export default function WavesPage() {
         scheduledStart:    form.scheduledStart ? new Date(form.scheduledStart).toISOString() : null,
         scheduledEnd:      form.scheduledEnd   ? new Date(form.scheduledEnd).toISOString()   : null,
         status:            form.status       || null,
+        unsoldStrategy:    form.unsoldStrategy,
       };
       const res = await fetch(`/api/waves/${editWave.id}`, {
         method: "PUT", credentials: "include",
@@ -1082,8 +1136,11 @@ export default function WavesPage() {
                   </thead>
                   <tbody>
                     {waves.slice((wavePage - 1) * WAVES_PER_PAGE, wavePage * WAVES_PER_PAGE).map((w, i) => {
-                      const isClosed = w.waveClosed || w.status === "closed";
-                      const isLocked = w.priceLocked;
+                      const isClosed     = w.waveClosed || w.status === "closed";
+                      const isLocked     = w.priceLocked;
+                      const soldCount    = w.soldCount ?? 0;
+                      // Wave is closed with zero minted — reveal is irrelevant (no buyers); auto-reveal fires during treasury close
+                      const isZeroMinted = isClosed && soldCount === 0 && (w.quantity ?? 0) > 0 && !w.closeAction;
                       return (
                         <tr key={w.id}
                           style={{ borderTop: i === 0 ? "none" : "1px solid #f3f4f6" }}
@@ -1220,6 +1277,8 @@ export default function WavesPage() {
                                 <div>{new Date(w.revealScheduledAt).toLocaleDateString()}</div>
                                 <div style={{ color: "#9bafc5", fontWeight: 400 }}>{new Date(w.revealScheduledAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</div>
                               </div>
+                            ) : isZeroMinted ? (
+                              <span className="text-xs font-semibold" style={{ color: "#9bafc5" }}>Auto</span>
                             ) : (
                               <span className="text-xs" style={{ color: "#d1d5db" }}>Not set</span>
                             )}
@@ -1241,6 +1300,28 @@ export default function WavesPage() {
                               if (!isClosed) return (
                                 <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>
                               );
+                              const isAuto = (w.unsoldStrategy ?? 'auto_treasury') === 'auto_treasury';
+                              const stratBadge = !w.waveRevealed ? (
+                                <div style={{ marginTop: 4 }}>
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                                    style={isAuto
+                                      ? { background: "rgba(65,175,235,0.08)", color: "#41afeb", border: "1px solid rgba(65,175,235,0.2)" }
+                                      : { background: "rgba(217,119,6,0.08)", color: "#d97706", border: "1px solid rgba(217,119,6,0.2)" }
+                                    }>
+                                    {isAuto ? "Auto → Treasury" : "Manual Transfer"}
+                                  </span>
+                                </div>
+                              ) : null;
+                              // 0-minted closed wave: no reveal date picker needed — backend handles reveal internally during transfer
+                              if (isZeroMinted) return (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                                  style={isAuto
+                                    ? { background: "rgba(65,175,235,0.08)", color: "#41afeb", border: "1px solid rgba(65,175,235,0.2)" }
+                                    : { background: "rgba(217,119,6,0.08)", color: "#d97706", border: "1px solid rgba(217,119,6,0.2)" }
+                                  }>
+                                  {isAuto ? "Auto → Treasury" : "Manual Transfer"}
+                                </span>
+                              );
                               const isReady = !w.waveRevealed && !!w.revealScheduledAt && new Date(w.revealScheduledAt).getTime() <= Date.now();
                               const makeWS = (): WaveSchedule => ({
                                 wave_number: w.waveNumber, wave_name: w.name, status: w.status,
@@ -1260,30 +1341,36 @@ export default function WavesPage() {
                                 </span>
                               );
                               if (isReady) return (
-                                <button onClick={() => setRevealWave(makeWS())}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold text-white"
-                                  style={{ background: "#d97706" }}>
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                  </svg>
-                                  Reveal Now
-                                </button>
+                                <div className="flex flex-col items-center gap-1">
+                                  <button onClick={() => setRevealWave(makeWS())}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold text-white"
+                                    style={{ background: "#d97706" }}>
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                    Reveal Now
+                                  </button>
+                                  {stratBadge}
+                                </div>
                               );
                               return (
-                                <button
-                                  onClick={() => {
-                                    setScheduleEditWave(makeWS());
-                                    setScheduleEditDate(w.revealScheduledAt ? toLocalDateTimeInput(new Date(w.revealScheduledAt)) : "");
-                                    setScheduleEditErr(null);
-                                  }}
-                                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg"
-                                  style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed", border: "1px solid rgba(124,58,237,0.2)" }}>
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                  </svg>
-                                  {w.revealScheduledAt ? "Edit Date" : "Set Date"}
-                                </button>
+                                <div className="flex flex-col items-center gap-1">
+                                  <button
+                                    onClick={() => {
+                                      setScheduleEditWave(makeWS());
+                                      setScheduleEditDate(w.revealScheduledAt ? toLocalDateTimeInput(new Date(w.revealScheduledAt)) : "");
+                                      setScheduleEditErr(null);
+                                    }}
+                                    className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg"
+                                    style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed", border: "1px solid rgba(124,58,237,0.2)" }}>
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    {w.revealScheduledAt ? "Edit Date" : "Set Date"}
+                                  </button>
+                                  {stratBadge}
+                                </div>
                               );
                             })()}
                           </td>
@@ -1298,7 +1385,24 @@ export default function WavesPage() {
                                 </svg>
                                 Manage
                               </button>
-                              {w.waveClosed && w.waveRevealed && (w.treasuryPendingCount ?? 0) > 0 && (
+                              {/* 0-minted wave: manual strategy only — auto_treasury is handled automatically on reveal */}
+                              {isZeroMinted && !w.closeAction && isClosed && w.unsoldStrategy === 'manual' && (
+                                <button
+                                  onClick={() => setTreasuryMoveWave(w)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                                  style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a", border: "1px solid rgba(22,163,74,0.3)" }}>
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                      d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                  </svg>
+                                  Move to Wallet
+                                </button>
+                              )}
+                              {/* Waves with customer sales: require reveal first, then show Move to Wallet for manual strategy */}
+                              {w.waveClosed && w.waveRevealed && !w.closeAction && !isZeroMinted &&
+                                w.unsoldStrategy === 'manual' &&
+                                (w.treasuryPendingCount ?? 0) > 0
+                              && (
                                 <button
                                   onClick={() => setTreasuryMoveWave(w)}
                                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
@@ -1528,11 +1632,28 @@ export default function WavesPage() {
                 </div>
               </div>
 
-              {/* Price + Sale Method — Wave 1 = free (no price/method inputs); Waves 2-7 = fixed price only */}
+              {/* Price + Sale Method — Wave 1 = free; Waves 2-7 = fixed price
+                  Closed waves: read-only display; active/upcoming: editable (locked if priceLocked) */}
               {editWave.waveNumber === 1 ? (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
                   style={{ background: "rgba(65,175,235,0.07)", border: "1px solid rgba(65,175,235,0.2)" }}>
                   <span className="text-xs font-semibold" style={{ color: "#41afeb" }}>Free Mint — no price applies to Wave 1</span>
+                </div>
+              ) : editWave.waveClosed ? (
+                <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                  style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                  <svg className="w-4 h-4 flex-shrink-0" style={{ color: "#9bafc5" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <div>
+                    <p className="text-xs font-bold" style={{ color: "#374151" }}>
+                      Final Price: {editWave.defaultPriceEth != null ? `${editWave.defaultPriceEth} ETH` : "Free"} · Fixed Price
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
+                      Wave closed — price and sale method are permanently locked
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <div className="ba-form-2">
@@ -1540,8 +1661,15 @@ export default function WavesPage() {
                     <label style={labelStyle}>Default Price (ETH)</label>
                     <input type="number" step="0.0001" min="0"
                       value={form.defaultPriceEth}
-                      onChange={e => setForm({ ...form, defaultPriceEth: e.target.value })}
-                      style={inputStyle} placeholder="0 = Free" />
+                      onChange={e => { if (!editWave.priceLocked) setForm({ ...form, defaultPriceEth: e.target.value }); }}
+                      style={editWave.priceLocked ? { ...inputStyle, background: "#f9fafb", color: "#6b7280", cursor: "not-allowed" } : inputStyle}
+                      readOnly={!!editWave.priceLocked}
+                      placeholder="0 = Free" />
+                    {editWave.priceLocked && (
+                      <p className="text-xs mt-1" style={{ color: "#dc2626" }}>
+                        Locked — first sale occurred. Price cannot be changed.
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label style={labelStyle}>Sale Method</label>
@@ -1553,8 +1681,8 @@ export default function WavesPage() {
                 </div>
               )}
 
-              {/* Emergency Pause — only admin override; upcoming/active/closed are auto-managed */}
-              <div className="flex items-center justify-between p-3 rounded-xl"
+              {/* Emergency Pause — only for upcoming/active waves; hidden for closed/revealed (no minting occurs) */}
+              {!editWave.waveClosed && <div className="flex items-center justify-between p-3 rounded-xl"
                 style={{
                   background: form.status === PAUSE_TOGGLE ? "rgba(217,119,6,0.07)" : "#f9fafb",
                   border: `1px solid ${form.status === PAUSE_TOGGLE ? "rgba(217,119,6,0.3)" : "#e5e7eb"}`,
@@ -1590,24 +1718,53 @@ export default function WavesPage() {
                   <div className="absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform"
                     style={{ left: 4, transform: form.status === PAUSE_TOGGLE ? "translateX(16px)" : "translateX(0)" }} />
                 </label>
-              </div>
+              </div>}
 
-              {/* Schedule */}
-              <div className="space-y-3">
-                <label style={{ ...labelStyle, marginBottom: 0 }}>Wave Schedule</label>
-                <div className="ba-form-2">
-                  <div>
-                    <label style={labelStyle}>Start Date</label>
-                    <input type="datetime-local" value={form.scheduledStart}
-                      onChange={e => setForm({ ...form, scheduledStart: e.target.value })} style={inputStyle} />
+              {/* Schedule — read-only once wave has started (API also rejects date changes after start) */}
+              {(() => {
+                const schedLocked = editWave.waveClosed ||
+                  editWave.status === "active" ||
+                  !!(editWave.scheduledStart && new Date(editWave.scheduledStart) <= new Date());
+                return (
+                  <div className="space-y-3">
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>Wave Schedule</label>
+                    {schedLocked ? (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-2.5 rounded-lg" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                            <p className="text-[10px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#9bafc5" }}>Start Date</p>
+                            <p className="text-xs font-semibold" style={{ color: "#374151" }}>
+                              {editWave.scheduledStart ? new Date(editWave.scheduledStart).toLocaleString() : <span style={{ color: "#d1d5db" }}>Not set</span>}
+                            </p>
+                          </div>
+                          <div className="p-2.5 rounded-lg" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                            <p className="text-[10px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#9bafc5" }}>End Date</p>
+                            <p className="text-xs font-semibold" style={{ color: "#374151" }}>
+                              {editWave.scheduledEnd ? new Date(editWave.scheduledEnd).toLocaleString() : <span style={{ color: "#d1d5db" }}>Not set</span>}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-[10px]" style={{ color: "#9bafc5" }}>
+                          Wave schedule is locked — dates cannot be changed after the wave starts.
+                        </p>
+                      </>
+                    ) : (
+                      <div className="ba-form-2">
+                        <div>
+                          <label style={labelStyle}>Start Date</label>
+                          <input type="datetime-local" value={form.scheduledStart}
+                            onChange={e => setForm({ ...form, scheduledStart: e.target.value })} style={inputStyle} />
+                        </div>
+                        <div>
+                          <label style={labelStyle}>End Date</label>
+                          <input type="datetime-local" value={form.scheduledEnd}
+                            onChange={e => setForm({ ...form, scheduledEnd: e.target.value })} style={inputStyle} />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <label style={labelStyle}>End Date</label>
-                    <input type="datetime-local" value={form.scheduledEnd}
-                      onChange={e => setForm({ ...form, scheduledEnd: e.target.value })} style={inputStyle} />
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* ── On-Chain Actions ── */}
               <div className="flex items-start gap-3 px-4 py-3 rounded-xl"
@@ -1751,6 +1908,71 @@ export default function WavesPage() {
                 )
               )}
 
+              {/* Unsold NFT Strategy — set BEFORE reveal; locked once wave is revealed */}
+              <div>
+                <label className="text-xs font-semibold mb-2 block" style={{ color: "#374151" }}>
+                  Unsold NFT Strategy
+                </label>
+                <p className="text-[11px] mb-2.5" style={{ color: "#9bafc5" }}>
+                  Determines what happens to unsold NFTs when this wave is revealed. Must be set before reveal.
+                </p>
+                <div className="flex gap-2">
+                  {/* Auto → Treasury */}
+                  <button
+                    disabled={!!editWave.waveRevealed}
+                    onClick={() => !editWave.waveRevealed && setForm(f => ({ ...f, unsoldStrategy: "auto_treasury" }))}
+                    className="flex-1 flex flex-col gap-1 px-3 py-2.5 rounded-xl text-left transition-all"
+                    style={{
+                      border: `1.5px solid ${form.unsoldStrategy === "auto_treasury" ? "#41afeb" : "#e5e7eb"}`,
+                      background: form.unsoldStrategy === "auto_treasury" ? "rgba(65,175,235,0.06)" : "white",
+                      opacity: editWave.waveRevealed ? 0.5 : 1,
+                      cursor: editWave.waveRevealed ? "not-allowed" : "pointer",
+                    }}>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
+                        style={{ borderColor: form.unsoldStrategy === "auto_treasury" ? "#41afeb" : "#d1d5db" }}>
+                        {form.unsoldStrategy === "auto_treasury" && (
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#41afeb" }} />
+                        )}
+                      </span>
+                      <span className="text-xs font-semibold" style={{ color: "#24315f" }}>Auto → Treasury Wallet</span>
+                    </div>
+                    <p className="text-[10px] ml-5" style={{ color: "#9bafc5" }}>
+                      Unsold NFTs automatically transfer to the treasury wallet as part of the reveal process. No extra admin action needed.
+                    </p>
+                  </button>
+                  {/* Manual */}
+                  <button
+                    disabled={!!editWave.waveRevealed}
+                    onClick={() => !editWave.waveRevealed && setForm(f => ({ ...f, unsoldStrategy: "manual" }))}
+                    className="flex-1 flex flex-col gap-1 px-3 py-2.5 rounded-xl text-left transition-all"
+                    style={{
+                      border: `1.5px solid ${form.unsoldStrategy === "manual" ? "#d97706" : "#e5e7eb"}`,
+                      background: form.unsoldStrategy === "manual" ? "rgba(217,119,6,0.05)" : "white",
+                      opacity: editWave.waveRevealed ? 0.5 : 1,
+                      cursor: editWave.waveRevealed ? "not-allowed" : "pointer",
+                    }}>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
+                        style={{ borderColor: form.unsoldStrategy === "manual" ? "#d97706" : "#d1d5db" }}>
+                        {form.unsoldStrategy === "manual" && (
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#d97706" }} />
+                        )}
+                      </span>
+                      <span className="text-xs font-semibold" style={{ color: "#24315f" }}>Manual Transfer</span>
+                    </div>
+                    <p className="text-[10px] ml-5" style={{ color: "#9bafc5" }}>
+                      Reveal runs for sold NFTs only. Admin manually moves unsold NFTs to treasury or a custom wallet using "Move to Wallet".
+                    </p>
+                  </button>
+                </div>
+                {editWave.waveRevealed && (
+                  <p className="text-[10px] mt-1.5" style={{ color: "#9bafc5" }}>
+                    Strategy is locked — this wave has already been revealed.
+                  </p>
+                )}
+              </div>
+
               {/* Reveal status */}
               {editWave.waveRevealed ? (
                 <div className="px-4 py-3 rounded-xl text-xs flex items-center gap-2"
@@ -1773,15 +1995,17 @@ export default function WavesPage() {
               )}
             </div>
 
-            {/* Footer */}
+            {/* Footer — Save only shown for non-closed waves (closed = all settings are historical/read-only) */}
             <div className="flex justify-end gap-3 px-6 py-4 flex-shrink-0" style={{ borderTop: "1px solid #e5e7eb" }}>
               <button onClick={closeManage} className="px-4 py-2 text-sm font-medium rounded-lg"
                 style={{ border: "1px solid #e5e7eb", color: "#6b7280" }}>Close</button>
-              <button onClick={handleSave} disabled={saving}
-                className="px-4 py-2 text-sm font-bold text-white rounded-lg"
-                style={{ background: saving ? "#9bafc5" : "#41afeb" }}>
-                {saving ? "Saving…" : "Save Settings"}
-              </button>
+              {(!editWave.waveClosed || !editWave.waveRevealed) && (
+                <button onClick={handleSave} disabled={saving}
+                  className="px-4 py-2 text-sm font-bold text-white rounded-lg"
+                  style={{ background: saving ? "#9bafc5" : "#41afeb" }}>
+                  {saving ? "Saving…" : "Save Settings"}
+                </button>
+              )}
             </div>
           </div>
         </div>

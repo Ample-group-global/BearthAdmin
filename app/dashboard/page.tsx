@@ -61,7 +61,7 @@ const RARITY_STYLE: Record<string, React.CSSProperties> = {
 type SortCol = "tokenId" | "owner" | "wave" | "rarity" | "date";
 
 const BLOCK_EXPLORER =
-  process.env.NEXT_PUBLIC_CONTRACT_NET === "mainnet"
+  process.env.NEXT_PUBLIC_NETWORK === "mainnet"
     ? "https://etherscan.io"
     : "https://sepolia.etherscan.io";
 

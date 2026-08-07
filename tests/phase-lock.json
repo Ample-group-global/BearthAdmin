@@ -21,16 +21,16 @@
     "failCount": 0
   },
   "phase-03": {
-    "status": "pending",
-    "locked": false,
-    "completedAt": null,
+    "status": "passed",
+    "locked": true,
+    "completedAt": "2026-08-07T00:09:06.622Z",
     "passCount": 0,
     "failCount": 0
   },
   "phase-04": {
-    "status": "pending",
-    "locked": false,
-    "completedAt": null,
+    "status": "passed",
+    "locked": true,
+    "completedAt": "2026-08-07T06:15:22.451Z",
     "passCount": 0,
     "failCount": 0
   },
