@@ -66,12 +66,19 @@ interface NftRecord {
   rarityRank: number | null;
   lastSalePriceEth: number | null;
   waveRevealTxHash: string | null;
+  tokenSbt: boolean;
 }
 
 interface Master {
   nftStages:        Array<{ id: string; name: string; code: string }>;
   nftTypes:         Array<{ id: string; name: string; code: string }>;
   deliveryStatuses: Array<{ id: string; name: string; code: string }>;
+}
+
+interface WaveOption {
+  waveNumber: number;
+  name: string;
+  onChain: { soldCount: number; closed: boolean; revealed: boolean } | null;
 }
 
 const TIER_COLORS: Record<string, string> = {
@@ -202,11 +209,14 @@ export default function NftPage() {
   const [records, setRecords]         = useState<NftRecord[]>([]);
   const [total, setTotal]             = useState(0);
   const [totalAll, setTotalAll]       = useState(0);
-  const [blindCount, setBlindCount]   = useState(0);
-  const [revealedCount, setRevealedCount] = useState(0);
-  const [mintedCount, setMintedCount] = useState(0);
-  const [soldCount, setSoldCount]     = useState(0);
-  const [deliveredCount, setDeliveredCount] = useState(0);
+  const [preMintCount, setPreMintCount]         = useState(0);
+  const [reservedCount, setReservedCount]       = useState(0);
+  const [treasuryWalletCount, setTreasuryWalletCount] = useState(0);
+  const [blindCount, setBlindCount]             = useState(0);
+  const [revealedCount, setRevealedCount]       = useState(0);
+  const [mintedCount, setMintedCount]           = useState(0);
+  const [soldCount, setSoldCount]               = useState(0);
+  const [deliveredCount, setDeliveredCount]     = useState(0);
   const [offset, setOffset]           = useState(0);
   const [search, setSearch]           = useState("");
   const [statusFilter, setStatusFilter]   = useState("");
@@ -214,6 +224,7 @@ export default function NftPage() {
   const [revealFilter, setRevealFilter]   = useState("");
   const [waveFilter, setWaveFilter]       = useState("");
   const [mintTypeFilter, setMintTypeFilter] = useState("");
+  const [rarityTierFilter, setRarityTierFilter] = useState("");
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
   const [master, setMaster]           = useState<Master | null>(null);
@@ -221,12 +232,35 @@ export default function NftPage() {
   const [sortDir, setSortDir]         = useState<"asc" | "desc">("asc");
   const [viewRecord, setViewRecord]   = useState<NftRecord | null>(null);
   const [modalMaximized, setModalMaximized] = useState(false);
-  const [waves, setWaves]             = useState<Array<{ waveNumber: number; name: string }>>([]);
+  const [waves, setWaves]             = useState<WaveOption[]>([]);
   const [blindBoxImageUrl, setBlindBoxImageUrl] = useState<string | null>(null);
   const [traitStats, setTraitStats] = useState<{ total: number; stats: Record<string, Record<string, number>> } | null>(null);
 
   const [mintedFrom,   setMintedFrom]   = useState("");
   const [mintedTo,     setMintedTo]     = useState("");
+
+  // ── Per-NFT reveal + transfer state ───────────────────────────────────────
+  const [revealUri,      setRevealUri]      = useState("");
+  const [revealing,      setRevealing]      = useState(false);
+  const [revealMsg,      setRevealMsg]      = useState<string | null>(null);
+
+  // ── Per-token SBT state ───────────────────────────────────────────────────
+  const [sbtBusy, setSbtBusy]       = useState(false);
+  const [sbtMsg,  setSbtMsg]        = useState<string | null>(null);
+  const [sbtRowBusy, setSbtRowBusy] = useState<string | null>(null); // record id being toggled inline
+
+  // ── Table row: treasury move busy state ──────────────────────────────────
+
+  // ── Modal lifecycle-action state ──────────────────────────────────────────
+  const [modalMintMoveRecip, setModalMintMoveRecip] = useState("");   // State 1
+  const [modalMintMoveBusy,  setModalMintMoveBusy]  = useState(false);
+  const [modalMintMoveMsg,   setModalMintMoveMsg]   = useState<string | null>(null);
+
+  // ── Testnet reset state ───────────────────────────────────────────────────
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetting,        setResetting]        = useState(false);
+  const [resetMsg,         setResetMsg]         = useState<string | null>(null);
+  const isTestnet = process.env.NEXT_PUBLIC_NETWORK !== "mainnet";
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -234,27 +268,31 @@ export default function NftPage() {
   const loadRecords = useCallback((
     q: string, off: number, status: string, stage: string, revealed: string, wave: string,
     sk?: string, sd?: "asc" | "desc",
-    mFrom?: string, mTo?: string, mintType?: string,
+    mFrom?: string, mTo?: string, mintType?: string, rarityTier?: string,
   ) => {
     setLoading(true); setError(null);
     const params = new URLSearchParams({ search: q, limit: String(PAGE_SIZE), offset: String(off) });
     if (status)  params.set("delivery_status", status);
     if (stage)   params.set("stage", stage);
     if (revealed === "pre_mint") {
-      params.set("minted", "false");
+      params.set("delivery_status", "pending");
+    } else if (revealed === "reserved") {
+      params.set("delivery_status", "treasury_pending");
     } else if (revealed === "minted") {
-      params.set("minted", "true");          // all minted (blind box + revealed combined)
-    } else if (revealed === "false") {
-      params.set("revealed", "false");
-      params.set("minted", "true");          // blind box = minted but not revealed
-    } else if (revealed === "true") {
-      params.set("revealed", "true");
+      params.set("minted", "true");
+    } else if (revealed === "revealed") {
+      params.set("delivery_status", "revealed");
+    } else if (revealed === "treasury_wallet") {
+      params.set("delivery_status", "treasury_wallet");
     }
     if (wave)     params.set("wave_number", wave);
     if (mFrom)    params.set("minted_from", mFrom);
     if (mTo)      params.set("minted_to",   mTo);
-    if (mintType) params.set("mint_type",   mintType);
-    if (sk)       params.set("sort_by", sk);
+    if (mintType)   params.set("mint_type",   mintType);
+    if (rarityTier) {
+      params.set("rarity_tier", rarityTier);
+    }
+    if (sk)         params.set("sort_by", sk);
     if (sk && sd) params.set("sort_dir", sd);
     fetch(`/api/nfts?${params}`, { credentials: "include" })
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
@@ -262,6 +300,9 @@ export default function NftPage() {
         setRecords(data.nftRecords ?? []);
         setTotal(data.total ?? 0);
         setTotalAll(data.totalAll ?? 0);
+        setPreMintCount(data.preMintCount ?? 0);
+        setReservedCount(data.reservedCount ?? 0);
+        setTreasuryWalletCount(data.treasuryWalletCount ?? 0);
         setBlindCount(data.blindCount ?? 0);
         setRevealedCount(data.revealedCount ?? 0);
         setMintedCount(data.mintedCount ?? 0);
@@ -271,6 +312,23 @@ export default function NftPage() {
       })
       .catch(() => { setError("Unable to load NFT records. Please try again."); setLoading(false); });
   }, []);
+
+  const handleTestnetReset = useCallback(async () => {
+    setResetting(true); setResetMsg(null);
+    try {
+      const res = await fetch("/api/nfts/testnet-reset", { method: "POST", credentials: "include" });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? "Reset failed");
+      setResetMsg(d.message ?? "Reset complete.");
+      setStatusFilter(""); setRevealFilter(""); setWaveFilter(""); setStageFilter("");
+      setMintedFrom(""); setMintedTo(""); setMintTypeFilter(""); setRarityTierFilter(""); setOffset(0);
+      loadRecords("", 0, "", "", "", "", undefined, "asc", "", "", "", "");
+    } catch (e) {
+      setResetMsg(e instanceof Error ? e.message : "Reset failed");
+    } finally {
+      setResetting(false); setShowResetConfirm(false);
+    }
+  }, [loadRecords]);
 
   // ── Initial loads ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -285,8 +343,8 @@ export default function NftPage() {
   }, []);
 
   useEffect(() => {
-    loadRecords(search, offset, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter);
-  }, [offset, statusFilter, stageFilter, revealFilter, waveFilter, mintTypeFilter]);
+    loadRecords(search, offset, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter, rarityTierFilter);
+  }, [offset, statusFilter, stageFilter, revealFilter, waveFilter, mintTypeFilter, rarityTierFilter]);
 
   // ── Watchdog: silent 30s poll on stats ───────────────────────────────────
   const [recWatchAlert, setRecWatchAlert] = useState<string | null>(null);
@@ -315,19 +373,115 @@ export default function NftPage() {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
       setOffset(0);
-      loadRecords(v, 0, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter);
+      loadRecords(v, 0, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter, rarityTierFilter);
     }, 300);
   };
 
-  const applyFilter = (status = statusFilter, stage = stageFilter, revealed = revealFilter, wave = waveFilter, mFrom = mintedFrom, mTo = mintedTo, mintType = mintTypeFilter) => {
+  const applyFilter = (status = statusFilter, stage = stageFilter, revealed = revealFilter, wave = waveFilter, mFrom = mintedFrom, mTo = mintedTo, mintType = mintTypeFilter, rarityTier = rarityTierFilter) => {
     setOffset(0);
-    loadRecords(search, 0, status, stage, revealed, wave, sortKey, sortDir, mFrom, mTo, mintType);
+    loadRecords(search, 0, status, stage, revealed, wave, sortKey, sortDir, mFrom, mTo, mintType, rarityTier);
   };
 
   const handleSort = (key: string, dir: "asc" | "desc") => {
     setSortKey(key); setSortDir(dir); setOffset(0);
-    loadRecords(search, 0, statusFilter, stageFilter, revealFilter, waveFilter, key, dir, mintedFrom, mintedTo, mintTypeFilter);
+    loadRecords(search, 0, statusFilter, stageFilter, revealFilter, waveFilter, key, dir, mintedFrom, mintedTo, mintTypeFilter, rarityTierFilter);
   };
+
+  // ── Computed: wave reveal panel ───────────────────────────────────────────
+  const activeWave = waveFilter ? waves.find(w => String(w.waveNumber) === waveFilter) : null;
+  const showRevealPanel = !!activeWave?.onChain?.closed && !activeWave?.onChain?.revealed && (activeWave?.onChain?.soldCount ?? 0) > 0;
+
+  // ── Per-NFT reveal handler ────────────────────────────────────────────────
+  const handleRevealWave = async () => {
+    if (!revealUri.startsWith("ipfs://")) { setRevealMsg("URI must start with ipfs://"); return; }
+    setRevealing(true); setRevealMsg(null);
+    try {
+      const res = await fetch(`/api/nft-sell/waves/${waveFilter}/reveal`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uri: revealUri }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setRevealMsg(d.error ?? "Reveal failed"); return; }
+      setRevealMsg(`Wave ${waveFilter} revealed! Tx: ${String(d.txHash).slice(0, 12)}…`);
+      fetch("/api/nft-sell/waves", { credentials: "include" })
+        .then(r => r.json()).then(d2 => setWaves(d2.waves ?? [])).catch(() => {});
+      loadRecords(search, offset, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter);
+    } catch { setRevealMsg("Network error during reveal"); }
+    finally { setRevealing(false); }
+  };
+
+  // ── Per-token SBT toggle ─────────────────────────────────────────────────
+  const handleToggleSbt = async (record: NftRecord, enable: boolean) => {
+    setSbtBusy(true); setSbtMsg(null);
+    try {
+      const res = await fetch(`/api/nfts/${record.id}/sbt`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: enable }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setSbtMsg(d.error ?? "SBT update failed"); return; }
+      setSbtMsg(`SBT ${enable ? "enabled" : "disabled"} — Tx: ${String(d.txHash).slice(0, 12)}…`);
+      loadRecords(search, offset, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter);
+      setViewRecord(r => r ? { ...r, tokenSbt: enable } : null);
+    } catch { setSbtMsg("Network error"); }
+    finally { setSbtBusy(false); }
+  };
+
+  // ── Inline table SBT toggle (no modal required) ──────────────────────────
+  const handleTableSbt = async (record: NftRecord, enable: boolean) => {
+    setSbtRowBusy(record.id);
+    try {
+      const res = await fetch(`/api/nfts/${record.id}/sbt`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: enable }),
+      });
+      if (!res.ok) return;
+      loadRecords(search, offset, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter, rarityTierFilter);
+    } catch { /* silent — user can retry */ }
+    finally { setSbtRowBusy(null); }
+  };
+
+
+  // ── Open modal with clean state (shared by row click + action buttons) ──
+  const openModal = useCallback((r: NftRecord) => {
+    setViewRecord(r); setModalMaximized(false); setTraitStats(null);
+    setModalMintMoveRecip(""); setModalMintMoveMsg(null);
+    if (r.isRevealed && r.traits && Object.keys(r.traits).length > 0) {
+      fetch("/api/nfts/trait-stats", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ traits: r.traits }),
+      }).then(res => res.ok ? res.json() : null).then(data => { if (data) setTraitStats(data); }).catch(() => null);
+    }
+  }, []);
+
+  // ── Modal: State 1 — Mint all reserved in wave + transfer to recipient ──
+  const handleModalMintMove = async () => {
+    if (!viewRecord || viewRecord.waveNumber == null) return;
+    const recip = modalMintMoveRecip.trim() || null;
+    if (recip && !/^0x[0-9a-fA-F]{40}$/.test(recip)) {
+      setModalMintMoveMsg("Enter a valid 0x address or leave blank for treasury wallet"); return;
+    }
+    setModalMintMoveBusy(true); setModalMintMoveMsg(null);
+    try {
+      const res = await fetch(`/api/nfts/${viewRecord.id}/treasury-move`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipient: recip }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setModalMintMoveMsg(d.error ?? "Operation failed"); return; }
+      setModalMintMoveMsg(`Done! Tx: ${String(d.txHash).slice(0, 12)}…`);
+      setModalMintMoveRecip("");
+      loadRecords(search, offset, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter, rarityTierFilter);
+    } catch { setModalMintMoveMsg("Network error"); }
+    finally { setModalMintMoveBusy(false); }
+  };
+
+
 
   // ── Records columns ───────────────────────────────────────────────────────
   const columns: ColumnDef<NftRecord>[] = [
@@ -361,11 +515,10 @@ export default function NftPage() {
                 </div>
               </>
             )}
-            {r.rarityTier && (
+            {r.tokenSbt && (
               <div className="mt-0.5">
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                  style={{ background: (TIER_COLORS[r.rarityTier.charAt(0).toUpperCase() + r.rarityTier.slice(1)] ?? "#6b7280") + "20", color: TIER_COLORS[r.rarityTier.charAt(0).toUpperCase() + r.rarityTier.slice(1)] ?? "#6b7280" }}>
-                  ● {r.rarityTier.charAt(0).toUpperCase() + r.rarityTier.slice(1)}
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "#fef2f2", color: "#dc2626" }}>
+                  🔒 Soulbound
                 </span>
               </div>
             )}
@@ -417,15 +570,88 @@ export default function NftPage() {
         if (code === "treasury_pending") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>◈ Reserved</span>;
         if (r.isRevealed)                return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#f5f3ff", color: "#7c3aed" }}>✦ Revealed</span>;
         if (r.tokenId != null)           return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#eff6ff", color: "#2563eb" }}>⬡ Minted</span>;
+        // Unminted NFT with a reveal scheduled = wave closed, NFT is unsold → Reserved
+        if (r.tokenId == null && r.waveRevealScheduledAt != null) return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>◈ Reserved</span>;
         return <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: "#f8fafc", color: "#94a3b8", border: "1px solid #e2e8f0" }}>○ Pre-mint</span>;
+      },
+    },
+    {
+      key: "rarity_tier",
+      header: "Tier",
+      render: r => {
+        if (!r.isRevealed) return <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
+        const tier = r.rarityTier ? r.rarityTier.charAt(0).toUpperCase() + r.rarityTier.slice(1) : null;
+        const tierColor = tier ? (TIER_COLORS[tier] ?? "#6b7280") : "#6b7280";
+        return tier
+          ? <span className="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
+              style={{ background: tierColor + "20", color: tierColor }}>● {tier}</span>
+          : <span className="text-[10px]" style={{ color: "#d1d5db" }}>—</span>;
+      },
+    },
+    {
+      key: "rarity_score",
+      header: "Score",
+      sortKey: "rarity_score",
+      align: "right",
+      render: r => {
+        if (!r.isRevealed) return <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
+        const tier = r.rarityTier ? r.rarityTier.charAt(0).toUpperCase() + r.rarityTier.slice(1) : null;
+        const tierColor = tier ? (TIER_COLORS[tier] ?? "#6b7280") : "#6b7280";
+        return r.rarityScore != null
+          ? <span className="text-xs font-semibold" style={{ color: tierColor }}>{Number(r.rarityScore).toFixed(2)}</span>
+          : <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
+      },
+    },
+    {
+      key: "rarity_rank",
+      header: "Rank",
+      sortKey: "rarity_rank",
+      align: "right",
+      render: r => {
+        if (!r.isRevealed) return <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
+        return r.rarityRank != null
+          ? <span className="text-xs font-bold" style={{ color: "#475569" }}>#{r.rarityRank}</span>
+          : <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
+      },
+    },
+    {
+      key: "sbt",
+      header: "SBT",
+      align: "center",
+      render: r => {
+        // Only minted tokens can have SBT toggled
+        if (r.tokenId == null) return <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
+        const busy = sbtRowBusy === r.id;
+        if (r.tokenSbt) {
+          return (
+            <button
+              disabled={busy}
+              onClick={e => { e.stopPropagation(); handleTableSbt(r, false); }}
+              title="Remove Soulbound"
+              className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded disabled:opacity-40"
+              style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", cursor: "pointer" }}>
+              {busy ? "…" : "🔒 Bound"}
+            </button>
+          );
+        }
+        return (
+          <button
+            disabled={busy}
+            onClick={e => { e.stopPropagation(); handleTableSbt(r, true); }}
+            title="Set Soulbound"
+            className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded disabled:opacity-40"
+            style={{ background: "#f8fafc", color: "#94a3b8", border: "1px solid #e2e8f0", cursor: "pointer" }}>
+            {busy ? "…" : "🔓 Set"}
+          </button>
+        );
       },
     },
     {
       key: "reveal_date",
       header: "Reveal",
       render: r => {
-        // Reserved (treasury pool): wave already revealed at wave level but this token was never minted — no per-token reveal
-        if (r.deliveryStatusCode === "treasury_pending") return <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
+        // Unminted NFTs have no per-token reveal — reveal happens via Mint & Move flow
+        if (r.tokenId == null) return <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
         if (r.isRevealed && r.revealedAt) return (
           <div>
             <div className="text-xs font-semibold" style={{ color: "#7c3aed" }}>Revealed</div>
@@ -433,12 +659,9 @@ export default function NftPage() {
           </div>
         );
         if (r.waveRevealScheduledAt) {
-          const isPast = new Date(r.waveRevealScheduledAt) < new Date();
           return (
             <div>
-              <div className="text-xs font-semibold" style={{ color: isPast ? "#dc2626" : "#6366f1" }}>
-                {isPast ? "Overdue" : "Scheduled"}
-              </div>
+              <div className="text-xs font-semibold" style={{ color: "#6366f1" }}>Scheduled</div>
               <div className="text-xs mt-0.5" style={{ color: "#64748b" }}>{fmt(r.waveRevealScheduledAt)}</div>
             </div>
           );
@@ -452,6 +675,7 @@ export default function NftPage() {
       sortKey: "price_eth",
       align: "right",
       render: r => {
+        if (r.waveNumber == null) return <span className="text-sm" style={{ color: "#d1d5db" }}>—</span>;
         const eff = r.effectivePriceEth;
         return eff != null
           ? <span className="text-sm font-bold" style={{ color: "#0f172a" }}>{Number(eff)} ETH</span>
@@ -463,12 +687,13 @@ export default function NftPage() {
       key: "last_activity",
       header: "Last Activity",
       render: r => {
+        const isReserved = r.deliveryStatusCode === "treasury_pending" || (r.tokenId == null && r.waveRevealScheduledAt != null);
         const latest =
-          r.deliveredAt ? { label: "Delivered", date: r.deliveredAt, color: "#15803d" } :
-          r.soldAt      ? { label: "Sold",      date: r.soldAt,      color: "#a16207" } :
-          r.revealedAt  ? { label: "Revealed",  date: r.revealedAt,  color: "#7c3aed" } :
-          r.mintedAt    ? { label: "Minted",    date: r.mintedAt,    color: "#2563eb" } :
-          r.deliveryStatusCode === "treasury_pending" ? { label: "Reserved", date: r.updatedAt, color: "#b45309" } :
+          r.deliveredAt ? { label: "Delivered", date: r.deliveredAt,           color: "#15803d" } :
+          r.soldAt      ? { label: "Sold",      date: r.soldAt,                color: "#a16207" } :
+          r.revealedAt  ? { label: "Revealed",  date: r.revealedAt,            color: "#7c3aed" } :
+          r.mintedAt    ? { label: "Minted",    date: r.mintedAt,              color: "#2563eb" } :
+          isReserved    ? { label: "Reserved",  date: r.waveRevealScheduledAt, color: "#b45309" } :
           null;
         if (!latest) return <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
         return (
@@ -480,21 +705,32 @@ export default function NftPage() {
       },
     },
     {
+      key: "lifecycle_action",
+      header: "Action",
+      align: "center",
+      render: r => {
+        // Only reserved unminted non-customer NFTs get an action — single-click Mint & Move
+        if (r.tokenId == null && r.deliveryStatusCode === "treasury_pending" && r.mintType !== "free" && r.mintType !== "paid") {
+          return (
+            <button
+              onClick={e => { e.stopPropagation(); openModal(r); }}
+              title="Mint &amp; Move to Treasury / Custom Wallet"
+              className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg"
+              style={{ background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", cursor: "pointer" }}>
+              ⬡ Mint &amp; Move
+            </button>
+          );
+        }
+        return <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
+      },
+    },
+    {
       key: "actions",
       header: "",
       align: "center",
       width: 80,
       render: r => (
-        <button onClick={() => {
-            setViewRecord(r); setModalMaximized(false); setTraitStats(null);
-            if (r.isRevealed && r.traits && Object.keys(r.traits).length > 0) {
-              fetch("/api/nfts/trait-stats", {
-                method: "POST", credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ traits: r.traits }),
-              }).then(res => res.ok ? res.json() : null).then(data => { if (data) setTraitStats(data); }).catch(() => null);
-            }
-          }} title="View full history"
+        <button onClick={() => openModal(r)} title="View full history"
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors"
           style={{ color: "#41afeb", border: "1px solid rgba(65,175,235,0.3)", background: "rgba(65,175,235,0.05)" }}
           onMouseEnter={e => { e.currentTarget.style.background = "rgba(65,175,235,0.12)"; e.currentTarget.style.borderColor = "rgba(65,175,235,0.5)"; }}
@@ -521,9 +757,24 @@ export default function NftPage() {
             Full lifecycle report — generation, wave assignment, minting, reveal, sale, and delivery
           </p>
         </div>
-        {/* Per-tab CSV export */}
+        {/* Per-tab actions */}
         {activeTab === "records" && (
-          <button onClick={() => {
+          <div className="flex items-center gap-2">
+            {/* Testnet-only reset — blocked on mainnet */}
+            {isTestnet && (
+              <button
+                onClick={() => setShowResetConfirm(true)}
+                disabled={resetting}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}
+                title="Reset all 9,999 records to pre-mint state (testnet only)">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {resetting ? "Resetting…" : "Reset DB"}
+              </button>
+            )}
+            <button onClick={() => {
             const headers = ["NFT #", "Token ID", "Artwork ID", "Wave", "Wave Start", "Wave End", "Reveal Date", "Minted At", "Revealed At", "Sold At", "Delivered At", "Status", "Price (ETH)", "Owner"];
             const rows = records.map(r => [
               r.serialNumber, r.tokenId ?? "", artworkId(r) != null ? `#${artworkId(r)}` : "", r.waveNumber ? `W${r.waveNumber}` : "",
@@ -543,8 +794,52 @@ export default function NftPage() {
             </svg>
             Export CSV
           </button>
+          </div>
         )}
       </div>
+
+      {/* ── Reset result banner ── */}
+      {resetMsg && (
+        <div className="flex items-center justify-between px-4 py-2.5 rounded-xl text-sm"
+          style={{ background: resetMsg.includes("complete") ? "rgba(22,163,74,0.08)" : "rgba(220,38,38,0.08)", border: `1px solid ${resetMsg.includes("complete") ? "rgba(22,163,74,0.2)" : "rgba(220,38,38,0.2)"}`, color: resetMsg.includes("complete") ? "#16a34a" : "#dc2626" }}>
+          <span>{resetMsg}</span>
+          <button onClick={() => setResetMsg(null)} className="ml-4 text-xs opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
+
+      {/* ── Testnet reset confirmation dialog ── */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl" style={{ border: "1px solid #fecaca" }}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#fef2f2" }}>
+                <svg className="w-5 h-5" style={{ color: "#dc2626" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-bold text-sm" style={{ color: "#0f172a" }}>Reset All DB Data?</p>
+                <p className="text-xs mt-0.5" style={{ color: "#64748b" }}>Testnet only — blocked on mainnet</p>
+              </div>
+            </div>
+            <p className="text-sm mb-5" style={{ color: "#374151" }}>
+              This will reset all <strong>9,999 NFT records</strong>, all <strong>7 waves</strong>, the wave pool, and customer wallet minted counts back to pre-mint state. This cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setShowResetConfirm(false)}
+                className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold bg-white"
+                style={{ border: "1px solid #e5e7eb", color: "#374151" }}>
+                Cancel
+              </button>
+              <button onClick={handleTestnetReset} disabled={resetting}
+                className="flex-1 px-4 py-2 rounded-xl text-sm font-bold"
+                style={{ background: "#dc2626", color: "white" }}>
+                {resetting ? "Resetting…" : "Yes, Reset All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Tab Bar ── */}
       <div className="ba-tabs" style={{ borderBottom: "1px solid #e5e7eb" }}>
@@ -608,28 +903,28 @@ export default function NftPage() {
                 filter: () => { setRevealFilter(""); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "", ""); },
               },
               {
-                label: "Pre-mint", value: totalAll - mintedCount, color: "#64748b", bg: "#f8fafc", pct: totalAll ? Math.round((totalAll - mintedCount) / totalAll * 100) : 0,
-                sub: "Awaiting mint",
-                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-                filter: () => { setRevealFilter("pre_mint"); applyFilter(statusFilter, stageFilter, "pre_mint", waveFilter); },
+                label: "Pre-mint", value: preMintCount, color: "#64748b", bg: "#f8fafc", pct: totalAll ? Math.round(preMintCount / totalAll * 100) : 0,
+                sub: "Blind box · awaiting mint",
+                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>,
+                filter: () => { setRevealFilter("pre_mint"); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "pre_mint", ""); },
+              },
+              {
+                label: "Reserved", value: reservedCount, color: "#b45309", bg: "#fffbeb", pct: totalAll ? Math.round(reservedCount / totalAll * 100) : 0,
+                sub: "Unsold · awaiting treasury",
+                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+                filter: () => { setRevealFilter("reserved"); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "reserved", ""); },
               },
               {
                 label: "Minted", value: mintedCount, color: "#2563eb", bg: "#eff6ff", pct: totalAll ? Math.round(mintedCount / totalAll * 100) : 0,
                 sub: "On-chain tokens",
                 icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>,
-                filter: () => { setRevealFilter("minted"); setStatusFilter(""); applyFilter("", stageFilter, "minted", waveFilter); },
-              },
-              {
-                label: "Blind Box", value: blindCount, color: "#d97706", bg: "#fffbeb", pct: totalAll ? Math.round(blindCount / totalAll * 100) : 0,
-                sub: "Minted, unrevealed",
-                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
-                filter: () => { setRevealFilter("false"); applyFilter(statusFilter, stageFilter, "false", waveFilter); },
+                filter: () => { setRevealFilter("minted"); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "minted", ""); },
               },
               {
                 label: "Revealed", value: revealedCount, color: "#7c3aed", bg: "#f5f3ff", pct: totalAll ? Math.round(revealedCount / totalAll * 100) : 0,
                 sub: "Artwork unlocked",
                 icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
-                filter: () => { setRevealFilter("true"); applyFilter(statusFilter, stageFilter, "true", waveFilter); },
+                filter: () => { setRevealFilter("revealed"); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "revealed", ""); },
               },
             ].map(s => (
               <button key={s.label} onClick={s.filter}
@@ -694,9 +989,10 @@ export default function NftPage() {
               className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
               style={{ border: "1px solid #e5e7eb", color: revealFilter ? "#111827" : "#9bafc5" }}>
               <option value="">All Artwork</option>
-              <option value="pre_mint">○ Pre-mint</option>
-              <option value="false">⬡ Blind Box</option>
-              <option value="true">✦ Revealed</option>
+              <option value="pre_mint">⬡ Pre-mint</option>
+              <option value="reserved">◈ Reserved</option>
+              <option value="revealed">✦ Revealed</option>
+              <option value="treasury_wallet">🏛 Treasury Wallet</option>
             </select>
 
             <select value={mintTypeFilter}
@@ -706,8 +1002,18 @@ export default function NftPage() {
               <option value="">All Mint Types</option>
               <option value="free">Free</option>
               <option value="paid">Paid</option>
-              <option value="admin">Admin</option>
               <option value="treasury">Treasury</option>
+            </select>
+
+            <select value={rarityTierFilter}
+              onChange={e => { setRarityTierFilter(e.target.value); applyFilter(statusFilter, stageFilter, revealFilter, waveFilter, mintedFrom, mintedTo, mintTypeFilter, e.target.value); }}
+              className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
+              style={{ border: "1px solid #e5e7eb", color: rarityTierFilter ? "#111827" : "#9bafc5" }}>
+              <option value="">All Rarity Tiers</option>
+              <option value="legendary">Legendary</option>
+              <option value="epic">Epic</option>
+              <option value="rare">Rare</option>
+              <option value="common">Common</option>
             </select>
 
             <input type="date" value={mintedFrom}
@@ -721,17 +1027,62 @@ export default function NftPage() {
               style={{ border: "1px solid #e5e7eb", color: mintedTo ? "#111827" : "#9bafc5" }}
               title="Minted to date" />
 
-            {(statusFilter || revealFilter || waveFilter || stageFilter || mintedFrom || mintedTo || mintTypeFilter) && (
+            {(statusFilter || revealFilter || waveFilter || stageFilter || mintedFrom || mintedTo || mintTypeFilter || rarityTierFilter) && (
               <button onClick={() => {
                 setStatusFilter(""); setRevealFilter(""); setWaveFilter(""); setStageFilter("");
-                setMintedFrom(""); setMintedTo(""); setMintTypeFilter("");
-                applyFilter("", "", "", "", "", "", "");
+                setMintedFrom(""); setMintedTo(""); setMintTypeFilter(""); setRarityTierFilter("");
+                applyFilter("", "", "", "", "", "", "", "");
               }} className="px-3 py-2 rounded-xl text-xs font-semibold"
                 style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
                 Clear filters
               </button>
             )}
           </div>
+
+          {/* ── Wave Reveal Panel ── */}
+          {showRevealPanel && (
+            <div className="rounded-2xl p-4 bg-white" style={{ border: "1px solid #c7d2fe", boxShadow: "0 1px 4px rgba(99,102,241,0.08)" }}>
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#ede9fe" }}>
+                  <svg className="w-5 h-5" style={{ color: "#7c3aed" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold" style={{ color: "#4c1d95" }}>Wave {waveFilter} is closed and awaiting reveal</p>
+                  <p className="text-xs mt-0.5" style={{ color: "#6d28d9" }}>
+                    Enter the IPFS metadata base URI to reveal artwork and assign tokens randomly via VRF.
+                  </p>
+                  <div className="flex items-center gap-2 mt-3 flex-wrap">
+                    <input
+                      type="text"
+                      value={revealUri}
+                      onChange={e => setRevealUri(e.target.value)}
+                      placeholder="ipfs://Qm..."
+                      className="flex-1 min-w-48 px-3 py-2 rounded-xl text-sm outline-none font-mono"
+                      style={{ border: "1px solid #ddd6fe", background: "#faf5ff", color: "#1e1b4b" }}
+                    />
+                    <button
+                      onClick={handleRevealWave}
+                      disabled={revealing || !revealUri.startsWith("ipfs://")}
+                      className="px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                      style={{
+                        background: (revealing || !revealUri.startsWith("ipfs://")) ? "#e5e7eb" : "linear-gradient(135deg,#7c3aed,#6366f1)",
+                        color: (revealing || !revealUri.startsWith("ipfs://")) ? "#9ca3af" : "#fff",
+                        border: "none", cursor: revealing ? "wait" : "pointer",
+                      }}>
+                      {revealing ? "Revealing…" : `✦ Reveal Wave ${waveFilter}`}
+                    </button>
+                  </div>
+                  {revealMsg && (
+                    <p className="text-xs mt-2 font-semibold" style={{ color: revealMsg.includes("!") ? "#16a34a" : "#dc2626" }}>
+                      {revealMsg}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ── Table ── */}
           <DataTable
@@ -751,6 +1102,7 @@ export default function NftPage() {
           />
         </>
       )}
+
 
       {activeTab === "otc"      && <OtcTab />}
       {activeTab === "bulk"     && <BulkTab />}
@@ -845,34 +1197,41 @@ export default function NftPage() {
                           const code = viewRecord.deliveryStatusCode;
                           if (code === "delivered") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#dcfce7", color: "#15803d" }}>✓ Delivered</span>;
                           if (code === "sold")             return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#fef9c3", color: "#a16207" }}>💰 Sold</span>;
-                          if (code === "treasury_pending") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>◈ Reserved</span>;
+                          if (code === "treasury_pending" || (viewRecord.tokenId == null && viewRecord.waveRevealScheduledAt != null))
+                            return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>◈ Reserved</span>;
                           if (viewRecord.isRevealed)       return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#f5f3ff", color: "#7c3aed" }}>✦ Revealed</span>;
                           if (viewRecord.tokenId != null)  return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#eff6ff", color: "#2563eb" }}>⬡ Minted</span>;
                           return <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#f8fafc", color: "#94a3b8", border: "1px solid #e2e8f0" }}>○ Pre-mint</span>;
                         })()}
                       </div>
-                      {/* Chain */}
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Chain</p>
-                        <div className="flex items-center gap-1.5">
-                          <svg width="14" height="14" viewBox="0 0 256 417" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M127.9 0L125.2 9V285.2L127.9 287.9L255.8 212.6L127.9 0Z" fill="#343434"/>
-                            <path d="M127.9 0L0 212.6L127.9 287.9V154.2V0Z" fill="#8C8C8C"/>
-                            <path d="M127.9 312.8L126.3 314.8V412.1L127.9 416.9L255.9 237.5L127.9 312.8Z" fill="#3C3C3B"/>
-                            <path d="M127.9 416.9V312.8L0 237.5L127.9 416.9Z" fill="#8C8C8C"/>
-                            <path d="M127.9 287.9L255.8 212.6L127.9 154.2V287.9Z" fill="#141414"/>
-                            <path d="M0 212.6L127.9 287.9V154.2L0 212.6Z" fill="#393939"/>
-                          </svg>
-                          <p className="text-sm font-semibold" style={{ color: "#0f172a" }}>
-                            {process.env.NEXT_PUBLIC_NETWORK === "mainnet" ? "Ethereum" : "Sepolia"}
-                          </p>
+                      {/* Chain — only meaningful once minted */}
+                      {viewRecord.tokenId != null && (
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Chain</p>
+                          <div className="flex items-center gap-1.5">
+                            <svg width="14" height="14" viewBox="0 0 256 417" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M127.9 0L125.2 9V285.2L127.9 287.9L255.8 212.6L127.9 0Z" fill="#343434"/>
+                              <path d="M127.9 0L0 212.6L127.9 287.9V154.2V0Z" fill="#8C8C8C"/>
+                              <path d="M127.9 312.8L126.3 314.8V412.1L127.9 416.9L255.9 237.5L127.9 312.8Z" fill="#3C3C3B"/>
+                              <path d="M127.9 416.9V312.8L0 237.5L127.9 416.9Z" fill="#8C8C8C"/>
+                              <path d="M127.9 287.9L255.8 212.6L127.9 154.2V287.9Z" fill="#141414"/>
+                              <path d="M0 212.6L127.9 287.9V154.2L0 212.6Z" fill="#393939"/>
+                            </svg>
+                            <p className="text-sm font-semibold" style={{ color: "#0f172a" }}>
+                              {process.env.NEXT_PUBLIC_NETWORK === "mainnet" ? "Ethereum" : "Sepolia"}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                      {/* Price */}
+                      )}
+                      {/* Price — only show after wave is assigned */}
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Mint Price</p>
-                        <p className="text-sm font-semibold leading-tight" style={{ color: viewRecord.effectivePriceEth != null ? "#0f172a" : "#15803d" }}>
-                          {viewRecord.effectivePriceEth != null ? `${Number(viewRecord.effectivePriceEth)} ETH` : "Free"}
+                        <p className="text-sm font-semibold leading-tight" style={{ color: viewRecord.waveNumber == null ? "#94a3b8" : viewRecord.effectivePriceEth != null ? "#0f172a" : "#15803d" }}>
+                          {viewRecord.waveNumber == null
+                            ? "—"
+                            : viewRecord.effectivePriceEth != null
+                              ? `${Number(viewRecord.effectivePriceEth)} ETH`
+                              : "Free"}
                         </p>
                       </div>
                       {/* Mint Type */}
@@ -896,30 +1255,30 @@ export default function NftPage() {
                             : "—"}
                         </p>
                       </div>
-                      {/* Rarity */}
-                      {/* Rarity Tier + Score + Rank — three cells in one row */}
-                      {viewRecord.rarityTier && (() => {
-                        const tier = viewRecord.rarityTier!.charAt(0).toUpperCase() + viewRecord.rarityTier!.slice(1);
-                        const tierColor = TIER_COLORS[tier] ?? "#6b7280";
+                      {/* Rarity Tier, Score + Rank — all hidden until revealed */}
+                      {(() => {
+                        const tier = viewRecord.isRevealed && viewRecord.rarityTier
+                          ? viewRecord.rarityTier.charAt(0).toUpperCase() + viewRecord.rarityTier.slice(1)
+                          : null;
+                        const tierColor = tier ? (TIER_COLORS[tier] ?? "#6b7280") : "#94a3b8";
                         return (
                           <>
                             <div>
                               <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#94a3b8" }}>Rarity Tier</p>
-                              <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                                style={{ background: tierColor + "20", color: tierColor }}>
-                                ● {tier}
-                              </span>
+                              {tier
+                                ? <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: tierColor + "20", color: tierColor }}>● {tier}</span>
+                                : <span style={{ color: "#cbd5e1" }}>—</span>}
                             </div>
                             <div>
                               <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Rarity Score</p>
-                              <p className="text-sm font-bold" style={{ color: tierColor }}>
-                                {viewRecord.rarityScore != null ? Number(viewRecord.rarityScore).toFixed(2) : <span style={{ color: "#cbd5e1" }}>—</span>}
+                              <p className="text-sm font-bold" style={{ color: viewRecord.isRevealed && viewRecord.rarityScore != null ? tierColor : "#cbd5e1" }}>
+                                {viewRecord.isRevealed && viewRecord.rarityScore != null ? Number(viewRecord.rarityScore).toFixed(2) : "—"}
                               </p>
                             </div>
                             <div>
                               <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Rank</p>
-                              <p className="text-sm font-bold" style={{ color: "#0f172a" }}>
-                                {viewRecord.rarityRank != null
+                              <p className="text-sm font-bold">
+                                {viewRecord.isRevealed && viewRecord.rarityRank != null
                                   ? <><span style={{ color: tierColor }}>#{viewRecord.rarityRank}</span><span className="text-xs font-normal" style={{ color: "#94a3b8" }}> / {totalAll.toLocaleString()}</span></>
                                   : <span style={{ color: "#cbd5e1" }}>—</span>}
                               </p>
@@ -973,28 +1332,31 @@ export default function NftPage() {
                           W{viewRecord.waveNumber}{viewRecord.waveName ? ` — ${viewRecord.waveName.split("—")[0]?.trim()}` : ""}{viewRecord.waveQuantity != null ? ` · ${viewRecord.waveQuantity.toLocaleString()} NFTs` : ""}
                         </span>
                       </div>
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-full"
-                        style={viewRecord.isRevealed
-                          ? { background: "#f5f3ff", color: "#7c3aed" }
-                          : viewRecord.mintedAt
-                          ? { background: "#eff6ff", color: "#3b82f6" }
-                          : { background: "#f8fafc", color: "#94a3b8" }}>
-                        {viewRecord.isRevealed ? "✦ Revealed" : viewRecord.mintedAt ? "⬡ Minted" : "○ Pending"}
-                      </span>
+                      {(() => {
+                        const isRes = viewRecord.deliveryStatusCode === "treasury_pending" || (viewRecord.tokenId == null && viewRecord.waveRevealScheduledAt != null);
+                        if (viewRecord.isRevealed)   return <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#f5f3ff", color: "#7c3aed" }}>✦ Revealed</span>;
+                        if (viewRecord.mintedAt)     return <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#eff6ff", color: "#3b82f6" }}>⬡ Minted</span>;
+                        if (isRes)                   return <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>◈ Reserved</span>;
+                        return <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#f8fafc", color: "#94a3b8" }}>○ Pending</span>;
+                      })()}
                     </div>
                     {/* Progress track */}
+                    {(() => {
+                      const isResTrack = viewRecord.deliveryStatusCode === "treasury_pending" || (viewRecord.tokenId == null && viewRecord.waveRevealScheduledAt != null);
+                      const isTreasury = viewRecord.deliveryStatusCode === "treasury_wallet" && !!viewRecord.mintedAt && viewRecord.mintType !== "free" && viewRecord.mintType !== "paid";
+                      const pctWidth   = viewRecord.isRevealed ? "100%" : isTreasury ? "100%" : isResTrack ? "100%" : viewRecord.mintedAt ? "65%" : viewRecord.waveScheduledStart && new Date(viewRecord.waveScheduledStart) < new Date() ? "32%" : "0%";
+                      const gradient   = viewRecord.isRevealed ? "linear-gradient(90deg,#6366f1,#8b5cf6)" : isTreasury ? "linear-gradient(90deg,#14b8a6,#0d9488)" : isResTrack ? "linear-gradient(90deg,#f59e0b,#b45309)" : "linear-gradient(90deg,#6366f1,#8b5cf6)";
+                      return (
                     <div className="px-5 pt-4 pb-1">
                       <div className="relative flex items-center">
                         <div className="flex-1 h-1 rounded-full" style={{ background: "#e2e8f0" }}>
-                          <div className="h-full rounded-full transition-all duration-500"
-                            style={{
-                              width: viewRecord.isRevealed ? "100%" : viewRecord.mintedAt ? "65%" : viewRecord.waveScheduledStart && new Date(viewRecord.waveScheduledStart) < new Date() ? "32%" : "0%",
-                              background: "linear-gradient(90deg,#6366f1,#8b5cf6)",
-                            }} />
+                          <div className="h-full rounded-full transition-all duration-500" style={{ width: pctWidth, background: gradient }} />
                         </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 px-5 py-4 gap-4">
+                      );
+                    })()}
+                    <div className={`grid px-5 py-4 gap-4 ${viewRecord.deliveryStatusCode === "treasury_wallet" && viewRecord.mintedAt && viewRecord.mintType !== "free" && viewRecord.mintType !== "paid" ? "grid-cols-4" : "grid-cols-3"}`}>
                       {[
                         { label: "Wave Start",  val: fmt(viewRecord.waveScheduledStart), dot: "#41afeb" },
                         { label: "Wave End",    val: fmt(viewRecord.waveScheduledEnd),   dot: "#f59e0b" },
@@ -1007,27 +1369,39 @@ export default function NftPage() {
                           </div>
                         </div>
                       ))}
-                      {/* Reveal Date — shows actual reveal time when revealed, scheduled date otherwise */}
+                      {/* Reveal / Reserved Date */}
+                      {(() => {
+                        const isRes = viewRecord.deliveryStatusCode === "treasury_pending" || (viewRecord.tokenId == null && viewRecord.waveRevealScheduledAt != null);
+                        const dotColor  = viewRecord.isRevealed ? "#16a34a" : isRes ? "#b45309" : "#7c3aed";
+                        const textColor = viewRecord.isRevealed && viewRecord.revealedAt ? "#16a34a" : isRes && viewRecord.waveRevealScheduledAt ? "#b45309" : viewRecord.waveRevealScheduledAt ? "#7c3aed" : "#cbd5e1";
+                        const label     = viewRecord.isRevealed ? "Revealed On" : isRes ? "Reserved Date" : "Reveal Date";
+                        const dateVal   = viewRecord.isRevealed && viewRecord.revealedAt ? fmt(viewRecord.revealedAt) : viewRecord.waveRevealScheduledAt ? fmt(viewRecord.waveRevealScheduledAt) : "—";
+                        return (
                       <div className="flex items-start gap-2">
-                        <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-                          style={{ background: viewRecord.isRevealed ? "#16a34a" : "#7c3aed" }} />
+                        <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: dotColor }} />
                         <div>
-                          <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>
-                            {viewRecord.isRevealed ? "Revealed On" : "Reveal Date"}
-                          </p>
-                          <p className="text-xs font-semibold"
-                            style={{ color: viewRecord.isRevealed && viewRecord.revealedAt ? "#16a34a" : viewRecord.waveRevealScheduledAt ? "#7c3aed" : "#cbd5e1" }}>
-                            {viewRecord.isRevealed && viewRecord.revealedAt
-                              ? fmt(viewRecord.revealedAt)
-                              : viewRecord.waveRevealScheduledAt
-                              ? fmt(viewRecord.waveRevealScheduledAt)
-                              : "—"}
-                          </p>
+                          <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>{label}</p>
+                          <p className="text-xs font-semibold" style={{ color: textColor }}>{dateVal}</p>
                           {viewRecord.isRevealed && (
                             <p className="text-[9px] mt-0.5 font-semibold" style={{ color: "#16a34a" }}>✓ Revealed</p>
                           )}
                         </div>
                       </div>
+                  );
+                  })()}
+                      {/* Treasury Wallet — only for admin/treasury mints physically moved to treasury */}
+                      {viewRecord.deliveryStatusCode === "treasury_wallet" && viewRecord.mintedAt && viewRecord.mintType !== "free" && viewRecord.mintType !== "paid" && (
+                        <div className="flex items-start gap-2">
+                          <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#0d9488" }} />
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Treasury Wallet</p>
+                            <p className="text-xs font-semibold" style={{ color: viewRecord.mintedAt ? "#0d9488" : "#cbd5e1" }}>
+                              {viewRecord.mintedAt ? fmt(viewRecord.mintedAt) : "—"}
+                            </p>
+                            <p className="text-[9px] mt-0.5 font-semibold" style={{ color: "#0d9488" }}>✓ In Treasury</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     {viewRecord.priceEth != null && (
                       <div className="flex items-center justify-between px-5 py-3 mx-0" style={{ borderTop: "1px solid #f1f5f9", background: "#fafaff" }}>
@@ -1048,12 +1422,14 @@ export default function NftPage() {
                   </div>
                   {[
                     { label: "Generated", date: viewRecord.createdAt,   color: "#6366f1", desc: "NFT created in DB from generator",  txHash: null },
-                    { label: "Reserved",  date: viewRecord.deliveryStatusCode === "treasury_pending" ? viewRecord.updatedAt : null, color: "#b45309", desc: "Added to wave pool — awaiting future mint", txHash: null },
+                    { label: "Reserved",  date: viewRecord.waveRevealScheduledAt ?? null, color: "#b45309", desc: "Wave closed — NFT unsold, awaiting mint & move to treasury", txHash: null },
                     { label: "Minted",    date: viewRecord.mintedAt,    color: "#7c3aed", desc: "Minted on-chain to buyer wallet",    txHash: viewRecord.mintTxHash },
                     { label: "Revealed",  date: viewRecord.revealedAt,  color: "#8b5cf6", desc: "Artwork revealed, blind box opened", txHash: viewRecord.waveRevealTxHash },
                     { label: "Sold",      date: viewRecord.soldAt,      color: "#f59e0b", desc: viewRecord.lastSalePriceEth != null ? `Sold for ${Number(viewRecord.lastSalePriceEth).toFixed(4)} ETH` : "Ownership transferred on-chain",     txHash: viewRecord.lastTxHash },
                     { label: "Delivered", date: viewRecord.deliveredAt, color: "#10b981", desc: "Delivered to customer wallet",        txHash: null },
-                  ].filter(step => step.date).map((step, i, arr) => (
+                  ].filter(step => step.date).map((step, i, arr) => {
+                    const isLast = i === arr.length - 1;
+                    return (
                     <div key={step.label} className="flex gap-4 px-5 py-3.5" style={{ borderTop: i > 0 ? "1px solid #f8fafc" : undefined }}>
                       {/* Step indicator */}
                       <div className="flex flex-col items-center flex-shrink-0 pt-0.5" style={{ width: 32 }}>
@@ -1063,7 +1439,7 @@ export default function NftPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                           </svg>
                         </div>
-                        {i < arr.length - 1 && (
+                        {!isLast && (
                           <div className="w-px flex-1 mt-1" style={{ background: "#e2e8f0", minHeight: 12 }} />
                         )}
                       </div>
@@ -1082,15 +1458,18 @@ export default function NftPage() {
                         </div>
                         <p className="text-xs mt-0.5" style={{ color: "#94a3b8" }}>{step.desc}</p>
                       </div>
-                      {/* Badge */}
+                      {/* Badge — last step = current active state, all others = done */}
                       <div className="flex-shrink-0 pt-0.5">
                         <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                          style={{ background: `${step.color}12`, color: step.color }}>
-                          Done
+                          style={isLast
+                            ? { background: `${step.color}20`, color: step.color, border: `1px solid ${step.color}40` }
+                            : { background: "#f1f5f9", color: "#64748b" }}>
+                          {isLast ? "Active" : "Done"}
                         </span>
                       </div>
                     </div>
-                  ))}
+                  )
+                  })}
                 </div>
 
                 {/* Blind Box notice */}
@@ -1178,12 +1557,59 @@ export default function NftPage() {
             </div>
 
             {/* ── Footer ─────────────────────────────────────────────────── */}
-            <div className="flex-shrink-0 flex justify-end px-5 py-3 bg-white" style={{ borderTop: "1px solid #e2e8f0" }}>
-              <button onClick={() => setViewRecord(null)}
-                className="px-5 py-2 text-sm font-semibold rounded-lg"
-                style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0" }}>
-                Close
-              </button>
+            <div className="flex-shrink-0 px-5 pt-4 pb-3 bg-white" style={{ borderTop: "1px solid #e2e8f0" }}>
+
+              {/* ── Lifecycle action panel — all 4 treasury states ── */}
+              {(() => {
+                const { tokenId, deliveryStatusCode, waveNumber, mintType } = viewRecord;
+
+                // Only reserved unminted non-customer NFTs show the Mint & Move panel
+                if (tokenId == null && deliveryStatusCode === "treasury_pending" && mintType !== "free" && mintType !== "paid") return (
+                  <div className="mb-4 p-3 rounded-xl" style={{ background: "#eff6ff", border: "1px solid #bfdbfe" }}>
+                    <p className="text-xs font-bold mb-1" style={{ color: "#1d4ed8" }}>⬡ Mint &amp; Move to Treasury / Custom Wallet</p>
+                    <p className="text-[10px] mb-2" style={{ color: "#3b82f6" }}>
+                      Mints all unsold NFTs in Wave {waveNumber} on-chain, then transfers to the wallet below. Leave blank for the contract&apos;s default treasury wallet.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={modalMintMoveRecip}
+                        onChange={e => setModalMintMoveRecip(e.target.value)}
+                        placeholder="0x… (leave blank for treasury wallet)"
+                        className="flex-1 px-3 py-1.5 rounded-lg text-xs outline-none font-mono"
+                        style={{ border: "1px solid #bfdbfe", background: "#fff", color: "#1e3a8a" }}
+                      />
+                      <button
+                        onClick={handleModalMintMove}
+                        disabled={modalMintMoveBusy}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold flex-shrink-0"
+                        style={{
+                          background: modalMintMoveBusy ? "#e5e7eb" : "linear-gradient(135deg,#2563eb,#1d4ed8)",
+                          color: modalMintMoveBusy ? "#9ca3af" : "#fff",
+                          border: "none", cursor: modalMintMoveBusy ? "wait" : "pointer",
+                        }}>
+                        {modalMintMoveBusy ? "Processing…" : "Mint & Move"}
+                      </button>
+                    </div>
+                    {modalMintMoveMsg && (
+                      <p className="text-xs mt-1.5 font-semibold" style={{ color: modalMintMoveMsg.startsWith("Done") ? "#16a34a" : "#dc2626" }}>
+                        {modalMintMoveMsg}
+                      </p>
+                    )}
+                  </div>
+                );
+
+                return null;
+              })()}
+
+              {/* ── Close row ────────────────────────────────────────────── */}
+              <div className="flex items-center justify-end">
+                <button onClick={() => setViewRecord(null)}
+                  className="px-5 py-2 text-sm font-semibold rounded-lg"
+                  style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0" }}>
+                  Close
+                </button>
+              </div>
             </div>
 
           </div>

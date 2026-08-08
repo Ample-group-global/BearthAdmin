@@ -1,15 +1,16 @@
 {
   "phase-01": {
-    "status": "passed",
-    "locked": true,
-    "completedAt": "2026-08-06T15:09:30.312Z",
+    "status": "pending",
+    "locked": false,
+    "completedAt": null,
     "passCount": 0,
-    "failCount": 0
+    "failCount": 0,
+    "note": "Reset 2026-08-08: fresh Sepolia deploy 0x94EF371e5a3Be9318d1B3081BCA1123442C676BB; sequential 1-wave-at-a-time testing begins"
   },
   "phase-02": {
-    "status": "passed",
-    "locked": true,
-    "completedAt": "2026-08-07T00:58:40.960Z",
+    "status": "pending",
+    "locked": false,
+    "completedAt": null,
     "passCount": 0,
     "failCount": 0
   },
@@ -25,16 +26,14 @@
     "locked": false,
     "completedAt": null,
     "passCount": 0,
-    "failCount": 0,
-    "note": "Unlocked 2026-08-08: extended to cover all 7 waves; waves 3-7 (0-minted, auto_treasury) need Auto Transfer triggered"
+    "failCount": 0
   },
   "phase-04": {
     "status": "pending",
     "locked": false,
     "completedAt": null,
     "passCount": 0,
-    "failCount": 0,
-    "note": "Unlocked 2026-08-08: rewritten as state-verification (all 7 waves) after Phase 03 completes all waves"
+    "failCount": 0
   },
   "phase-05": {
     "status": "pending",

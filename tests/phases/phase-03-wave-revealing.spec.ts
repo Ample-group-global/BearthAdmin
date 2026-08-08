@@ -53,7 +53,8 @@ test.describe('Phase 3 — Wave Revealing (All 7 Waves)', () => {
   });
 
   test.afterEach(async ({ page }, testInfo) => {
-    if (testInfo.status === 'failed') {
+    // Catch both 'failed' and 'timedOut' — timed-out tests must not count as passes
+    if (testInfo.status === 'failed' || testInfo.status === 'timedOut') {
       failCount++;
       await page.screenshot({
         path: `tests/phase-results/screenshots/${PHASE_ID}-${testInfo.title.replace(/[^a-z0-9]/gi, '_')}.png`,
@@ -69,7 +70,7 @@ test.describe('Phase 3 — Wave Revealing (All 7 Waves)', () => {
 
   // ─── P3-01: Verify Wave 1 + Wave 2 already revealed (Flow A check) ────────
   test('P3-01: Waves 1 and 2 are already revealed (verified via API)', async ({ page }) => {
-    const res = await page.request.get('/api/nft-sell/waves');
+    const res = await page.request.get('/api/nft-sell/waves', { timeout: 30_000 });
     expect(res.ok()).toBeTruthy();
     const data = await res.json();
     const waves: any[] = data.waves ?? [];
@@ -109,11 +110,15 @@ test.describe('Phase 3 — Wave Revealing (All 7 Waves)', () => {
   // ─── P3-03 to P3-07: Auto Transfer for Waves 3–7 ─────────────────────────
   for (const waveNum of ZERO_MINTED_WAVES) {
     test(`P3-0${waveNum}: Wave ${waveNum} Auto Transfer (reveal + treasury in one call)`, async ({ page }) => {
+      // Each wave needs revealWave() + treasuryClose() on Sepolia — up to 4 min per wave
+      test.setTimeout(480_000);
+
       await page.goto('/nft/waves');
       await page.waitForLoadState('networkidle');
 
       // Check if this wave already has closeAction via API
-      const res = await page.request.get('/api/nft-sell/waves');
+      // Use 30s timeout — actionTimeout default (5s) is too short if API is busy
+      const res = await page.request.get('/api/nft-sell/waves', { timeout: 30_000 });
       const data = await res.json();
       const wave = (data.waves ?? []).find((w: any) => w.waveNumber === waveNum);
 
@@ -123,12 +128,10 @@ test.describe('Phase 3 — Wave Revealing (All 7 Waves)', () => {
       }
 
       if (wave?.waveRevealed) {
-        console.log(`P3-0${waveNum}: Wave ${waveNum} already revealed (no auto-treasury fired?) ⚠`);
+        console.log(`P3-0${waveNum}: Wave ${waveNum} already revealed — needs treasury-close only`);
       }
 
       // Find "Auto Transfer" button — REVEAL column for 0-minted waves
-      // Row order: Wave 3 = row 3, etc.
-      // Each "Auto Transfer" button corresponds to a wave in order
       const autoTransferBtns = page.locator('button').filter({ hasText: /auto transfer/i });
       const btnCount = await autoTransferBtns.count();
 
@@ -140,8 +143,8 @@ test.describe('Phase 3 — Wave Revealing (All 7 Waves)', () => {
       // Click the first available Auto Transfer button (waves process sequentially)
       await autoTransferBtns.first().click();
 
-      // TreasuryMoveModal opens — it's a fixed overlay
-      const modal = page.locator('div.fixed.inset-0').filter({ hasText: /move to wallet|auto transfer|complete wave/i }).last();
+      // TreasuryMoveModal opens — wait for it (it has "Move to Wallet" in its heading)
+      const modal = page.locator('div.fixed.inset-0').filter({ hasText: /Move to Wallet/i }).last();
       await expect(modal).toBeVisible({ timeout: 10000 });
 
       // For 0-minted unrevealed waves, modal shows a revealUri input
@@ -155,6 +158,8 @@ test.describe('Phase 3 — Wave Revealing (All 7 Waves)', () => {
           await uriInput.fill(REVEAL_URI);
         }
         console.log(`P3-0${waveNum}: Entered reveal URI for Wave ${waveNum} ✓`);
+      } else {
+        console.log(`P3-0${waveNum}: Wave ${waveNum} already revealed — no URI input needed`);
       }
 
       // Select Default Treasury Wallet (first radio)
@@ -163,33 +168,40 @@ test.describe('Phase 3 — Wave Revealing (All 7 Waves)', () => {
         await defaultRadio.check();
       }
 
-      // Confirm transfer
+      // Confirm transfer — DO NOT press Escape after (it aborts the client-side fetch)
       const confirmBtn = modal.locator('button').filter({ hasText: /confirm/i }).first();
       await expect(confirmBtn).toBeEnabled({ timeout: 5000 });
       await confirmBtn.click();
+      console.log(`P3-0${waveNum}: Wave ${waveNum} Confirm clicked — waiting for on-chain confirm…`);
 
-      // Wait for success — treasury-close + internal reveal can take 60–120s on Sepolia
+      // Wait for TreasurySuccessModal — "Wave N Transferred!" heading
+      // This only appears after the API returns {ok:true} (both reveal + treasuryClose done on Sepolia)
+      // Two transactions on Sepolia can take up to 3–4 minutes
       await expect(
-        page.locator('div.fixed.inset-0').filter({ hasText: /transferred|treasury|0x[0-9a-f]{8,}/i })
-      ).toBeVisible({ timeout: 180_000 });
+        page.locator('h2').filter({ hasText: `Wave ${waveNum} Transferred!` })
+      ).toBeVisible({ timeout: 300_000 }); // 5-minute hard limit per wave
 
-      console.log(`P3-0${waveNum}: Wave ${waveNum} Auto Transfer confirmed ✓`);
+      console.log(`P3-0${waveNum}: Wave ${waveNum} Auto Transfer SUCCESS ✓ (TreasurySuccessModal visible)`);
 
-      // Dismiss modal and wait for page to update
-      await page.keyboard.press('Escape').catch(() => {});
-      await page.waitForTimeout(2000);
+      // Dismiss the success modal via the Done button
+      const doneBtn = page.locator('button').filter({ hasText: /^Done$/i });
+      if (await doneBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await doneBtn.click();
+      }
+      await page.waitForTimeout(3000); // let loadWaves() refresh
 
       // Verify via API
-      const verRes = await page.request.get('/api/nft-sell/waves');
+      const verRes = await page.request.get('/api/nft-sell/waves', { timeout: 30_000 });
       const verData = await verRes.json();
       const verWave = (verData.waves ?? []).find((w: any) => w.waveNumber === waveNum);
       console.log(`P3-0${waveNum}: Wave ${waveNum} after — closeAction: ${verWave?.closeAction}, waveRevealed: ${verWave?.waveRevealed}`);
+      expect(verWave?.closeAction).toBe('treasury');
     });
   }
 
   // ─── P3-08: All 7 waves — final state verification ────────────────────────
   test('P3-08: All 7 waves verified — revealed or treasury-closed', async ({ page }) => {
-    const res = await page.request.get('/api/nft-sell/waves');
+    const res = await page.request.get('/api/nft-sell/waves', { timeout: 30_000 });
     expect(res.ok()).toBeTruthy();
     const data = await res.json();
     const waves: any[] = data.waves ?? [];
@@ -209,7 +221,7 @@ test.describe('Phase 3 — Wave Revealing (All 7 Waves)', () => {
 
   // ─── P3-09: NFT Records delivery_status distribution check ────────────────
   test('P3-09: NFT records delivery_status breakdown reflects all waves', async ({ page }) => {
-    const res = await page.request.get('/api/nfts?limit=1');
+    const res = await page.request.get('/api/nfts?limit=1', { timeout: 30_000 });
     if (res.ok()) {
       const d = await res.json();
       console.log(`P3-09: Total NFT records: ${d.total ?? 'unknown'}`);
