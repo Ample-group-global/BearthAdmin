@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
@@ -10,7 +10,7 @@ import WhitelistTab from "@/components/nft/tabs/WhitelistTab";
 import PacksTab from "@/components/nft/tabs/PacksTab";
 import CollaborationsTab from "@/components/nft/tabs/CollaborationsTab";
 
-// ─── Types (Waves tab) ────────────────────────────────────────────────────────
+// â”€â”€â”€ Types (Waves tab) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface Wave {
   id: string;
@@ -39,6 +39,7 @@ interface Wave {
   waveRevealUri?: string | null;
   closeAction?: string | null;
   unsoldStrategy?: 'auto_treasury' | 'manual';
+  whitelistRequired?: boolean;
   syncedAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -64,20 +65,15 @@ interface OnChainWaveInfo {
 }
 
 interface SaleMethod { code: string; label: string; is_active: boolean; sort_order: number; }
-
-// Only "paused" is a legitimate admin override — upcoming/active are managed by auto-trigger
 const PAUSE_TOGGLE = "paused";
-
-// Per-wave thematic icons — Bearth ecosystem palette (#24315f navy + #41afeb sky-blue)
-// Each wave uses a distinct shade/depth variation within the same brand DNA
 const WAVE_ICONS: Record<number, { symbol: string; gradient: string; shadow: string }> = {
-  1: { symbol: "✦",  gradient: "linear-gradient(135deg, #24315f, #41afeb)",           shadow: "#41afeb" }, // Genesis Free  — full brand gradient
-  2: { symbol: "◈",  gradient: "linear-gradient(135deg, #1a2347, #2e9fd8)",           shadow: "#2e9fd8" }, // Genesis Paid  — deeper navy to mid-blue
-  3: { symbol: "↑",  gradient: "linear-gradient(135deg, #24315f, #0ea5e9)",           shadow: "#0ea5e9" }, // Ascension     — navy to bright cyan-blue
-  4: { symbol: "⊛",  gradient: "linear-gradient(135deg, #0f172a, #24315f)",           shadow: "#24315f" }, // Odyssey       — darkest — deep-space navy
-  5: { symbol: "⚡",  gradient: "linear-gradient(135deg, #41afeb, #93d3f8)",           shadow: "#41afeb" }, // Awakening     — light blue dawn
-  6: { symbol: "∞",  gradient: "linear-gradient(135deg, #1e3a5f, #4a62a8)",           shadow: "#4a62a8" }, // Continuum     — navy to brand indigo
-  7: { symbol: "✦✦", gradient: "linear-gradient(135deg, #24315f, #6b85c4)",           shadow: "#6b85c4" }, // Eternity      — navy to muted periwinkle
+  1: { symbol: "âœ¦", gradient: "linear-gradient(135deg, #24315f, #41afeb)", shadow: "#41afeb" }, // Genesis Free  â€” full brand gradient
+  2: { symbol: "â—ˆ", gradient: "linear-gradient(135deg, #1a2347, #2e9fd8)", shadow: "#2e9fd8" }, // Genesis Paid  â€” deeper navy to mid-blue
+  3: { symbol: "â†‘", gradient: "linear-gradient(135deg, #24315f, #0ea5e9)", shadow: "#0ea5e9" }, // Ascension     â€” navy to bright cyan-blue
+  4: { symbol: "âŠ›", gradient: "linear-gradient(135deg, #0f172a, #24315f)", shadow: "#24315f" }, // Odyssey       â€” darkest â€” deep-space navy
+  5: { symbol: "âš¡", gradient: "linear-gradient(135deg, #41afeb, #93d3f8)", shadow: "#41afeb" }, // Awakening     â€” light blue dawn
+  6: { symbol: "âˆž", gradient: "linear-gradient(135deg, #1e3a5f, #4a62a8)", shadow: "#4a62a8" }, // Continuum     â€” navy to brand indigo
+  7: { symbol: "âœ¦âœ¦", gradient: "linear-gradient(135deg, #24315f, #6b85c4)", shadow: "#6b85c4" }, // Eternity      â€” navy to muted periwinkle
 };
 
 // Per-wave purpose descriptions shown in the Purpose column
@@ -91,26 +87,26 @@ const WAVE_PURPOSE: Record<number, string> = {
   7: "The project becomes an iconic NFT brand with lasting value and history.",
 };
 
-// ─── Types (Reveal tab) ───────────────────────────────────────────────────────
+// â”€â”€â”€ Types (Reveal tab) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface WaveSchedule {
-  wave_number:           number;
-  wave_name:             string;
-  status:                string;
-  scheduled_start:       string | null;
-  scheduled_end:         string | null;
-  reveal_scheduled_at:   string | null;
-  wave_start_triggered:  boolean;
-  wave_end_triggered:    boolean;
+  wave_number: number;
+  wave_name: string;
+  status: string;
+  scheduled_start: string | null;
+  scheduled_end: string | null;
+  reveal_scheduled_at: string | null;
+  wave_start_triggered: boolean;
+  wave_end_triggered: boolean;
   wave_reveal_triggered: boolean;
-  is_revealed:           boolean;
-  wave_revealed_at:      string | null;
-  sold_count:            number;
-  minted_count:          number;
-  quantity:              number;
+  is_revealed: boolean;
+  wave_revealed_at: string | null;
+  sold_count: number;
+  minted_count: number;
+  quantity: number;
 }
 
-// ─── Reveal tab helpers ───────────────────────────────────────────────────────
+// â”€â”€â”€ Reveal tab helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const PHASE_LABELS: Record<number, string> = { 0: "Whitelist", 1: "PaidMint", 2: "Revealed" };
 const PHASE_COLORS: Record<number, { color: string; bg: string }> = {
@@ -120,12 +116,12 @@ const PHASE_COLORS: Record<number, { color: string; bg: string }> = {
 };
 
 function fmtDate(dt: string | null): string {
-  if (!dt) return "—";
+  if (!dt) return "â€”";
   return new Date(dt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function fmtFull(dt: string | null): string {
-  if (!dt) return "—";
+  if (!dt) return "â€”";
   return new Date(dt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
@@ -141,8 +137,8 @@ function waveState(w: WaveSchedule): "revealed" | "ready_reveal" | "reveal_sched
   // Reveal states only apply after the wave has ended
   if (w.wave_end_triggered) {
     if (w.reveal_scheduled_at && new Date(w.reveal_scheduled_at).getTime() <= now) return "ready_reveal";
-    if (w.reveal_scheduled_at && new Date(w.reveal_scheduled_at).getTime() > now)  return "reveal_scheduled";
-    // 0-minted closed wave: nothing to reveal, auto-treasury handles it → treat as complete
+    if (w.reveal_scheduled_at && new Date(w.reveal_scheduled_at).getTime() > now) return "reveal_scheduled";
+    // 0-minted closed wave: nothing to reveal, auto-treasury handles it â†’ treat as complete
     if ((w.sold_count ?? 0) === 0) return "ended_zero";
     return "ended";
   }
@@ -151,27 +147,27 @@ function waveState(w: WaveSchedule): "revealed" | "ready_reveal" | "reveal_sched
 }
 
 const STATE_META: Record<string, { label: string; color: string; bg: string }> = {
-  revealed:         { label: "Revealed",          color: "#16a34a", bg: "rgba(22,163,74,0.1)" },
-  ready_reveal:     { label: "Ready to Reveal",   color: "#d97706", bg: "rgba(217,119,6,0.12)" },
-  reveal_scheduled: { label: "Reveal Scheduled",  color: "#7c3aed", bg: "rgba(124,58,237,0.1)" },
-  active:           { label: "Active",             color: "#41afeb", bg: "rgba(65,175,235,0.1)" },
-  ended:            { label: "Wave Ended",         color: "#6b7280", bg: "rgba(107,114,128,0.1)" },
-  ended_zero:       { label: "Complete",           color: "#16a34a", bg: "rgba(22,163,74,0.1)"   },
-  upcoming:         { label: "Upcoming",           color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
-  not_scheduled:    { label: "Not Scheduled",      color: "#9bafc5", bg: "rgba(156,163,175,0.1)" },
+  revealed: { label: "Revealed", color: "#16a34a", bg: "rgba(22,163,74,0.1)" },
+  ready_reveal: { label: "Ready to Reveal", color: "#d97706", bg: "rgba(217,119,6,0.12)" },
+  reveal_scheduled: { label: "Reveal Scheduled", color: "#7c3aed", bg: "rgba(124,58,237,0.1)" },
+  active: { label: "Active", color: "#41afeb", bg: "rgba(65,175,235,0.1)" },
+  ended: { label: "Wave Ended", color: "#6b7280", bg: "rgba(107,114,128,0.1)" },
+  ended_zero: { label: "Complete", color: "#16a34a", bg: "rgba(22,163,74,0.1)" },
+  upcoming: { label: "Upcoming", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
+  not_scheduled: { label: "Not Scheduled", color: "#9bafc5", bg: "rgba(156,163,175,0.1)" },
 };
 
-// ─── Sub-components (Waves tab) ───────────────────────────────────────────────
+// â”€â”€â”€ Sub-components (Waves tab) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const WAVE_COLORS = {
-  revealed:         { bg: "rgba(124,58,237,0.1)",   color: "#7c3aed", label: "Revealed"         },
-  reveal_scheduled: { bg: "rgba(124,58,237,0.08)",  color: "#7c3aed", label: "Reveal Scheduled" },
-  ready_reveal:     { bg: "rgba(217,119,6,0.1)",    color: "#d97706", label: "Ready to Reveal"  },
-  active:           { bg: "rgba(65,175,235,0.12)",  color: "#41afeb", label: "Active"           },
-  upcoming:         { bg: "rgba(156,163,175,0.12)", color: "#9ca3af", label: "Upcoming"         },
-  paused:           { bg: "rgba(217,119,6,0.1)",    color: "#d97706", label: "Paused"           },
-  closed:           { bg: "rgba(22,163,74,0.1)",    color: "#16a34a", label: "Closed"           },
-  ended:            { bg: "rgba(107,114,128,0.1)",  color: "#6b7280", label: "Ended"            },
+  revealed: { bg: "rgba(124,58,237,0.1)", color: "#7c3aed", label: "Revealed" },
+  reveal_scheduled: { bg: "rgba(124,58,237,0.08)", color: "#7c3aed", label: "Reveal Scheduled" },
+  ready_reveal: { bg: "rgba(217,119,6,0.1)", color: "#d97706", label: "Ready to Reveal" },
+  active: { bg: "rgba(65,175,235,0.12)", color: "#41afeb", label: "Active" },
+  upcoming: { bg: "rgba(156,163,175,0.12)", color: "#9ca3af", label: "Upcoming" },
+  paused: { bg: "rgba(217,119,6,0.1)", color: "#d97706", label: "Paused" },
+  closed: { bg: "rgba(22,163,74,0.1)", color: "#16a34a", label: "Closed" },
+  ended: { bg: "rgba(107,114,128,0.1)", color: "#6b7280", label: "Ended" },
 };
 
 function deriveWaveDisplayStatus(w: Wave): string {
@@ -179,7 +175,7 @@ function deriveWaveDisplayStatus(w: Wave): string {
   if (w.waveClosed) {
     const now = Date.now();
     if (w.revealScheduledAt && new Date(w.revealScheduledAt).getTime() <= now) return "ready_reveal";
-    if (w.revealScheduledAt && new Date(w.revealScheduledAt).getTime() > now)  return "reveal_scheduled";
+    if (w.revealScheduledAt && new Date(w.revealScheduledAt).getTime() > now) return "reveal_scheduled";
     return "closed";
   }
   if (w.status === "active" && w.scheduledEnd && new Date(w.scheduledEnd) < new Date()) return "ended";
@@ -196,7 +192,7 @@ function SaleMethodBadge({ method, saleMethods }: { method: string; saleMethods:
   );
 }
 
-// ─── Reveal Confirmation Modal ────────────────────────────────────────────────
+// â”€â”€â”€ Reveal Confirmation Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function RevealModal({
   wave, onClose, onSuccess,
@@ -205,10 +201,10 @@ function RevealModal({
   onClose: () => void;
   onSuccess: (txHash: string) => void;
 }) {
-  const [uri,       setUri]       = useState("");
+  const [uri, setUri] = useState("");
   const [confirmed, setConfirmed] = useState(false);
-  const [busy,      setBusy]      = useState(false);
-  const [error,     setError]     = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function doReveal() {
     if (!confirmed || !uri.startsWith("ipfs://")) return;
@@ -333,8 +329,8 @@ function RevealModal({
             className="px-5 py-2 text-sm font-bold rounded-lg flex items-center gap-2"
             style={{
               background: confirmed && uri.startsWith("ipfs://") && !busy ? "#d97706" : "#f3f4f6",
-              color:      confirmed && uri.startsWith("ipfs://") && !busy ? "#fff"    : "#9bafc5",
-              cursor:     confirmed && uri.startsWith("ipfs://") && !busy ? "pointer" : "default",
+              color: confirmed && uri.startsWith("ipfs://") && !busy ? "#fff" : "#9bafc5",
+              cursor: confirmed && uri.startsWith("ipfs://") && !busy ? "pointer" : "default",
             }}>
             {busy ? (
               <>
@@ -342,7 +338,7 @@ function RevealModal({
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                Revealing…
+                Revealingâ€¦
               </>
             ) : "Confirm Reveal"}
           </button>
@@ -352,7 +348,7 @@ function RevealModal({
   );
 }
 
-// ── Reveal Success Modal ───────────────────────────────────────────────────────
+// â”€â”€ Reveal Success Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function SuccessModal({ txHash, waveNum, onClose }: { txHash: string; waveNum: number; onClose: () => void }) {
   const etherscan = process.env.NEXT_PUBLIC_NETWORK === "mainnet"
@@ -398,7 +394,7 @@ function SuccessModal({ txHash, waveNum, onClose }: { txHash: string; waveNum: n
   );
 }
 
-// ─── Treasury Move Modal ─────────────────────────────────────────────────────
+// â”€â”€â”€ Treasury Move Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function TreasuryMoveModal({
   wave,
@@ -412,11 +408,12 @@ function TreasuryMoveModal({
   const [useCustom, setUseCustom] = useState(false);
   const [recipient, setRecipient] = useState("");
   const [revealUri, setRevealUri] = useState(wave.waveRevealUri ?? "");
-  const [saving, setSaving]       = useState(false);
-  const [error, setError]         = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // 0-minted wave that hasn't been revealed yet needs a reveal URI to proceed
-  const needsRevealUri = (wave.soldCount ?? 0) === 0 && !wave.waveRevealed;
+  // Contract now allows treasury-close without reveal for 0-minted waves (waveSoldCount == 0)
+  // so a reveal URI is never required from the modal â€” the API skips the reveal step entirely.
+  const needsRevealUri = false;
 
   const handleSubmit = async () => {
     if (useCustom && !/^0x[0-9a-fA-F]{40}$/.test(recipient)) {
@@ -455,9 +452,9 @@ function TreasuryMoveModal({
     }
   };
 
-  const pendingCount  = wave.treasuryPendingCount ?? 0;
-  const canSubmit     = !saving && (!useCustom || !!recipient.trim()) && (!needsRevealUri || revealUri.trim().startsWith("ipfs://"));
-  const actionLabel   = saving ? "Transferring…" : "Confirm Transfer";
+  const pendingCount = wave.treasuryPendingCount ?? 0;
+  const canSubmit = !saving && (!useCustom || !!recipient.trim()) && (!needsRevealUri || revealUri.trim().startsWith("ipfs://"));
+  const actionLabel = saving ? "Transferringâ€¦" : "Confirm Transfer";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
@@ -465,7 +462,7 @@ function TreasuryMoveModal({
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid #e5e7eb" }}>
           <div>
             <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>
-              Move to Wallet — W{wave.waveNumber} {wave.name}
+              Move to Wallet â€” W{wave.waveNumber} {wave.name}
             </h2>
             <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
               {pendingCount.toLocaleString()} unsold NFT{pendingCount !== 1 ? "s" : ""} awaiting transfer
@@ -481,7 +478,7 @@ function TreasuryMoveModal({
         <div className="px-6 py-5 space-y-3">
           {error && <ErrBanner msg={error} onDismiss={() => setError(null)} />}
 
-          {/* Reveal URI — only for 0-minted unrevealed waves */}
+          {/* Reveal URI â€” only for 0-minted unrevealed waves */}
           {needsRevealUri && (
             <div className="px-3.5 py-3 rounded-xl space-y-2"
               style={{ background: "rgba(65,175,235,0.05)", border: "1px solid rgba(65,175,235,0.2)" }}>
@@ -493,7 +490,7 @@ function TreasuryMoveModal({
                 <p className="text-[11px] font-semibold" style={{ color: "#24315f" }}>Reveal URI Required</p>
               </div>
               <p className="text-[10px]" style={{ color: "#9bafc5" }}>
-                No customers minted in this wave — reveal will run automatically during the transfer. Enter the IPFS metadata base URI to use for this wave&apos;s artwork.
+                No customers minted in this wave â€” reveal will run automatically during the transfer. Enter the IPFS metadata base URI to use for this wave&apos;s artwork.
               </p>
               <input
                 type="text"
@@ -506,7 +503,7 @@ function TreasuryMoveModal({
             </div>
           )}
 
-          {/* Option A — default treasury wallet */}
+          {/* Option A â€” default treasury wallet */}
           <label
             className="flex items-start gap-3 p-3.5 rounded-xl cursor-pointer transition-colors"
             style={{ border: `1.5px solid ${!useCustom ? "#41afeb" : "#e5e7eb"}`, background: !useCustom ? "rgba(65,175,235,0.04)" : "white" }}>
@@ -519,7 +516,7 @@ function TreasuryMoveModal({
             </div>
           </label>
 
-          {/* Option B — custom wallet */}
+          {/* Option B â€” custom wallet */}
           <label
             className="flex items-start gap-3 p-3.5 rounded-xl cursor-pointer transition-colors"
             style={{ border: `1.5px solid ${useCustom ? "#41afeb" : "#e5e7eb"}`, background: useCustom ? "rgba(65,175,235,0.04)" : "white" }}>
@@ -574,7 +571,7 @@ function TreasuryMoveModal({
   );
 }
 
-// ─── Treasury Transfer Success Modal ─────────────────────────────────────────
+// â”€â”€â”€ Treasury Transfer Success Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function TreasurySuccessModal({ txHash, waveNum, onClose }: { txHash: string; waveNum: number; onClose: () => void }) {
   const etherscan = process.env.NEXT_PUBLIC_NETWORK === "mainnet"
@@ -623,64 +620,65 @@ function TreasurySuccessModal({ txHash, waveNum, onClose }: { txHash: string; wa
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function WavesPage() {
   const searchParams = useSearchParams();
   const strategyHighlight = searchParams.get("saleMethod");
-  const strategyName      = searchParams.get("strategy");
-  const highlightRef      = useRef<HTMLDivElement>(null);
+  const strategyName = searchParams.get("strategy");
+  const highlightRef = useRef<HTMLDivElement>(null);
 
-  // ── Tab state ──
+  // â”€â”€ Tab state â”€â”€
   const [activeTab, setActiveTab] = useState<"waves" | "whitelist" | "packs" | "collaborations">("waves");
 
-  // ── Waves tab state ──
-  const [waves, setWaves]             = useState<Wave[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState<string | null>(null);
+  // â”€â”€ Waves tab state â”€â”€
+  const [waves, setWaves] = useState<Wave[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [saleMethods, setSaleMethods] = useState<SaleMethod[]>([]);
-  const [wavePage, setWavePage]       = useState(1);
+  const [wavePage, setWavePage] = useState(1);
   const WAVES_PER_PAGE = 10;
 
   // DB edit modal
-  const [editWave, setEditWave]   = useState<Wave | null>(null);
+  const [editWave, setEditWave] = useState<Wave | null>(null);
   const [manageMaximized, setManageMaximized] = useState(false);
-  const [saving, setSaving]       = useState(false);
+  const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [form, setForm] = useState({
     defaultPriceEth: "", saleMethod: "", scheduledStart: "",
     scheduledEnd: "", status: "", unsoldStrategy: "auto_treasury" as 'auto_treasury' | 'manual',
+    whitelistRequired: false,
   });
 
   // On-chain action modal
-  const [chainWave, setChainWave]         = useState<Wave | null>(null);
-  const [chainOnChain, setChainOnChain]   = useState<OnChainWaveInfo | null>(null);
-  const [chainLoading, setChainLoading]   = useState(false);
-  const [chainSaving, setChainSaving]     = useState<string | null>(null);
-  const [chainError, setChainError]       = useState<string | null>(null);
-  const [chainTx, setChainTx]             = useState<string | null>(null);
+  const [chainWave, setChainWave] = useState<Wave | null>(null);
+  const [chainOnChain, setChainOnChain] = useState<OnChainWaveInfo | null>(null);
+  const [chainLoading, setChainLoading] = useState(false);
+  const [chainSaving, setChainSaving] = useState<string | null>(null);
+  const [chainError, setChainError] = useState<string | null>(null);
+  const [chainTx, setChainTx] = useState<string | null>(null);
 
   // Chain form fields
-  const [chainPrice, setChainPrice]   = useState("");
+  const [chainPrice, setChainPrice] = useState("");
 
-  // ── Treasury move modal state ──
-  const [treasuryMoveWave,    setTreasuryMoveWave]    = useState<Wave | null>(null);
+  // â”€â”€ Treasury move modal state â”€â”€
+  const [treasuryMoveWave, setTreasuryMoveWave] = useState<Wave | null>(null);
   const [treasurySuccessData, setTreasurySuccessData] = useState<{ txHash: string; waveNum: number } | null>(null);
 
-  // ── Reveal tab state ──
-  const [revealWaves,       setRevealWaves]       = useState<WaveSchedule[]>([]);
-  const [revealPhase,       setRevealPhase]       = useState<number | null>(null);
-  const [revealLoading,     setRevealLoading]     = useState(false);
-  const [revealErr,         setRevealErr]         = useState<string | null>(null);
-  const [revealWave,        setRevealWave]        = useState<WaveSchedule | null>(null);
+  // â”€â”€ Reveal tab state â”€â”€
+  const [revealWaves, setRevealWaves] = useState<WaveSchedule[]>([]);
+  const [revealPhase, setRevealPhase] = useState<number | null>(null);
+  const [revealLoading, setRevealLoading] = useState(false);
+  const [revealErr, setRevealErr] = useState<string | null>(null);
+  const [revealWave, setRevealWave] = useState<WaveSchedule | null>(null);
   const [revealSuccessData, setRevealSuccessData] = useState<{ txHash: string; waveNum: number } | null>(null);
-  const [scheduleEditWave,   setScheduleEditWave]   = useState<WaveSchedule | null>(null);
-  const [scheduleEditDate,   setScheduleEditDate]   = useState("");
+  const [scheduleEditWave, setScheduleEditWave] = useState<WaveSchedule | null>(null);
+  const [scheduleEditDate, setScheduleEditDate] = useState("");
   const [scheduleEditSaving, setScheduleEditSaving] = useState(false);
-  const [scheduleEditErr,    setScheduleEditErr]    = useState<string | null>(null);
+  const [scheduleEditErr, setScheduleEditErr] = useState<string | null>(null);
   const [blindBoxUrl, setBlindBoxUrl] = useState<string | null>(null);
 
-  // ── Waves tab data loading ──
+  // â”€â”€ Waves tab data loading â”€â”€
 
   const loadWaves = () => {
     setLoading(true); setError(null);
@@ -690,7 +688,7 @@ export default function WavesPage() {
       .catch(() => { setError("Failed to load waves."); setLoading(false); });
   };
 
-  // ── Watchdog: silent 30s poll ─────────────────────────────────────────────
+  // â”€â”€ Watchdog: silent 30s poll â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [waveWatchAlert, setWaveWatchAlert] = useState<string | null>(null);
   const [revealReadyCount, setRevealReadyCount] = useState(0);
   const [watchUpdated, setWatchUpdated] = useState<Date | null>(null);
@@ -726,12 +724,12 @@ export default function WavesPage() {
     fetch("/api/nft-sell/lookups/wave-sale-methods", { credentials: "include" })
       .then(r => r.json())
       .then(d => setSaleMethods(d.saleMethods ?? []))
-      .catch(() => {});
+      .catch(() => { });
     fetch("/api/nft-sell/collection/stats", { credentials: "include" })
       .then(r => r.json())
       .then(d => { if (d.blindBoxImageUrl) setBlindBoxUrl(d.blindBoxImageUrl); })
-      .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      .catch(() => { });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -740,14 +738,14 @@ export default function WavesPage() {
     }
   }, [strategyHighlight, waves]);
 
-  // ── Reveal tab data loading (lazy) ──
+  // â”€â”€ Reveal tab data loading (lazy) â”€â”€
 
   const loadRevealData = useCallback(async () => {
     setRevealLoading(true); setRevealErr(null);
     try {
       const [wr, sr] = await Promise.all([
         fetch("/api/nft-sell/waves/schedule-status", { credentials: "include" }),
-        fetch("/api/nft-sell/scheduler/status",      { credentials: "include" }),
+        fetch("/api/nft-sell/scheduler/status", { credentials: "include" }),
       ]);
       const wd = await wr.json();
       setRevealWaves(wd.waves ?? []);
@@ -783,17 +781,18 @@ export default function WavesPage() {
 
 
 
-  // ── Waves tab handlers ──
+  // â”€â”€ Waves tab handlers â”€â”€
 
   const openEdit = (w: Wave) => {
     setEditWave(w);
     setForm({
-      defaultPriceEth:    w.defaultPriceEth != null ? String(w.defaultPriceEth) : "",
-      saleMethod:         w.saleMethod ?? "fixed_price",
-      scheduledStart:     w.scheduledStart     ? toLocalDateTimeInput(new Date(w.scheduledStart)) : "",
-      scheduledEnd:       w.scheduledEnd       ? toLocalDateTimeInput(new Date(w.scheduledEnd))   : "",
-      status:             w.status ?? "upcoming",
-      unsoldStrategy:     (w.unsoldStrategy ?? "auto_treasury") as 'auto_treasury' | 'manual',
+      defaultPriceEth: w.defaultPriceEth != null ? String(w.defaultPriceEth) : "",
+      saleMethod: w.saleMethod ?? "fixed_price",
+      scheduledStart: w.scheduledStart ? toLocalDateTimeInput(new Date(w.scheduledStart)) : "",
+      scheduledEnd: w.scheduledEnd ? toLocalDateTimeInput(new Date(w.scheduledEnd)) : "",
+      status: w.status ?? "upcoming",
+      unsoldStrategy: (w.unsoldStrategy ?? "auto_treasury") as 'auto_treasury' | 'manual',
+      whitelistRequired: w.whitelistRequired ?? false,
     });
     setSaveError(null);
   };
@@ -803,12 +802,13 @@ export default function WavesPage() {
     setSaving(true); setSaveError(null);
     try {
       const body: Record<string, unknown> = {
-        defaultPriceEth:   form.defaultPriceEth !== "" ? Number(form.defaultPriceEth) : null,
-        saleMethod:        form.saleMethod   || null,
-        scheduledStart:    form.scheduledStart ? new Date(form.scheduledStart).toISOString() : null,
-        scheduledEnd:      form.scheduledEnd   ? new Date(form.scheduledEnd).toISOString()   : null,
-        status:            form.status       || null,
-        unsoldStrategy:    form.unsoldStrategy,
+        defaultPriceEth: form.defaultPriceEth !== "" ? Number(form.defaultPriceEth) : null,
+        saleMethod: form.saleMethod || null,
+        scheduledStart: form.scheduledStart ? new Date(form.scheduledStart).toISOString() : null,
+        scheduledEnd: form.scheduledEnd ? new Date(form.scheduledEnd).toISOString() : null,
+        status: form.status || null,
+        unsoldStrategy: form.unsoldStrategy,
+        whitelistRequired: form.whitelistRequired,
       };
       const res = await fetch(`/api/waves/${editWave.id}`, {
         method: "PUT", credentials: "include",
@@ -829,7 +829,7 @@ export default function WavesPage() {
     fetch(`/api/nft-sell/waves/${w.waveNumber}`, { credentials: "include" })
       .then(r => r.json())
       .then(d => setChainOnChain(d.onChain ?? null))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setChainLoading(false));
   };
 
@@ -843,7 +843,7 @@ export default function WavesPage() {
     setChainSaving(opName); setChainError(null); setChainTx(null);
     try {
       const res = await fn();
-      const d   = await res.json();
+      const d = await res.json();
       if (!res.ok) { setChainError(d.error ?? `${opName} failed.`); return; }
       setChainTx(d.txHash ?? null);
       const fresh = await fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}`, { credentials: "include" }).then(r => r.json());
@@ -855,7 +855,7 @@ export default function WavesPage() {
 
   const handleSetScheduleOnChain = () => {
     if (!editWave?.scheduledStart || !editWave?.scheduledEnd) {
-      setChainError("No schedule in DB — set start/end dates in the Settings tab first.");
+      setChainError("No schedule in DB â€” set start/end dates in the Settings tab first.");
       return;
     }
     chainOp("schedule", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/schedule`, {
@@ -863,7 +863,7 @@ export default function WavesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         startUnix: Math.floor(new Date(editWave.scheduledStart!).getTime() / 1000),
-        endUnix:   Math.floor(new Date(editWave.scheduledEnd!).getTime()   / 1000),
+        endUnix: Math.floor(new Date(editWave.scheduledEnd!).getTime() / 1000),
       }),
     }));
   };
@@ -878,23 +878,24 @@ export default function WavesPage() {
   };
 
 
-  // ── Reveal tab handlers ──
+  // â”€â”€ Reveal tab handlers â”€â”€
 
   function handleRevealSuccess(txHash: string, waveNum: number) {
     setRevealWave(null);
     setRevealSuccessData({ txHash, waveNum });
     loadRevealData();
+    loadWaves();
   }
 
-  // ── Derived values ──
+  // â”€â”€ Derived values â”€â”€
 
-  const totalNfts      = waves.reduce((s, w) => s + (w.quantity ?? 0), 0);
-  const activeWave     = waves.find(w => deriveWaveDisplayStatus(w) === "active");
+  const totalNfts = waves.reduce((s, w) => s + (w.quantity ?? 0), 0);
+  const activeWave = waves.find(w => deriveWaveDisplayStatus(w) === "active");
   // Waves whose minting period is over: closed, reveal-scheduled, ready-to-reveal, revealed, or transitional ended
   const completedCount = waves.filter(w =>
     ["revealed", "closed", "reveal_scheduled", "ready_reveal", "ended"].includes(deriveWaveDisplayStatus(w))
   ).length;
-  const totalSold      = waves.reduce((s, w) => s + (w.soldCount ?? w.onChain?.soldCount ?? 0), 0);
+  const totalSold = waves.reduce((s, w) => s + (w.soldCount ?? w.onChain?.soldCount ?? 0), 0);
 
   const revealNow = Date.now();
   const readyCount = Math.max(
@@ -909,7 +910,7 @@ export default function WavesPage() {
     .filter((x): x is { label: string; dt: number } => x !== null && x.dt > revealNow)
     .sort((a, b) => a.dt - b.dt)[0] ?? null;
 
-  // ── Tab UI helpers ──
+  // â”€â”€ Tab UI helpers â”€â”€
 
   const TAB_STYLE_ACTIVE = {
     color: "#24315f",
@@ -927,7 +928,7 @@ export default function WavesPage() {
   return (
     <div className="p-5 space-y-5">
 
-      {/* ── Header ── */}
+      {/* â”€â”€ Header â”€â”€ */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-lg font-bold" style={{ color: "#24315f" }}>NFT Waves</h1>
@@ -946,13 +947,13 @@ export default function WavesPage() {
         </button>
       </div>
 
-      {/* ── Tabs ── */}
+      {/* â”€â”€ Tabs â”€â”€ */}
       <div className="ba-tabs" style={{ borderBottom: "1px solid #e5e7eb" }}>
         <div className="flex gap-0">
           {([
-            { key: "waves",          label: "Waves" },
-            { key: "whitelist",      label: "Whitelist" },
-            { key: "packs",          label: "Mystery Packs" },
+            { key: "waves", label: "Waves" },
+            { key: "whitelist", label: "Whitelist" },
+            { key: "packs", label: "Mystery Packs" },
             { key: "collaborations", label: "Collaborations" },
           ] as const).map(tab => (
             <button
@@ -966,21 +967,21 @@ export default function WavesPage() {
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* ── WAVES TAB ────────────────────────────────────────────────────── */}
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* Watchdog alert — shown across all tabs */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* â”€â”€ WAVES TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* Watchdog alert â€” shown across all tabs */}
       {waveWatchAlert && (
         <div className="flex items-center justify-between px-4 py-2 rounded-xl text-sm"
           style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.25)", color: "#d97706" }}>
-          <span>⚡ {waveWatchAlert}</span>
-          <button onClick={() => setWaveWatchAlert(null)} className="ml-4 text-xs opacity-60 hover:opacity-100">✕</button>
+          <span>âš¡ {waveWatchAlert}</span>
+          <button onClick={() => setWaveWatchAlert(null)} className="ml-4 text-xs opacity-60 hover:opacity-100">âœ•</button>
         </div>
       )}
       {watchUpdated && (
         <div className="flex items-center gap-1.5 text-xs" style={{ color: "#9bafc5" }}>
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
-          Live · last checked {watchUpdated.toLocaleTimeString()}
+          Live Â· last checked {watchUpdated.toLocaleTimeString()}
         </div>
       )}
 
@@ -998,7 +999,7 @@ export default function WavesPage() {
                   {strategyName ? `Strategy: ${strategyName}` : "Strategy selected"}
                 </span>
                 <span className="ml-2" style={{ color: "#6b7280" }}>
-                  — Configure waves with{" "}
+                  â€” Configure waves with{" "}
                   <strong>{saleMethods.find(s => s.code === strategyHighlight)?.label ?? strategyHighlight}</strong>{" "}
                   as the sale method. Edit each wave below and set Sale Method accordingly.
                 </span>
@@ -1009,9 +1010,9 @@ export default function WavesPage() {
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: "Total Waves",  value: String(waves.length),    color: "#41afeb" },
-              { label: "Complete",      value: String(completedCount),  color: "#16a34a" },
-              { label: "Active Wave",  value: activeWave?.name ?? "—", color: "#7c3aed", small: true },
+              { label: "Total Waves", value: String(waves.length), color: "#41afeb" },
+              { label: "Complete", value: String(completedCount), color: "#16a34a" },
+              { label: "Active Wave", value: activeWave?.name ?? "â€”", color: "#7c3aed", small: true },
               { label: "Total Minted", value: `${totalSold.toLocaleString()} / ${totalNfts.toLocaleString()}`, color: "#24315f", small: true },
             ].map(s => (
               <div key={s.label} className="bg-white rounded-xl p-4 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
@@ -1021,7 +1022,7 @@ export default function WavesPage() {
             ))}
           </div>
 
-          {error    && <ErrBanner msg={error}     onDismiss={() => setError(null)} />}
+          {error && <ErrBanner msg={error} onDismiss={() => setError(null)} />}
           {revealErr && <ErrBanner msg={revealErr} onDismiss={() => setRevealErr(null)} />}
 
           {/* Contract phase badge */}
@@ -1042,7 +1043,7 @@ export default function WavesPage() {
               </p>
               <div className="flex items-center">
                 {revealWaves.map((w, i) => {
-                  const st   = waveState(w);
+                  const st = waveState(w);
                   const meta = STATE_META[st];
                   const isLast = i === revealWaves.length - 1;
                   return (
@@ -1125,7 +1126,7 @@ export default function WavesPage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                Loading…
+                Loadingâ€¦
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1139,10 +1140,10 @@ export default function WavesPage() {
                   </thead>
                   <tbody>
                     {waves.slice((wavePage - 1) * WAVES_PER_PAGE, wavePage * WAVES_PER_PAGE).map((w, i) => {
-                      const isClosed     = w.waveClosed || w.status === "closed";
-                      const isLocked     = w.priceLocked;
-                      const soldCount    = w.soldCount ?? 0;
-                      // Wave is closed with zero minted — reveal is irrelevant (no buyers); auto-reveal fires during treasury close
+                      const isClosed = w.waveClosed || w.status === "closed";
+                      const isLocked = w.priceLocked;
+                      const soldCount = w.soldCount ?? 0;
+                      // Wave is closed with zero minted â€” reveal is irrelevant (no buyers); auto-reveal fires during treasury close
                       const isZeroMinted = isClosed && soldCount === 0 && (w.quantity ?? 0) > 0 && !w.closeAction;
                       return (
                         <tr key={w.id}
@@ -1160,7 +1161,7 @@ export default function WavesPage() {
                             <span className="text-xs font-bold" style={{ color: "#24315f" }}>Wave {w.waveNumber}</span>
                           </td>
 
-                          {/* Image — thematic per-wave icon */}
+                          {/* Image â€” thematic per-wave icon */}
                           <td style={{ padding: "10px 14px", textAlign: "center" }}>
                             {(() => {
                               const icon = WAVE_ICONS[w.waveNumber];
@@ -1176,7 +1177,7 @@ export default function WavesPage() {
                                     fontWeight: 700,
                                     letterSpacing: "-1px",
                                   }}>
-                                  {icon?.symbol ?? "◆"}
+                                  {icon?.symbol ?? "â—†"}
                                 </div>
                               );
                             })()}
@@ -1191,7 +1192,7 @@ export default function WavesPage() {
                           <td style={{ padding: "10px 14px", minWidth: 220, maxWidth: 260 }}>
                             {WAVE_PURPOSE[w.waveNumber]
                               ? <span className="text-xs leading-relaxed" style={{ color: "#6b7280" }}>{WAVE_PURPOSE[w.waveNumber]}</span>
-                              : <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>}
+                              : <span className="text-xs" style={{ color: "#d1d5db" }}>â€”</span>}
                           </td>
 
                           <td style={{ padding: "10px 14px", textAlign: "center" }}>
@@ -1269,7 +1270,7 @@ export default function WavesPage() {
 
                           <td style={{ padding: "10px 14px", minWidth: 130 }}>
                             {!isClosed ? (
-                              <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>
+                              <span className="text-xs" style={{ color: "#d1d5db" }}>â€”</span>
                             ) : w.waveRevealed && w.waveRevealedAt ? (
                               <div className="text-xs font-semibold" style={{ color: "#16a34a" }}>
                                 <div>{new Date(w.waveRevealedAt).toLocaleDateString()}</div>
@@ -1292,7 +1293,7 @@ export default function WavesPage() {
                               <StatusBadge status={deriveWaveDisplayStatus(w)} colorMap={WAVE_COLORS} dot />
                               {isClosed && w.closeAction && (
                                 <span className="block text-xs" style={{ color: "#9bafc5" }}>
-                                  {w.closeAction === "treasury" ? "→ Treasury" : "→ Burned"}
+                                  {w.closeAction === "treasury" ? "â†’ Treasury" : "â†’ Burned"}
                                 </span>
                               )}
                             </div>
@@ -1301,7 +1302,7 @@ export default function WavesPage() {
                           <td style={{ padding: "10px 14px", textAlign: "center" }}>
                             {(() => {
                               if (!isClosed) return (
-                                <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>
+                                <span className="text-xs" style={{ color: "#d1d5db" }}>â€”</span>
                               );
                               const isAuto = (w.unsoldStrategy ?? 'auto_treasury') === 'auto_treasury';
                               const stratBadge = !w.waveRevealed ? (
@@ -1311,11 +1312,11 @@ export default function WavesPage() {
                                       ? { background: "rgba(65,175,235,0.08)", color: "#41afeb", border: "1px solid rgba(65,175,235,0.2)" }
                                       : { background: "rgba(217,119,6,0.08)", color: "#d97706", border: "1px solid rgba(217,119,6,0.2)" }
                                     }>
-                                    {isAuto ? "Auto → Treasury" : "Manual Transfer"}
+                                    {isAuto ? "Auto â†’ Treasury" : "Manual Transfer"}
                                   </span>
                                 </div>
                               ) : null;
-                              // 0-minted closed wave: no reveal date picker needed — backend auto-reveals + transfers
+                              // 0-minted closed wave: no reveal date picker needed â€” backend auto-reveals + transfers
                               if (isZeroMinted) {
                                 // Auto-treasury + no action taken yet: show trigger button (opens TreasuryMoveModal)
                                 if (isAuto && !w.closeAction) return (
@@ -1335,7 +1336,7 @@ export default function WavesPage() {
                                       ? { background: "rgba(22,163,74,0.08)", color: "#16a34a", border: "1px solid rgba(22,163,74,0.2)" }
                                       : { background: "rgba(217,119,6,0.08)", color: "#d97706", border: "1px solid rgba(217,119,6,0.2)" }
                                     }>
-                                    {isAuto ? "✓ Transferred" : "Manual Transfer"}
+                                    {isAuto ? "âœ“ Transferred" : "Manual Transfer"}
                                   </span>
                                 );
                               }
@@ -1402,7 +1403,7 @@ export default function WavesPage() {
                                 </svg>
                                 Manage
                               </button>
-                              {/* 0-minted wave: manual strategy only — auto_treasury is handled automatically on reveal */}
+                              {/* 0-minted wave: manual strategy only â€” auto_treasury is handled automatically on reveal */}
                               {isZeroMinted && !w.closeAction && isClosed && w.unsoldStrategy === 'manual' && (
                                 <button
                                   onClick={() => setTreasuryMoveWave(w)}
@@ -1419,18 +1420,18 @@ export default function WavesPage() {
                               {w.waveClosed && w.waveRevealed && !w.closeAction && !isZeroMinted &&
                                 w.unsoldStrategy === 'manual' &&
                                 (w.treasuryPendingCount ?? 0) > 0
-                              && (
-                                <button
-                                  onClick={() => setTreasuryMoveWave(w)}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
-                                  style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a", border: "1px solid rgba(22,163,74,0.3)" }}>
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                                  </svg>
-                                  Move to Wallet
-                                </button>
-                              )}
+                                && (
+                                  <button
+                                    onClick={() => setTreasuryMoveWave(w)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                                    style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a", border: "1px solid rgba(22,163,74,0.3)" }}>
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                        d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                    </svg>
+                                    Move to Wallet
+                                  </button>
+                                )}
                             </div>
                           </td>
                         </tr>
@@ -1446,13 +1447,13 @@ export default function WavesPage() {
           {!loading && waves.length > WAVES_PER_PAGE && (
             <div className="flex items-center justify-between px-2 py-1">
               <span className="text-xs" style={{ color: "#9bafc5" }}>
-                Showing {(wavePage - 1) * WAVES_PER_PAGE + 1}–{Math.min(wavePage * WAVES_PER_PAGE, waves.length)} of {waves.length}
+                Showing {(wavePage - 1) * WAVES_PER_PAGE + 1}â€“{Math.min(wavePage * WAVES_PER_PAGE, waves.length)} of {waves.length}
               </span>
               <div className="flex items-center gap-1">
                 <button onClick={() => setWavePage(p => Math.max(1, p - 1))} disabled={wavePage === 1}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
                   style={{ border: "1px solid #e5e7eb", color: "#374151", background: "white" }}>
-                  ← Prev
+                  â† Prev
                 </button>
                 {Array.from({ length: Math.ceil(waves.length / WAVES_PER_PAGE) }, (_, i) => i + 1).map(p => (
                   <button key={p} onClick={() => setWavePage(p)}
@@ -1464,7 +1465,7 @@ export default function WavesPage() {
                 <button onClick={() => setWavePage(p => Math.min(Math.ceil(waves.length / WAVES_PER_PAGE), p + 1))} disabled={wavePage === Math.ceil(waves.length / WAVES_PER_PAGE)}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
                   style={{ border: "1px solid #e5e7eb", color: "#374151", background: "white" }}>
-                  Next →
+                  Next â†’
                 </button>
               </div>
             </div>
@@ -1483,18 +1484,18 @@ export default function WavesPage() {
         </>
       )}
 
-      {activeTab === "whitelist"      && <WhitelistTab />}
-      {activeTab === "packs"          && <PacksTab />}
+      {activeTab === "whitelist" && <WhitelistTab />}
+      {activeTab === "packs" && <PacksTab />}
       {activeTab === "collaborations" && <CollaborationsTab />}
 
-      {/* ── Reveal Date Editor Modal ─────────────────────────────────────── */}
+      {/* â”€â”€ Reveal Date Editor Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {scheduleEditWave && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
           <div className="ba-modal-sm shadow-xl">
             <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid #e5e7eb" }}>
               <div>
                 <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>
-                  Set Reveal Date — W{scheduleEditWave.wave_number} {scheduleEditWave.wave_name}
+                  Set Reveal Date â€” W{scheduleEditWave.wave_number} {scheduleEditWave.wave_name}
                 </h2>
                 <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
                   Choose when this wave will be revealed to holders
@@ -1535,7 +1536,7 @@ export default function WavesPage() {
                   disabled={scheduleEditSaving || !scheduleEditDate}
                   className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white"
                   style={{ background: scheduleEditSaving || !scheduleEditDate ? "#9bafc5" : "#7c3aed", cursor: scheduleEditSaving || !scheduleEditDate ? "not-allowed" : "pointer" }}>
-                  {scheduleEditSaving ? "Saving…" : "Save Reveal Date"}
+                  {scheduleEditSaving ? "Savingâ€¦" : "Save Reveal Date"}
                 </button>
               </div>
             </div>
@@ -1543,7 +1544,7 @@ export default function WavesPage() {
         </div>
       )}
 
-      {/* ── Reveal Modals ────────────────────────────────────────────────── */}
+      {/* â”€â”€ Reveal Modals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {revealWave && (
         <RevealModal
           wave={revealWave}
@@ -1559,7 +1560,7 @@ export default function WavesPage() {
         />
       )}
 
-      {/* ── Treasury Move Modal ─────────────────────────────────────────────── */}
+      {/* â”€â”€ Treasury Move Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {treasuryMoveWave && (
         <TreasuryMoveModal
           wave={treasuryMoveWave}
@@ -1579,7 +1580,7 @@ export default function WavesPage() {
         />
       )}
 
-      {/* ══ Manage Modal ═══════════════════════════════════════════════════════ */}
+      {/* â•â• Manage Modal â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       {editWave && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
           <div className={`ba-modal-manage shadow-xl flex flex-col transition-all duration-200${manageMaximized ? " maximized" : ""}`}>
@@ -1632,7 +1633,7 @@ export default function WavesPage() {
                 </div>
               )}
 
-              {/* Wave Quantity — read-only */}
+              {/* Wave Quantity â€” read-only */}
               <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
                 style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
                 <svg className="w-4 h-4 flex-shrink-0" style={{ color: "#9bafc5" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1644,17 +1645,17 @@ export default function WavesPage() {
                     Wave Quantity: {(editWave.quantity ?? 0).toLocaleString()} NFTs
                   </p>
                   <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
-                    Fixed at launch — predefined by the Fibonacci allocation plan
+                    Fixed at launch â€” predefined by the Fibonacci allocation plan
                   </p>
                 </div>
               </div>
 
-              {/* Price + Sale Method — Wave 1 = free; Waves 2-7 = fixed price
+              {/* Price + Sale Method â€” Wave 1 = free; Waves 2-7 = fixed price
                   Closed waves: read-only display; active/upcoming: editable (locked if priceLocked) */}
               {editWave.waveNumber === 1 ? (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
                   style={{ background: "rgba(65,175,235,0.07)", border: "1px solid rgba(65,175,235,0.2)" }}>
-                  <span className="text-xs font-semibold" style={{ color: "#41afeb" }}>Free Mint — no price applies to Wave 1</span>
+                  <span className="text-xs font-semibold" style={{ color: "#41afeb" }}>Free Mint â€” no price applies to Wave 1</span>
                 </div>
               ) : editWave.waveClosed ? (
                 <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
@@ -1665,10 +1666,10 @@ export default function WavesPage() {
                   </svg>
                   <div>
                     <p className="text-xs font-bold" style={{ color: "#374151" }}>
-                      Final Price: {editWave.defaultPriceEth != null ? `${editWave.defaultPriceEth} ETH` : "Free"} · Fixed Price
+                      Final Price: {editWave.defaultPriceEth != null ? `${editWave.defaultPriceEth} ETH` : "Free"} Â· Fixed Price
                     </p>
                     <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
-                      Wave closed — price and sale method are permanently locked
+                      Wave closed â€” price and sale method are permanently locked
                     </p>
                   </div>
                 </div>
@@ -1684,7 +1685,7 @@ export default function WavesPage() {
                       placeholder="0 = Free" />
                     {editWave.priceLocked && (
                       <p className="text-xs mt-1" style={{ color: "#dc2626" }}>
-                        Locked — first sale occurred. Price cannot be changed.
+                        Locked â€” first sale occurred. Price cannot be changed.
                       </p>
                     )}
                   </div>
@@ -1698,7 +1699,7 @@ export default function WavesPage() {
                 </div>
               )}
 
-              {/* Emergency Pause — only for upcoming/active waves; hidden for closed/revealed (no minting occurs) */}
+              {/* Emergency Pause â€” only for upcoming/active waves; hidden for closed/revealed (no minting occurs) */}
               {!editWave.waveClosed && <div className="flex items-center justify-between p-3 rounded-xl"
                 style={{
                   background: form.status === PAUSE_TOGGLE ? "rgba(217,119,6,0.07)" : "#f9fafb",
@@ -1737,7 +1738,7 @@ export default function WavesPage() {
                 </label>
               </div>}
 
-              {/* Schedule — read-only once wave has started (API also rejects date changes after start) */}
+              {/* Schedule â€” read-only once wave has started (API also rejects date changes after start) */}
               {(() => {
                 const schedLocked = editWave.waveClosed ||
                   editWave.status === "active" ||
@@ -1762,7 +1763,7 @@ export default function WavesPage() {
                           </div>
                         </div>
                         <p className="text-[10px]" style={{ color: "#9bafc5" }}>
-                          Wave schedule is locked — dates cannot be changed after the wave starts.
+                          Wave schedule is locked â€” dates cannot be changed after the wave starts.
                         </p>
                       </>
                     ) : (
@@ -1783,7 +1784,7 @@ export default function WavesPage() {
                 );
               })()}
 
-              {/* ── On-Chain Actions ── */}
+              {/* â”€â”€ On-Chain Actions â”€â”€ */}
               <div className="flex items-start gap-3 px-4 py-3 rounded-xl"
                 style={{ background: "rgba(217,119,6,0.07)", border: "1px solid rgba(217,119,6,0.25)" }}>
                 <svg className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "#d97706" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1804,7 +1805,7 @@ export default function WavesPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Reading on-chain state…
+                  Reading on-chain stateâ€¦
                 </div>
               )}
 
@@ -1812,7 +1813,7 @@ export default function WavesPage() {
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { label: "Minted", value: `${chainOnChain.soldCount} / ${chainOnChain.qty}` },
-                    { label: "Price",  value: `${chainOnChain.price} ETH` },
+                    { label: "Price", value: `${chainOnChain.price} ETH` },
                     { label: "Closed", value: chainOnChain.closed ? "Yes" : "No" },
                   ].map(s => (
                     <div key={s.label} className="p-3 rounded-xl text-center" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
@@ -1823,7 +1824,7 @@ export default function WavesPage() {
                 </div>
               )}
 
-              {/* DB ↔ On-Chain price sync indicator — shows when the price buyers actually pay differs from the DB record */}
+              {/* DB â†” On-Chain price sync indicator â€” shows when the price buyers actually pay differs from the DB record */}
               {chainOnChain && editWave.waveNumber > 1 && (() => {
                 const onChainPrice = parseFloat(chainOnChain.price);
                 const dbPrice = editWave.defaultPriceEth;
@@ -1839,7 +1840,7 @@ export default function WavesPage() {
                     <div style={{ color: "#dc2626" }}>
                       <p className="font-bold">Price out of sync</p>
                       <p className="mt-0.5">
-                        On-chain: <strong>{chainOnChain.price} ETH</strong> · DB: <strong>{dbPrice} ETH</strong>
+                        On-chain: <strong>{chainOnChain.price} ETH</strong> Â· DB: <strong>{dbPrice} ETH</strong>
                       </p>
                       {!editWave.waveClosed && !editWave.priceLocked && (
                         <p className="mt-0.5" style={{ color: "#92400e" }}>
@@ -1848,7 +1849,7 @@ export default function WavesPage() {
                       )}
                       {editWave.priceLocked && (
                         <p className="mt-0.5" style={{ color: "#92400e" }}>
-                          Price is locked (first sale occurred) — on-chain and DB are now permanently diverged.
+                          Price is locked (first sale occurred) â€” on-chain and DB are now permanently diverged.
                         </p>
                       )}
                     </div>
@@ -1864,10 +1865,10 @@ export default function WavesPage() {
                 );
               })()}
 
-              {chainTx    && <SharedTxBanner txHash={chainTx} />}
+              {chainTx && <SharedTxBanner txHash={chainTx} />}
               {chainError && <ErrBanner msg={chainError} onDismiss={() => setChainError(null)} />}
 
-              {/* Schedule Push — only before wave has started (upcoming only) */}
+              {/* Schedule Push â€” only before wave has started (upcoming only) */}
               {(() => {
                 const waveStarted = editWave.waveClosed || editWave.status === "active";
                 return !waveStarted ? (
@@ -1893,17 +1894,17 @@ export default function WavesPage() {
                     <button onClick={handleSetScheduleOnChain} disabled={chainSaving === "schedule" || !editWave.scheduledStart || !editWave.scheduledEnd}
                       className="px-4 py-2 text-xs font-bold text-white rounded-lg"
                       style={{ background: chainSaving === "schedule" || !editWave.scheduledStart || !editWave.scheduledEnd ? "#9bafc5" : "#41afeb" }}>
-                      {chainSaving === "schedule" ? "Submitting…" : "Push Schedule to Chain"}
+                      {chainSaving === "schedule" ? "Submittingâ€¦" : "Push Schedule to Chain"}
                     </button>
                   </div>
                 ) : null;
               })()}
 
-              {/* Set Price — paid waves only, only before wave closes, only if not locked */}
+              {/* Set Price â€” paid waves only, only before wave closes, only if not locked */}
               {editWave.waveNumber > 1 && !editWave.waveClosed && (
                 editWave.priceLocked ? (
                   <div className="px-4 py-3 rounded-xl text-xs" style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
-                    Price locked — first sale has already occurred. No further price changes allowed.
+                    Price locked â€” first sale has already occurred. No further price changes allowed.
                   </div>
                 ) : (
                   <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
@@ -1918,14 +1919,14 @@ export default function WavesPage() {
                       <button onClick={handleSetPriceOnChain} disabled={chainSaving === "price"}
                         className="px-4 py-2 text-xs font-bold text-white rounded-lg flex-shrink-0"
                         style={{ background: chainSaving === "price" ? "#9bafc5" : "#41afeb" }}>
-                        {chainSaving === "price" ? "Submitting…" : "Set Price"}
+                        {chainSaving === "price" ? "Submittingâ€¦" : "Set Price"}
                       </button>
                     </div>
                   </div>
                 )
               )}
 
-              {/* Unsold NFT Strategy — set BEFORE reveal; locked once wave is revealed */}
+              {/* Unsold NFT Strategy â€” set BEFORE reveal; locked once wave is revealed */}
               <div>
                 <label className="text-xs font-semibold mb-2 block" style={{ color: "#374151" }}>
                   Unsold NFT Strategy
@@ -1934,7 +1935,7 @@ export default function WavesPage() {
                   Determines what happens to unsold NFTs when this wave is revealed. Must be set before reveal.
                 </p>
                 <div className="flex gap-2">
-                  {/* Auto → Treasury */}
+                  {/* Auto â†’ Treasury */}
                   <button
                     disabled={!!editWave.waveRevealed}
                     onClick={() => !editWave.waveRevealed && setForm(f => ({ ...f, unsoldStrategy: "auto_treasury" }))}
@@ -1952,7 +1953,7 @@ export default function WavesPage() {
                           <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#41afeb" }} />
                         )}
                       </span>
-                      <span className="text-xs font-semibold" style={{ color: "#24315f" }}>Auto → Treasury Wallet</span>
+                      <span className="text-xs font-semibold" style={{ color: "#24315f" }}>Auto â†’ Treasury Wallet</span>
                     </div>
                     <p className="text-[10px] ml-5" style={{ color: "#9bafc5" }}>
                       Unsold NFTs automatically transfer to the treasury wallet as part of the reveal process. No extra admin action needed.
@@ -1985,10 +1986,29 @@ export default function WavesPage() {
                 </div>
                 {editWave.waveRevealed && (
                   <p className="text-[10px] mt-1.5" style={{ color: "#9bafc5" }}>
-                    Strategy is locked — this wave has already been revealed.
+                    Strategy is locked â€” this wave has already been revealed.
                   </p>
                 )}
               </div>
+
+              {/* Whitelist Restriction */}
+              {editWave.waveNumber > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 rounded-xl" style={{ border: "1px solid #e5e7eb", background: "#f9fafb" }}>
+                  <div>
+                    <p className="text-xs font-bold" style={{ color: "#374151" }}>Restrict to Whitelist</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: "#9bafc5" }}>
+                      When enabled, only admin-approved wallets can mint in this wave.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setForm(f => ({ ...f, whitelistRequired: !f.whitelistRequired }))}
+                    className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0"
+                    style={{ background: form.whitelistRequired ? "#41afeb" : "#d1d5db" }}>
+                    <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow"
+                      style={{ transform: form.whitelistRequired ? "translateX(18px)" : "translateX(2px)" }} />
+                  </button>
+                </div>
+              )}
 
               {/* Reveal status */}
               {editWave.waveRevealed ? (
@@ -2006,13 +2026,13 @@ export default function WavesPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   {editWave.revealScheduledAt
-                    ? `Reveal scheduled for ${new Date(editWave.revealScheduledAt).toLocaleString()} — system will auto-reveal`
-                    : `No reveal date set — use the "Set Date" button in the Waves table`}
+                    ? `Reveal scheduled for ${new Date(editWave.revealScheduledAt).toLocaleString()} â€” system will auto-reveal`
+                    : `No reveal date set â€” use the "Set Date" button in the Waves table`}
                 </div>
               )}
             </div>
 
-            {/* Footer — Save only shown for non-closed waves (closed = all settings are historical/read-only) */}
+            {/* Footer â€” Save only shown for non-closed waves (closed = all settings are historical/read-only) */}
             <div className="flex justify-end gap-3 px-6 py-4 flex-shrink-0" style={{ borderTop: "1px solid #e5e7eb" }}>
               <button onClick={closeManage} className="px-4 py-2 text-sm font-medium rounded-lg"
                 style={{ border: "1px solid #e5e7eb", color: "#6b7280" }}>Close</button>
@@ -2020,7 +2040,7 @@ export default function WavesPage() {
                 <button onClick={handleSave} disabled={saving}
                   className="px-4 py-2 text-sm font-bold text-white rounded-lg"
                   style={{ background: saving ? "#9bafc5" : "#41afeb" }}>
-                  {saving ? "Saving…" : "Save Settings"}
+                  {saving ? "Savingâ€¦" : "Save Settings"}
                 </button>
               )}
             </div>
@@ -2031,3 +2051,5 @@ export default function WavesPage() {
     </div>
   );
 }
+
+

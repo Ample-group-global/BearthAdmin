@@ -354,7 +354,7 @@ export default function NftPage() {
   const silentRecPoll = useCallback(async () => {
     try {
       const res = await fetch("/api/nft-sell/collection/stats", { credentials: "include" });
-      if (!res.ok) return;
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setSbtMsg(d.error ?? "SBT update failed"); return; }
       const d = await res.json();
       setRecWatchUpdated(new Date());
       if (d.blindBoxImageUrl) setBlindBoxImageUrl(d.blindBoxImageUrl);
@@ -362,7 +362,7 @@ export default function NftPage() {
         setRecWatchAlert(`${d.totalMinted - prevRecMintedRef.current} new NFT${d.totalMinted - prevRecMintedRef.current > 1 ? "s" : ""} minted on-chain. Refresh records to see latest.`);
       }
       prevRecMintedRef.current = d.totalMinted ?? prevRecMintedRef.current;
-    } catch { /* silent */ }
+    } catch { setSbtMsg("Network error"); }
   }, []);
 
   useInterval(silentRecPoll, 30_000);
@@ -438,9 +438,9 @@ export default function NftPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled: enable }),
       });
-      if (!res.ok) return;
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setSbtMsg(d.error ?? "SBT update failed"); return; }
       loadRecords(search, offset, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter, rarityTierFilter);
-    } catch { /* silent — user can retry */ }
+    } catch { setSbtMsg("Network error"); }
     finally { setSbtRowBusy(null); }
   };
 
@@ -476,6 +476,7 @@ export default function NftPage() {
       if (!res.ok) { setModalMintMoveMsg(d.error ?? "Operation failed"); return; }
       setModalMintMoveMsg(`Done! Tx: ${String(d.txHash).slice(0, 12)}…`);
       setModalMintMoveRecip("");
+      setTimeout(() => setViewRecord(null), 1500);
       loadRecords(search, offset, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter, rarityTierFilter);
     } catch { setModalMintMoveMsg("Network error"); }
     finally { setModalMintMoveBusy(false); }
@@ -1618,3 +1619,4 @@ export default function NftPage() {
     </div>
   );
 }
+
