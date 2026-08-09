@@ -136,6 +136,7 @@ export default function NftPage() {
   const [mintedCount, setMintedCount] = useState(0);
   const [soldCount, setSoldCount] = useState(0);
   const [deliveredCount, setDeliveredCount] = useState(0);
+  const [customerWalletCount, setCustomerWalletCount] = useState(0);
   const [offset, setOffset] = useState(0);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -229,6 +230,7 @@ export default function NftPage() {
         setMintedCount(data.mintedCount ?? 0);
         setSoldCount(data.soldCount ?? 0);
         setDeliveredCount(data.deliveredCount ?? 0);
+        setCustomerWalletCount(data.customerWalletCount ?? 0);
         setLoading(false);
         console.log("records loaded:", data.nftRecords?.length ?? 0);
         console.groupEnd();
@@ -823,6 +825,18 @@ export default function NftPage() {
                 sub: "Artwork unlocked",
                 icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
                 filter: () => { setRevealFilter("revealed"); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "revealed", ""); },
+              },
+              {
+                label: "Customer Wallets", value: customerWalletCount, color: "#0891b2", bg: "#ecfeff", pct: totalAll ? Math.round(customerWalletCount / totalAll * 100) : 0,
+                sub: "Owned by customers",
+                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+                filter: () => { setRevealFilter("revealed"); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "revealed", ""); },
+              },
+              {
+                label: "Treasury Wallet", value: treasuryWalletCount, color: "#0e7490", bg: "#f0fdff", pct: totalAll ? Math.round(treasuryWalletCount / totalAll * 100) : 0,
+                sub: "Unsold · treasury-owned",
+                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" /></svg>,
+                filter: () => { setRevealFilter("treasury_wallet"); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "treasury_wallet", ""); },
               },
             ].map(s => (
               <button key={s.label} onClick={s.filter}
