@@ -900,8 +900,10 @@ export default function NftPage() {
               onChange={e => {
                 const newReveal = e.target.value;
                 setRevealFilter(newReveal);
-                // Rarity tier data only exists on revealed NFTs — clear tier if artwork changes away from revealed
-                if (rarityTierFilter && newReveal !== "revealed") {
+                // Only clear rarity tier for stages that have no rarity data (pre_mint / reserved)
+                // revealed + treasury_wallet NFTs both have rarity populated
+                const noRarityStages = ["pre_mint", "reserved"];
+                if (rarityTierFilter && noRarityStages.includes(newReveal)) {
                   setRarityTierFilter("");
                   applyFilter(statusFilter, stageFilter, newReveal, waveFilter, mintedFrom, mintedTo, mintTypeFilter, "");
                 } else {
@@ -928,7 +930,18 @@ export default function NftPage() {
             </select>
 
             <select value={rarityTierFilter}
-              onChange={e => { const tier = e.target.value; setRarityTierFilter(tier); const newReveal = tier ? "revealed" : revealFilter; if (tier) setRevealFilter("revealed"); applyFilter(statusFilter, stageFilter, newReveal, waveFilter, mintedFrom, mintedTo, mintTypeFilter, tier); }}
+              onChange={e => {
+                const tier = e.target.value;
+                setRarityTierFilter(tier);
+                // Only auto-set Artwork to "revealed" if no artwork filter is currently active.
+                // If user already has "treasury_wallet" (or any other filter), keep it —
+                // those NFTs also have rarity data populated.
+                const noRarityStages = ["pre_mint", "reserved"];
+                const forceReveal = tier && (!revealFilter || noRarityStages.includes(revealFilter));
+                const newReveal = forceReveal ? "revealed" : revealFilter;
+                if (forceReveal) setRevealFilter("revealed");
+                applyFilter(statusFilter, stageFilter, newReveal, waveFilter, mintedFrom, mintedTo, mintTypeFilter, tier);
+              }}
               className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
               style={{ border: "1px solid #e5e7eb", color: rarityTierFilter ? "#111827" : "#9bafc5" }}>
               <option value="">All Rarity Tiers</option>
