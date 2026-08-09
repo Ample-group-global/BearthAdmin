@@ -110,7 +110,7 @@ export default function CustomerReportTab() {
         {[
           { label: "Total Customers",  value: total,         color: "#24315f", sub: `${convRate}% conversion` },
           { label: "With Orders",      value: withOrders,    color: "#41afeb", href: "/orders" },
-          { label: "NFT Items Bought", value: totalNfts,     color: "#7c3aed", href: "/nft/records" },
+          { label: "NFT Items Bought", value: totalNfts,     color: "#7c3aed", href: "/nft/nftlist" },
           { label: "Product Items",    value: totalProducts, color: "#16a34a", href: "/products" },
         ].map(m => {
           const inner = (

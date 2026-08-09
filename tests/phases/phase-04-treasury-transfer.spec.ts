@@ -18,7 +18,7 @@
  *   - All 7 waves show close_action='treasury' via API
  *   - /nft/waves page: no "Move to Wallet", "Auto Transfer" or "Reveal Now" buttons remain
  *   - /nft/waves REVEAL column shows "✓ Transferred" badge for 0-minted waves
- *   - /nft/records page loads 9,999 total records
+ *   - /nft/nftlist page loads 9,999 total records
  *   - delivery_status breakdown: no treasury_pending records
  *   - Progress bar circles: Waves 1–2 green (Revealed), Waves 3–7 green (Complete)
  *
@@ -130,9 +130,9 @@ test.describe('Phase 4 — Treasury Transfer Verification (All 7 Waves)', () => 
     console.log('P4-04: All wave circles show correct completed state ✓');
   });
 
-  // ─── P4-05: /nft/records — 9,999 total, no treasury_pending ──────────────
+  // ─── P4-05: /nft/nftlist — 9,999 total, no treasury_pending ──────────────
   test('P4-05: NFT Records — 9,999 total records, no treasury_pending', async ({ page }) => {
-    await page.goto('/nft/records');
+    await page.goto('/nft/nftlist');
     await page.waitForLoadState('networkidle');
 
     const body = await page.textContent('body') ?? '';

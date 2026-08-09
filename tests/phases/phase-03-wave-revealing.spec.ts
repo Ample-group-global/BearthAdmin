@@ -227,8 +227,8 @@ test.describe('Phase 3 — Wave Revealing (All 7 Waves)', () => {
       console.log(`P3-09: Total NFT records: ${d.total ?? 'unknown'}`);
     }
 
-    // Navigate to /nft/records and verify page loads with 9,999 total
-    await page.goto('/nft/records');
+    // Navigate to /nft/nftlist and verify page loads with 9,999 total
+    await page.goto('/nft/nftlist');
     await page.waitForLoadState('networkidle');
     const body = await page.textContent('body') ?? '';
     expect(body).toMatch(/9[,.]?999/);

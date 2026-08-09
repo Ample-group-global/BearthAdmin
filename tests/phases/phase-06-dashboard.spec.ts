@@ -209,7 +209,7 @@ test.describe('Phase 6 — Dashboard (/dashboard)', () => {
     const dashMinted: number = stats?.totalMinted ?? dashboardTotalMinted;
 
     // Navigate to NFT Records page
-    await page.goto('/nft/records');
+    await page.goto('/nft/nftlist');
     await page.waitForLoadState('networkidle');
 
     // The "Minted" stat card shows `mintedCount` from API
@@ -272,7 +272,7 @@ test.describe('Phase 6 — Dashboard (/dashboard)', () => {
     // The three quick action links from dashboard/page.tsx:
     // "Wave Management" → /nft/waves
     // "Contract Operations" → /nft/selling
-    // "NFT Records" → /nft/records
+    // "NFT Records" → /nft/nftlist
     const waveLink = page.getByText('Wave Management', { exact: false });
     await expect(waveLink.first()).toBeVisible();
 

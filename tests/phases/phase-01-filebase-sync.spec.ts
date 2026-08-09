@@ -60,8 +60,8 @@ test.describe('Phase 1 — Filebase → nft_records Sync (Pre-Mint Foundation)',
   });
 
   // ─── P1-01: NFT Records page loads and shows 9,999 total ─────────────────
-  test('P1-01: /nft/records shows 9,999 total NFTs', async ({ page }) => {
-    await page.goto('/nft/records');
+  test('P1-01: /nft/nftlist shows 9,999 total NFTs', async ({ page }) => {
+    await page.goto('/nft/nftlist');
     await page.waitForLoadState('networkidle');
 
     const body = await page.textContent('body') ?? '';
@@ -73,7 +73,7 @@ test.describe('Phase 1 — Filebase → nft_records Sync (Pre-Mint Foundation)',
 
   // ─── P1-02: All records in blind-box / pending state ─────────────────────
   test('P1-02: REVEALED stat = 0 and SOLD stat = 0 before any minting', async ({ page }) => {
-    await page.goto('/nft/records');
+    await page.goto('/nft/nftlist');
     await page.waitForLoadState('networkidle');
 
     // REVEALED count — should be 0 before any reveal
@@ -93,7 +93,7 @@ test.describe('Phase 1 — Filebase → nft_records Sync (Pre-Mint Foundation)',
 
   // ─── P1-03: Serial number search returns correct record ───────────────────
   test('P1-03: Serial number search for #1 returns the first NFT record', async ({ page }) => {
-    await page.goto('/nft/records');
+    await page.goto('/nft/nftlist');
     await page.waitForLoadState('networkidle');
 
     // Find the search input — could be placeholder "Search", "Serial", or type="search"
@@ -116,7 +116,7 @@ test.describe('Phase 1 — Filebase → nft_records Sync (Pre-Mint Foundation)',
 
   // ─── P1-04: Wave 1 has 303 assigned records ───────────────────────────────
   test('P1-04: Wave 1 filter returns 303 records (Fibonacci Wave 1 qty)', async ({ page }) => {
-    await page.goto('/nft/records');
+    await page.goto('/nft/nftlist');
     await page.waitForLoadState('networkidle');
 
     // Find wave filter dropdown or select

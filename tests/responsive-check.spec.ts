@@ -21,7 +21,7 @@ const PAGES = [
   { slug: "forgot-password",path: "/forgot-password",     auth: false },
   { slug: "dashboard",      path: "/",                    auth: true  },
   { slug: "nft-waves",      path: "/nft/waves",           auth: true  },
-  { slug: "nft-records",    path: "/nft/records",         auth: true  },
+  { slug: "nft-records",    path: "/nft/nftlist",         auth: true  },
   { slug: "orders",         path: "/orders",              auth: true  },
   { slug: "customers",      path: "/customers",           auth: true  },
   { slug: "products",       path: "/products",            auth: true  },
