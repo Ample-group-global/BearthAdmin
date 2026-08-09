@@ -361,7 +361,9 @@ export default function NftHistoryModal({
                     </span>
                   </div>
                   {(() => {
-                    const isRes = viewRecord.deliveryStatusCode === "treasury_pending" || (viewRecord.tokenId == null && viewRecord.waveRevealScheduledAt != null);
+                    const isTrsy = viewRecord.deliveryStatusCode === "treasury_wallet" || viewRecord.deliveryStatusCode === "transferred";
+                    const isRes  = viewRecord.deliveryStatusCode === "treasury_pending" || (viewRecord.tokenId == null && viewRecord.waveRevealScheduledAt != null);
+                    if (isTrsy)                  return <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#ccfbf1", color: "#0d9488", border: "1px solid #99f6e4" }}>🏛 Treasury Wallet</span>;
                     if (viewRecord.isRevealed)   return <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#f5f3ff", color: "#7c3aed" }}>✦ Revealed</span>;
                     if (viewRecord.mintedAt)     return <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#eff6ff", color: "#3b82f6" }}>⬡ Minted</span>;
                     if (isRes)                   return <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>◈ Reserved</span>;
@@ -371,9 +373,9 @@ export default function NftHistoryModal({
                 {/* Progress track */}
                 {(() => {
                   const isResTrack = viewRecord.deliveryStatusCode === "treasury_pending" || (viewRecord.tokenId == null && viewRecord.waveRevealScheduledAt != null);
-                  const isTreasury = (viewRecord.deliveryStatusCode === "treasury_wallet" || viewRecord.deliveryStatusCode === "transferred") && !!viewRecord.mintedAt && viewRecord.mintType !== "free" && viewRecord.mintType !== "paid";
-                  const pctWidth   = viewRecord.isRevealed ? "100%" : isTreasury ? "100%" : isResTrack ? "100%" : viewRecord.mintedAt ? "65%" : viewRecord.waveScheduledStart && new Date(viewRecord.waveScheduledStart) < new Date() ? "32%" : "0%";
-                  const gradient   = viewRecord.isRevealed ? "linear-gradient(90deg,#6366f1,#8b5cf6)" : isTreasury ? "linear-gradient(90deg,#14b8a6,#0d9488)" : isResTrack ? "linear-gradient(90deg,#f59e0b,#b45309)" : "linear-gradient(90deg,#6366f1,#8b5cf6)";
+                  const isTreasury = viewRecord.deliveryStatusCode === "treasury_wallet" || viewRecord.deliveryStatusCode === "transferred";
+                  const pctWidth   = isTreasury ? "100%" : viewRecord.isRevealed ? "100%" : isResTrack ? "100%" : viewRecord.mintedAt ? "65%" : viewRecord.waveScheduledStart && new Date(viewRecord.waveScheduledStart) < new Date() ? "32%" : "0%";
+                  const gradient   = isTreasury ? "linear-gradient(90deg,#14b8a6,#0d9488)" : viewRecord.isRevealed ? "linear-gradient(90deg,#6366f1,#8b5cf6)" : isResTrack ? "linear-gradient(90deg,#f59e0b,#b45309)" : "linear-gradient(90deg,#6366f1,#8b5cf6)";
                   return (
                     <div className="px-5 pt-4 pb-1">
                       <div className="relative flex items-center">
@@ -384,7 +386,7 @@ export default function NftHistoryModal({
                     </div>
                   );
                 })()}
-                <div className={`grid px-5 py-4 gap-4 ${(viewRecord.deliveryStatusCode === "treasury_wallet" || viewRecord.deliveryStatusCode === "transferred") && viewRecord.mintedAt && viewRecord.mintType !== "free" && viewRecord.mintType !== "paid" ? "grid-cols-4" : "grid-cols-3"}`}>
+                <div className={`grid px-5 py-4 gap-4 ${viewRecord.deliveryStatusCode === "treasury_wallet" || viewRecord.deliveryStatusCode === "transferred" ? "grid-cols-4" : "grid-cols-3"}`}>
                   {[
                     { label: "Wave Start",  val: fmt(viewRecord.waveScheduledStart), dot: "#41afeb" },
                     { label: "Wave End",    val: fmt(viewRecord.waveScheduledEnd),   dot: "#f59e0b" },
@@ -418,13 +420,13 @@ export default function NftHistoryModal({
                     );
                   })()}
                   {/* Treasury Wallet — only for admin/treasury mints physically moved to treasury */}
-                  {(viewRecord.deliveryStatusCode === "treasury_wallet" || viewRecord.deliveryStatusCode === "transferred") && viewRecord.mintedAt && viewRecord.mintType !== "free" && viewRecord.mintType !== "paid" && (
+                  {(viewRecord.deliveryStatusCode === "treasury_wallet" || viewRecord.deliveryStatusCode === "transferred") && (
                     <div className="flex items-start gap-2">
                       <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#0d9488" }} />
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94a3b8" }}>Treasury Wallet</p>
-                        <p className="text-xs font-semibold" style={{ color: viewRecord.mintedAt ? "#0d9488" : "#cbd5e1" }}>
-                          {viewRecord.mintedAt ? fmt(viewRecord.mintedAt) : "—"}
+                        <p className="text-xs font-semibold" style={{ color: (viewRecord.deliveredAt || viewRecord.mintedAt) ? "#0d9488" : "#cbd5e1" }}>
+                          {fmt(viewRecord.deliveredAt ?? viewRecord.mintedAt)}
                         </p>
                         <p className="text-[9px] mt-0.5 font-semibold" style={{ color: "#0d9488" }}>✓ In Treasury</p>
                       </div>
