@@ -42,7 +42,7 @@ function deriveWaveDisplayStatus(w: Wave): string {
   if (w.status === "active" && w.scheduledEnd && new Date(w.scheduledEnd) < new Date()) return "ended";
   return w.status;
 }
-// â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Main Page â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 export default function WavesPage() {
   const searchParams = useSearchParams();
@@ -50,10 +50,10 @@ export default function WavesPage() {
   const strategyName = searchParams.get("strategy");
   const highlightRef = useRef<HTMLDivElement>(null);
 
-  // â”€â”€ Tab state â”€â”€
+  // â"€â"€ Tab state â"€â"€
   const [activeTab, setActiveTab] = useState<"waves" | "whitelist" | "packs" | "collaborations">("waves");
 
-  // â”€â”€ Waves tab state â”€â”€
+  // â"€â"€ Waves tab state â"€â"€
   const [waves, setWaves] = useState<Wave[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,11 +83,11 @@ export default function WavesPage() {
   // Chain form fields
   const [chainPrice, setChainPrice] = useState("");
 
-  // â”€â”€ Treasury move modal state â”€â”€
+  // â"€â"€ Treasury move modal state â"€â"€
   const [treasuryMoveWave, setTreasuryMoveWave] = useState<Wave | null>(null);
   const [treasurySuccessData, setTreasurySuccessData] = useState<{ txHash: string; waveNum: number } | null>(null);
 
-  // â”€â”€ Reveal tab state â”€â”€
+  // â"€â"€ Reveal tab state â"€â"€
   const [revealWaves, setRevealWaves] = useState<WaveSchedule[]>([]);
   const [revealPhase, setRevealPhase] = useState<number | null>(null);
   const [revealLoading, setRevealLoading] = useState(false);
@@ -100,7 +100,7 @@ export default function WavesPage() {
   const [scheduleEditErr, setScheduleEditErr] = useState<string | null>(null);
   const [blindBoxUrl, setBlindBoxUrl] = useState<string | null>(null);
 
-  // â”€â”€ Waves tab data loading â”€â”€
+  // â"€â"€ Waves tab data loading â"€â"€
 
   const loadWaves = () => {
     console.group("[WavesPage] loadWaves");
@@ -120,7 +120,7 @@ export default function WavesPage() {
       });
   };
 
-  // â”€â”€ Watchdog: silent 30s poll â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Watchdog: silent 30s poll â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   const [waveWatchAlert, setWaveWatchAlert] = useState<string | null>(null);
   const [revealReadyCount, setRevealReadyCount] = useState(0);
   const [watchUpdated, setWatchUpdated] = useState<Date | null>(null);
@@ -170,7 +170,7 @@ export default function WavesPage() {
     }
   }, [strategyHighlight, waves]);
 
-  // â”€â”€ Reveal tab data loading (lazy) â”€â”€
+  // â"€â"€ Reveal tab data loading (lazy) â"€â"€
 
   const loadRevealData = useCallback(async () => {
     setRevealLoading(true); setRevealErr(null);
@@ -213,7 +213,7 @@ export default function WavesPage() {
 
 
 
-  // â”€â”€ Waves tab handlers â”€â”€
+  // â"€â"€ Waves tab handlers â"€â"€
 
   const openEdit = (w: Wave) => {
     setEditWave(w);
@@ -294,7 +294,7 @@ export default function WavesPage() {
 
   const handleSetScheduleOnChain = () => {
     if (!editWave?.scheduledStart || !editWave?.scheduledEnd) {
-      setChainError("No schedule in DB â€” set start/end dates in the Settings tab first.");
+      setChainError("No schedule in DB — set start/end dates in the Settings tab first.");
       return;
     }
     chainOp("schedule", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/schedule`, {
@@ -317,7 +317,7 @@ export default function WavesPage() {
   };
 
 
-  // â”€â”€ Reveal tab handlers â”€â”€
+  // â"€â"€ Reveal tab handlers â"€â"€
 
   function handleRevealSuccess(txHash: string, waveNum: number) {
     console.group("[WavesPage] handleRevealSuccess");
@@ -329,7 +329,7 @@ export default function WavesPage() {
     loadWaves();
   }
 
-  // â”€â”€ Derived values â”€â”€
+  // â"€â"€ Derived values â"€â"€
 
   const totalNfts = waves.reduce((s, w) => s + (w.quantity ?? 0), 0);
   const activeWave = waves.find(w => deriveWaveDisplayStatus(w) === "active");
@@ -352,7 +352,7 @@ export default function WavesPage() {
     .filter((x): x is { label: string; dt: number } => x !== null && x.dt > revealNow)
     .sort((a, b) => a.dt - b.dt)[0] ?? null;
 
-  // â”€â”€ Tab UI helpers â”€â”€
+  // â"€â"€ Tab UI helpers â"€â"€
 
   const TAB_STYLE_ACTIVE = {
     color: "#24315f",
@@ -370,7 +370,7 @@ export default function WavesPage() {
   return (
     <div className="p-5 space-y-5">
 
-      {/* â”€â”€ Header â”€â”€ */}
+      {/* â"€â"€ Header â"€â"€ */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-lg font-bold" style={{ color: "#24315f" }}>NFT Waves</h1>
@@ -389,7 +389,7 @@ export default function WavesPage() {
         </button>
       </div>
 
-      {/* â”€â”€ Tabs â”€â”€ */}
+      {/* â"€â"€ Tabs â"€â"€ */}
       <div className="ba-tabs" style={{ borderBottom: "1px solid #e5e7eb" }}>
         <div className="flex gap-0">
           {([
@@ -410,9 +410,9 @@ export default function WavesPage() {
       </div>
 
       {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-      {/* â”€â”€ WAVES TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* â"€â"€ WAVES TAB â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
       {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-      {/* Watchdog alert â€” shown across all tabs */}
+      {/* Watchdog alert — shown across all tabs */}
       {waveWatchAlert && (
         <div className="flex items-center justify-between px-4 py-2 rounded-xl text-sm"
           style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.25)", color: "#d97706" }}>
@@ -441,7 +441,7 @@ export default function WavesPage() {
                   {strategyName ? `Strategy: ${strategyName}` : "Strategy selected"}
                 </span>
                 <span className="ml-2" style={{ color: "#6b7280" }}>
-                  â€” Configure waves with{" "}
+                  — Configure waves with{" "}
                   <strong>{saleMethods.find(s => s.code === strategyHighlight)?.label ?? strategyHighlight}</strong>{" "}
                   as the sale method. Edit each wave below and set Sale Method accordingly.
                 </span>
@@ -454,7 +454,7 @@ export default function WavesPage() {
             {[
               { label: "Total Waves", value: String(waves.length), color: "#41afeb" },
               { label: "Complete", value: String(completedCount), color: "#16a34a" },
-              { label: "Active Wave", value: activeWave?.name ?? "â€”", color: "#7c3aed", small: true },
+              { label: "Active Wave", value: activeWave?.name ?? "—", color: "#7c3aed", small: true },
               { label: "Total Minted", value: `${totalSold.toLocaleString()} / ${totalNfts.toLocaleString()}`, color: "#24315f", small: true },
             ].map(s => (
               <div key={s.label} className="bg-white rounded-xl p-4 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
@@ -557,7 +557,7 @@ export default function WavesPage() {
         />
       )}
 
-      {/* â”€â”€ Reveal Modals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* â"€â"€ Reveal Modals â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
       {revealWave && (
         <RevealModal
           wave={revealWave}
@@ -568,7 +568,7 @@ export default function WavesPage() {
       {revealSuccessData && (
         <TxSuccessModal
           title={`Wave ${revealSuccessData.waveNum} Revealed!`}
-          message=”The reveal transaction was submitted on-chain. Buyers can now see their NFT artwork.”
+          message="The reveal transaction was submitted on-chain. Buyers can now see their NFT artwork."
           txHash={revealSuccessData.txHash}
           onClose={() => setRevealSuccessData(null)}
         />
