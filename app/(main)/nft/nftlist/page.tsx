@@ -562,9 +562,9 @@ export default function NftPage() {
               disabled={busy}
               onClick={e => { e.stopPropagation(); handleTableSbt(r, false); }}
               title="Remove Soulbound"
-              className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded disabled:opacity-40"
-              style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", cursor: "pointer" }}>
-              {busy ? "…" : "🔒 Bound"}
+              className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-md disabled:opacity-40 whitespace-nowrap"
+              style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", cursor: "pointer", letterSpacing: "0.01em" }}>
+              {busy ? "…" : "🔒 Soulbound"}
             </button>
           );
         }
@@ -573,9 +573,9 @@ export default function NftPage() {
             disabled={busy}
             onClick={e => { e.stopPropagation(); handleTableSbt(r, true); }}
             title="Set Soulbound"
-            className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded disabled:opacity-40"
-            style={{ background: "#f8fafc", color: "#94a3b8", border: "1px solid #e2e8f0", cursor: "pointer" }}>
-            {busy ? "…" : "🔓 Set"}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md disabled:opacity-40 whitespace-nowrap"
+            style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0", cursor: "pointer", letterSpacing: "0.01em" }}>
+            {busy ? "…" : "🔓 Set Soulbound"}
           </button>
         );
       },
