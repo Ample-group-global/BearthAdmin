@@ -897,7 +897,17 @@ export default function NftPage() {
 
             {/* Artwork state — matches NFT lifecycle badge language */}
             <select value={revealFilter}
-              onChange={e => { setRevealFilter(e.target.value); applyFilter(statusFilter, stageFilter, e.target.value, waveFilter); }}
+              onChange={e => {
+                const newReveal = e.target.value;
+                setRevealFilter(newReveal);
+                // Rarity tier data only exists on revealed NFTs — clear tier if artwork changes away from revealed
+                if (rarityTierFilter && newReveal !== "revealed") {
+                  setRarityTierFilter("");
+                  applyFilter(statusFilter, stageFilter, newReveal, waveFilter, mintedFrom, mintedTo, mintTypeFilter, "");
+                } else {
+                  applyFilter(statusFilter, stageFilter, newReveal, waveFilter, mintedFrom, mintedTo, mintTypeFilter, rarityTierFilter);
+                }
+              }}
               className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
               style={{ border: "1px solid #e5e7eb", color: revealFilter ? "#111827" : "#9bafc5" }}>
               <option value="">All Artwork</option>
