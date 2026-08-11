@@ -143,7 +143,7 @@ export default function RoyaltyTab() {
   );
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5">
       <div>
         <h2 className="text-lg font-bold" style={{ color: "#24315f" }}>Royalty & Marketplace Settings</h2>
         <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>

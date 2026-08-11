@@ -240,10 +240,10 @@ export default function MembershipTab() {
             <div>
               <label style={labelStyle}>Tier Level</label>
               <select value={form.tier_level} onChange={e => setForm(f => ({ ...f, tier_level: e.target.value }))} style={inputStyle}>
-                <option value="1">1 — Bronze</option>
-                <option value="2">2 — Silver</option>
-                <option value="3">3 — Gold</option>
-                <option value="4">4 — Platinum</option>
+                <option value="1">Bronze</option>
+                <option value="2">Silver</option>
+                <option value="3">Gold</option>
+                <option value="4">Platinum</option>
               </select>
             </div>
             <div className="grid grid-cols-2 gap-3">
