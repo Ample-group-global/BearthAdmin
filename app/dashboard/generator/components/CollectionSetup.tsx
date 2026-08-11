@@ -139,7 +139,7 @@ function readEntry(entry) {
   });
 }
 
-export default function CollectionSetup({ collection, onChange, onNext, onReset, onLayersChange, syncing = false, syncError = '' }) {
+export default function CollectionSetup({ collection, onChange, onNext, onReset, onLayersChange, syncing = false, syncError = '', sessionRestored = false, collectionId = undefined, onDismissRestore = undefined }) {
   const [dragOver,      setDragOver]      = useState(false);
   const [uploading,     setUploading]     = useState(false);
   const [uploadDone,    setUploadDone]    = useState(false);
@@ -251,6 +251,38 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
 
   return (
     <div className="setup-page">
+
+      {/* Session restore banner — shown when a previous collection is auto-loaded from DB */}
+      {sessionRestored && collectionId && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          padding: '10px 16px', marginBottom: 16,
+          background: 'rgba(65,175,235,0.08)', border: '1px solid rgba(65,175,235,0.25)',
+          borderRadius: 10, fontSize: 13, color: '#2e9fd8',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>↩</span>
+            <span>
+              <strong>Previous session resumed</strong> — your collection and layers are ready.
+              Go to the <strong>Organize</strong> tab to review your layers.
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <button
+              className="link-btn"
+              style={{ fontSize: 12, color: '#2e9fd8', fontWeight: 600 }}
+              onClick={() => { onDismissRestore?.(); }}
+            >Dismiss</button>
+            <span style={{ color: 'rgba(65,175,235,0.4)' }}>·</span>
+            <button
+              className="link-btn"
+              style={{ fontSize: 12, color: '#ef4444', fontWeight: 600 }}
+              onClick={onReset}
+            >Start fresh</button>
+          </div>
+        </div>
+      )}
+
       <div className="setup-two-col">
 
         {/* ── Left: form ── */}
@@ -367,7 +399,9 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
               <span style={{ color:'var(--dim)' }}>Active layers folder:</span>
               {activeFolder
                 ? <span style={{ color:'var(--accent)', fontWeight:600, fontFamily:'monospace' }}>{activeFolder}</span>
-                : <span style={{ color:'var(--dim)', fontStyle:'italic' }}>None — drop a folder below to import</span>
+                : collectionId
+                  ? <span style={{ color:'#2e9fd8', fontWeight:600 }}>Saved in database — drop a new folder to replace</span>
+                  : <span style={{ color:'var(--dim)', fontStyle:'italic' }}>None — drop a folder below to import</span>
               }
             </div>
             <div

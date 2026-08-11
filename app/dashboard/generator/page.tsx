@@ -35,6 +35,7 @@ export default function Page() {
   const [collectionId, setCollectionId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState('');
+  const [sessionRestored, setSessionRestored] = useState(false);
   const [layers, setLayers] = useState<Layer[]>([]);
   const [weights, setWeights] = useState<Weights>({});
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
@@ -108,6 +109,7 @@ export default function Page() {
 
       if (savedId) {
         setCollectionId(savedId);
+        setSessionRestored(true);
         const s = sessionData?.supply;
         if (s && s > 0) setCollection(prev => ({ ...prev, supply: s }));
         fetch(`/api/nft-gen/collections/${savedId}`)
@@ -137,6 +139,7 @@ export default function Page() {
             const first = (data?.collections ?? data)?.[0] ?? null;
             if (!first?.id) return;
             setCollectionId(first.id);
+            setSessionRestored(true);
             loadLayers(undefined, first.id);
             fetch('/api/session/collection', {
               method: 'POST',
@@ -307,6 +310,8 @@ export default function Page() {
   function resetCollection() {
     setCollection(DEFAULT_COLLECTION);
     setCollectionId(null);
+    setSessionRestored(false);
+    setLayers([]);
     fetch('/api/session/collection', { method: 'DELETE' }).catch(() => {});
   }
 
@@ -342,6 +347,11 @@ export default function Page() {
             onLayersChange={loadLayers}
             syncing={syncing}
             syncError={syncError}
+            sessionRestored={sessionRestored}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            collectionId={collectionId as any}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onDismissRestore={(() => setSessionRestored(false)) as any}
           />
         )}
 
