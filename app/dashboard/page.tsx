@@ -63,7 +63,7 @@ function MetricCard({ label, value, sub, accent, progress }: {
 
 // ─── Section components ───────────────────────────────────────────────────────
 
-function MintOverview({ stats, wlCount }: { stats: DbStats; wlCount: number | null }) {
+function MintOverview({ stats }: { stats: DbStats }) {
   const phaseIdx = stats.phase ?? 0;
   const pc = PHASE_COLORS[phaseIdx] ?? PHASE_COLORS[0];
   return (
@@ -421,7 +421,7 @@ export default function DashboardPage() {
         <LoadingSkeleton />
       ) : stats ? (
         <>
-          <MintOverview stats={stats} wlCount={wlCount} />
+          <MintOverview stats={stats} />
           <WaveStats    stats={stats} wlCount={wlCount} />
           <AccessControls stats={stats} />
           {stats.adminRevenue && stats.adminRevenue.totalSales > 0 && (

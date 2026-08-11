@@ -168,8 +168,8 @@ export default function RoyaltyTab() {
           )}
         </div>
 
-        {royaltyTx && <TxBanner txHash={royaltyTx} />}
-        {royaltyError && <ErrBanner msg={royaltyError} />}
+        {royaltyTx    && <TxBanner  txHash={royaltyTx}   onDismiss={() => setRoyaltyTx(null)} />}
+        {royaltyError && <ErrBanner msg={royaltyError}   onDismiss={() => setRoyaltyError(null)} />}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -249,7 +249,7 @@ export default function RoyaltyTab() {
         </div>
 
         {mktTx && (
-          <div className="mx-5 mt-4"><TxBanner txHash={mktTx} /></div>
+          <div className="mx-5 mt-4"><TxBanner txHash={mktTx} onDismiss={() => setMktTx(null)} /></div>
         )}
 
         <div className="overflow-x-auto">

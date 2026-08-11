@@ -145,7 +145,7 @@ export default function MintOperationsTab({ onChain, config, onRefresh }: Props)
     <div className="space-y-7">
       {tx      && <TxBanner  txHash={tx}   onDismiss={() => setTx(null)} />}
       {opError && <ErrBanner msg={opError}  onDismiss={() => setOpError(null)} />}
-      {opOk   && <OkBanner  msg={opOk} />}
+      {opOk   && <OkBanner  msg={opOk} onDismiss={() => setOpOk(null)} />}
 
       {/* ─── PHASE MANAGEMENT ─────────────────────────── */}
       <section>
