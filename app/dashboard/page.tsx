@@ -80,7 +80,15 @@ export default function DashboardPage() {
         fetch("/api/nft-sell/collection/stats", { credentials: "include" }),
         fetch("/api/whitelist", { credentials: "include" }),
       ]);
-      if (!statsRes.ok) throw new Error(`HTTP ${statsRes.status}`);
+      if (!statsRes.ok) {
+        const errData = await statsRes.json().catch(() => null);
+        throw new Error(
+          errData?.error ??
+          (statsRes.status === 503 ? "Service temporarily unavailable — please try again in a moment." :
+           statsRes.status === 401 ? "Session expired — please sign in again." :
+           `Unable to load dashboard data (${statsRes.status}).`)
+        );
+      }
       setStats(await statsRes.json());
       if (wlRes.ok) {
         const d = await wlRes.json();
@@ -191,8 +199,17 @@ export default function DashboardPage() {
 
       {/* ── Stats ── */}
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-          <strong>Error:</strong> {error}
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 flex items-start justify-between gap-4">
+          <div>
+            <p className="font-semibold mb-0.5">Could not load dashboard data</p>
+            <p className="text-red-600 opacity-90">{error}</p>
+          </div>
+          <button
+            onClick={fetchStats}
+            className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition-colors"
+          >
+            Try again
+          </button>
         </div>
       )}
       {loading ? (
