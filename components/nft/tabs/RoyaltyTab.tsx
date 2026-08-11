@@ -21,26 +21,36 @@ interface Marketplace {
   synced_at: string | null;
 }
 
+const ETH_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
+
 export default function RoyaltyTab() {
-  const [royalty, setRoyalty]         = useState<RoyaltyConfig | null>(null);
-  const [markets, setMarkets]         = useState<Marketplace[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState<string | null>(null);
+  const [royalty, setRoyalty]     = useState<RoyaltyConfig | null>(null);
+  const [markets, setMarkets]     = useState<Marketplace[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [error,   setError]       = useState<string | null>(null);
 
-  const [feePct, setFeePct]           = useState("");
-  const [receiver, setReceiver]       = useState("");
-  const [enforced, setEnforced]       = useState(true);
+  // Royalty form
+  const [feePct,        setFeePct]        = useState("");
+  const [receiver,      setReceiver]      = useState("");
+  const [enforced,      setEnforced]      = useState(true);
   const [savingRoyalty, setSavingRoyalty] = useState(false);
-  const [royaltyError, setRoyaltyError]   = useState<string | null>(null);
-  const [royaltyTx, setRoyaltyTx]         = useState<string | null>(null);
+  const [royaltyError,  setRoyaltyError]  = useState<string | null>(null);
+  const [royaltyTx,     setRoyaltyTx]     = useState<string | null>(null);
 
+  // Transfer Validator
+  const [validatorAddr,    setValidatorAddr]    = useState("");
+  const [savingValidator,  setSavingValidator]  = useState(false);
+  const [validatorError,   setValidatorError]   = useState<string | null>(null);
+  const [validatorTx,      setValidatorTx]      = useState<string | null>(null);
+
+  // Marketplace form
   const [showAddMarket, setShowAddMarket] = useState(false);
-  const [mktAddr, setMktAddr]             = useState("");
-  const [mktName, setMktName]             = useState("");
-  const [mktEnabled, setMktEnabled]       = useState(true);
-  const [savingMkt, setSavingMkt]         = useState(false);
-  const [mktError, setMktError]           = useState<string | null>(null);
-  const [mktTx, setMktTx]                 = useState<string | null>(null);
+  const [mktAddr,       setMktAddr]       = useState("");
+  const [mktName,       setMktName]       = useState("");
+  const [mktEnabled,    setMktEnabled]    = useState(true);
+  const [savingMkt,     setSavingMkt]     = useState(false);
+  const [mktError,      setMktError]      = useState<string | null>(null);
+  const [mktTx,         setMktTx]         = useState<string | null>(null);
 
   const load = () => {
     setLoading(true); setError(null);
@@ -68,8 +78,8 @@ export default function RoyaltyTab() {
     if (isNaN(pctNum) || pctNum < 0 || pctNum > 10) {
       setRoyaltyError("Royalty must be 0–10%."); setSavingRoyalty(false); return;
     }
-    if (!receiver.startsWith("0x") || receiver.length !== 42) {
-      setRoyaltyError("Enter a valid Ethereum address (0x...)."); setSavingRoyalty(false); return;
+    if (!ETH_ADDR_RE.test(receiver)) {
+      setRoyaltyError("Enter a valid Ethereum address (0x + 40 hex)."); setSavingRoyalty(false); return;
     }
     try {
       const res = await fetch("/api/nft-sell/royalty", {
@@ -85,6 +95,7 @@ export default function RoyaltyTab() {
     finally { setSavingRoyalty(false); }
   };
 
+  // DB-only — updates metadata flag in nft_collection_config, no on-chain call
   const handleToggleEnforcement = async (val: boolean) => {
     setEnforced(val);
     try {
@@ -95,14 +106,31 @@ export default function RoyaltyTab() {
       });
       const d = await res.json();
       if (!res.ok) { setRoyaltyError(d.error ?? "Failed to toggle."); setEnforced(!val); return; }
-      setRoyaltyTx(d.txHash);
     } catch { setRoyaltyError("Network error."); setEnforced(!val); }
+  };
+
+  const handleSetTransferValidator = async () => {
+    setSavingValidator(true); setValidatorError(null); setValidatorTx(null);
+    if (!ETH_ADDR_RE.test(validatorAddr)) {
+      setValidatorError("Enter a valid Ethereum address (0x + 40 hex)."); setSavingValidator(false); return;
+    }
+    try {
+      const res = await fetch("/api/nft-sell/royalty/transfer-validator", {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ validatorAddress: validatorAddr }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setValidatorError(d.error ?? "Failed to set validator."); return; }
+      setValidatorTx(d.txHash);
+    } catch { setValidatorError("Network error."); }
+    finally { setSavingValidator(false); }
   };
 
   const handleSaveMarketplace = async () => {
     setSavingMkt(true); setMktError(null); setMktTx(null);
-    if (!mktAddr.startsWith("0x") || mktAddr.length !== 42) {
-      setMktError("Enter a valid Ethereum address (0x...)."); setSavingMkt(false); return;
+    if (!ETH_ADDR_RE.test(mktAddr)) {
+      setMktError("Enter a valid Ethereum address (0x + 40 hex)."); setSavingMkt(false); return;
     }
     try {
       const res = await fetch("/api/nft-sell/royalty/marketplaces", {
@@ -112,7 +140,6 @@ export default function RoyaltyTab() {
       });
       const d = await res.json();
       if (!res.ok) { setMktError(d.error ?? "Save failed."); return; }
-      setMktTx(d.txHash);
       setShowAddMarket(false); setMktAddr(""); setMktName(""); setMktEnabled(true);
       load();
     } catch { setMktError("Network error."); }
@@ -147,18 +174,19 @@ export default function RoyaltyTab() {
       <div>
         <h2 className="text-lg font-bold" style={{ color: "#24315f" }}>Royalty & Marketplace Settings</h2>
         <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
-          ERC2981 on-chain royalty — changes submit a blockchain transaction and update the DB mirror automatically
+          ERC2981 on-chain royalty + ERC721C transfer validator for enforcement
         </p>
       </div>
 
       {error && <ErrBanner msg={error} />}
 
+      {/* ─── ERC2981 ROYALTY ────────────────────────────── */}
       <div className="bg-white rounded-2xl shadow-sm p-6 space-y-5" style={{ border: "1px solid #e5e7eb" }}>
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>ERC2981 Royalty</h2>
             <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
-              OpenSea reads this automatically. Max 10%.
+              OpenSea reads this automatically. Max 10%. Requires OPERATOR_ROLE.
             </p>
           </div>
           {royalty?.last_tx_hash && (
@@ -168,7 +196,7 @@ export default function RoyaltyTab() {
           )}
         </div>
 
-        {royaltyTx    && <TxBanner  txHash={royaltyTx}   onDismiss={() => setRoyaltyTx(null)} />}
+        {royaltyTx    && <TxBanner  txHash={royaltyTx}  onDismiss={() => setRoyaltyTx(null)} />}
         {royaltyError && <ErrBanner msg={royaltyError}   onDismiss={() => setRoyaltyError(null)} />}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -202,14 +230,37 @@ export default function RoyaltyTab() {
           </div>
         </div>
 
+        <div className="flex justify-end">
+          <button onClick={handleSaveRoyalty} disabled={savingRoyalty}
+            className="px-5 py-2.5 text-sm font-bold text-white rounded-xl transition-opacity"
+            style={{ background: savingRoyalty ? "#9bafc5" : "#41afeb" }}>
+            {savingRoyalty ? "Submitting tx…" : "⛓ Save Royalty On-Chain"}
+          </button>
+        </div>
+      </div>
+
+      {/* ─── ENFORCEMENT FLAG (DB only) ─────────────────── */}
+      <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4" style={{ border: "1px solid #e5e7eb" }}>
+        <div>
+          <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Enforcement Status</h2>
+          <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
+            This flag is recorded in the database for reference. Actual on-chain enforcement is controlled by the Transfer Validator below.
+          </p>
+        </div>
+
+        <div className="px-4 py-3 rounded-xl text-xs"
+          style={{ background: "#fffbeb", border: "1px solid #fde68a", color: "#d97706" }}>
+          <strong>DB only</strong> — toggling this does NOT submit a blockchain transaction. To enforce royalties on-chain, set the Transfer Validator address in the section below.
+        </div>
+
         <div className="flex items-center justify-between p-4 rounded-xl"
           style={{ background: enforced ? "rgba(65,175,235,0.06)" : "#f9fafb", border: "1px solid #e5e7eb" }}>
           <div>
-            <p className="text-sm font-semibold" style={{ color: "#24315f" }}>Royalty Enforcement</p>
+            <p className="text-sm font-semibold" style={{ color: "#24315f" }}>Royalty Enforcement (DB flag)</p>
             <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
               {enforced
-                ? "ON — transfers only via approved marketplaces"
-                : "OFF — NFTs tradeable anywhere (royalties not enforced)"}
+                ? "Marked ON — remember to set the Transfer Validator for real on-chain enforcement"
+                : "Marked OFF — transfers are not restricted by royalty rules"}
             </p>
           </div>
           <Toggle value={enforced} onChange={handleToggleEnforcement} />
@@ -220,22 +271,44 @@ export default function RoyaltyTab() {
             Warning: When enforcement is OFF, buyers can bypass royalties by trading on unapproved platforms.
           </div>
         )}
+      </div>
 
-        <div className="flex justify-end">
-          <button onClick={handleSaveRoyalty} disabled={savingRoyalty}
-            className="px-5 py-2.5 text-sm font-bold text-white rounded-xl transition-opacity"
-            style={{ background: savingRoyalty ? "#9bafc5" : "#41afeb" }}>
-            {savingRoyalty ? "Submitting tx…" : "Save Royalty On-Chain"}
+      {/* ─── ERC721C TRANSFER VALIDATOR ─────────────────── */}
+      <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4" style={{ border: "1px solid #e5e7eb" }}>
+        <div>
+          <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Transfer Validator (On-Chain Enforcement)</h2>
+          <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
+            ERC721C — sets the contract that validates every transfer. This is the actual on-chain royalty enforcement mechanism. Requires DEFAULT_ADMIN_ROLE.
+          </p>
+        </div>
+
+        <div className="px-4 py-3 rounded-xl text-xs"
+          style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)", color: "#7c3aed" }}>
+          The validator contract allowlists which marketplace operator contracts may call transfers. Zero address disables enforcement and allows all transfers.
+        </div>
+
+        {validatorTx    && <TxBanner  txHash={validatorTx}  onDismiss={() => setValidatorTx(null)} />}
+        {validatorError && <ErrBanner msg={validatorError}   onDismiss={() => setValidatorError(null)} />}
+
+        <div className="flex gap-2">
+          <input type="text" value={validatorAddr} onChange={e => setValidatorAddr(e.target.value)}
+            style={{ ...inputStyle, flex: 1, fontFamily: "monospace" }}
+            placeholder="0x… (validator contract address, or 0x000…000 to disable)" />
+          <button onClick={handleSetTransferValidator} disabled={savingValidator || !validatorAddr}
+            className="px-4 py-2 text-xs font-bold text-white rounded-xl flex-shrink-0"
+            style={{ background: savingValidator || !validatorAddr ? "#9bafc5" : "#7c3aed" }}>
+            {savingValidator ? "Submitting tx…" : "⛓ Set On-Chain"}
           </button>
         </div>
       </div>
 
+      {/* ─── APPROVED MARKETPLACES (DB metadata) ────────── */}
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid #e5e7eb" }}>
           <div>
             <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Approved Marketplaces</h2>
             <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
-              Only these platforms can execute transfers when enforcement is ON
+              Reference list — stored in DB only. Actual on-chain enforcement is via the Transfer Validator above.
             </p>
           </div>
           <button onClick={() => setShowAddMarket(true)}
@@ -256,7 +329,7 @@ export default function RoyaltyTab() {
           <table className="w-full text-sm">
             <thead>
               <tr>
-                {["Marketplace", "Address", "Status", "Synced", "Toggle"].map(h => (
+                {["Marketplace", "Address", "Status", "Toggle"].map(h => (
                   <th key={h} style={{ ...thStyle, textAlign: h === "Toggle" ? "center" : "left" }}>{h}</th>
                 ))}
               </tr>
@@ -264,7 +337,7 @@ export default function RoyaltyTab() {
             <tbody>
               {markets.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-10 text-sm" style={{ color: "#9bafc5" }}>
+                  <td colSpan={4} className="text-center py-10 text-sm" style={{ color: "#9bafc5" }}>
                     No marketplaces configured
                   </td>
                 </tr>
@@ -290,12 +363,7 @@ export default function RoyaltyTab() {
                         color: m.enabled ? "#16a34a" : "#9ca3af",
                       }}>
                       <span className="w-1.5 h-1.5 rounded-full" style={{ background: m.enabled ? "#16a34a" : "#9ca3af" }} />
-                      {m.enabled ? "Allowed" : "Blocked"}
-                    </span>
-                  </td>
-                  <td style={{ padding: "10px 14px" }}>
-                    <span className="text-xs" style={{ color: "#9bafc5" }}>
-                      {m.synced_at ? new Date(m.synced_at).toLocaleDateString() : "—"}
+                      {m.enabled ? "Allowed (DB)" : "Blocked (DB)"}
                     </span>
                   </td>
                   <td style={{ padding: "10px 14px", textAlign: "center" }}>
@@ -308,12 +376,16 @@ export default function RoyaltyTab() {
         </div>
       </div>
 
+      {/* ─── Add Marketplace Modal ───────────────────────── */}
       {showAddMarket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
           <div className="bg-white rounded-2xl shadow-xl flex flex-col"
             style={{ width: "100%", maxWidth: 480, border: "1px solid #e5e7eb" }}>
             <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid #e5e7eb" }}>
-              <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Add Marketplace</h2>
+              <div>
+                <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Add Marketplace</h2>
+                <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>Saved to DB only — set transfer validator for on-chain enforcement</p>
+              </div>
               <button onClick={() => { setShowAddMarket(false); setMktError(null); }}
                 style={{ color: "#9bafc5" }}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -335,7 +407,7 @@ export default function RoyaltyTab() {
               </div>
               <div className="flex items-center justify-between p-3 rounded-xl"
                 style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
-                <span className="text-sm font-medium" style={{ color: "#374151" }}>Allow transfers</span>
+                <span className="text-sm font-medium" style={{ color: "#374151" }}>Allow transfers (DB flag)</span>
                 <Toggle value={mktEnabled} onChange={setMktEnabled} />
               </div>
             </div>
@@ -348,7 +420,7 @@ export default function RoyaltyTab() {
               <button onClick={handleSaveMarketplace} disabled={savingMkt}
                 className="px-4 py-2 text-sm font-bold text-white rounded-lg"
                 style={{ background: savingMkt ? "#9bafc5" : "#41afeb" }}>
-                {savingMkt ? "Submitting tx…" : "Add On-Chain"}
+                {savingMkt ? "Saving…" : "Save to DB"}
               </button>
             </div>
           </div>

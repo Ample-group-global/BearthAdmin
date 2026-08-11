@@ -22,12 +22,20 @@ interface Props {
   onRefresh: () => Promise<void>;
 }
 
+function GroupLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-bold uppercase tracking-widest mb-3"
+      style={{ color: "#9bafc5" }}>{children}</p>
+  );
+}
+
 export default function CollectionControlsTab({ onChain, config, events, onRefresh }: Props) {
-  const [saving,    setSaving]    = useState<string | null>(null);
-  const [tx,        setTx]        = useState<string | null>(null);
-  const [opError,   setOpError]   = useState<string | null>(null);
-  const [revealUri, setRevealUri] = useState("");
-  const [treasury,  setTreasury]  = useState(config?.treasury_wallet ?? "");
+  const [saving,      setSaving]      = useState<string | null>(null);
+  const [tx,          setTx]          = useState<string | null>(null);
+  const [opError,     setOpError]     = useState<string | null>(null);
+  const [revealUri,   setRevealUri]   = useState("");
+  const [blindBoxUri, setBlindBoxUri] = useState(config?.blind_box_uri ?? "");
+  const [treasury,    setTreasury]    = useState(config?.treasury_wallet ?? "");
 
   const doOp = async (opName: string, fn: () => Promise<Response>) => {
     setSaving(opName); setOpError(null); setTx(null);
@@ -50,6 +58,15 @@ export default function CollectionControlsTab({ onChain, config, events, onRefre
     }));
   };
 
+  const handleSetBlindBoxUri = () => {
+    if (!blindBoxUri.startsWith("ipfs://")) { setOpError("Blind box URI must start with ipfs://"); return; }
+    doOp("blind-box", () => fetch("/api/nft-sell/collection/blind-box-uri", {
+      method: "PUT", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uri: blindBoxUri }),
+    }));
+  };
+
   const handleSetTreasury = () => {
     if (!ETH_ADDRESS_RE.test(treasury)) { setOpError("Treasury must be a valid Ethereum address (0x + 40 hex)."); return; }
     doOp("treasury", () => fetch("/api/nft-sell/collection/treasury", {
@@ -59,14 +76,23 @@ export default function CollectionControlsTab({ onChain, config, events, onRefre
     }));
   };
 
-  const handleWithdraw = () =>
+  const handleWithdraw = () => {
+    if (!window.confirm("Withdraw all ETH balance to the treasury wallet? This is immediate and irreversible.")) return;
     doOp("withdraw", () => fetch("/api/nft-sell/collection/withdraw", { method: "POST", credentials: "include" }));
+  };
 
-  const handlePause = (pause: boolean) =>
+  const handlePause = (pause: boolean) => {
+    const msg = pause
+      ? "Pause the contract? All minting and transfers will stop immediately."
+      : "Unpause the contract? Minting and transfers will resume.";
+    if (!window.confirm(msg)) return;
     doOp(pause ? "pause" : "unpause", () => fetch(
       `/api/nft-sell/collection/${pause ? "pause" : "unpause"}`,
       { method: "POST", credentials: "include" }
     ));
+  };
+
+  const alreadyRevealed = (config?.reveal_count ?? 0) > 0;
 
   return (
     <div className="space-y-7">
@@ -75,25 +101,56 @@ export default function CollectionControlsTab({ onChain, config, events, onRefre
 
       {/* ─── CONTENT ────────────────────────────────────── */}
       <section>
-        <p className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: "#9bafc5" }}>Content</p>
+        <GroupLabel>Content</GroupLabel>
         <div className="space-y-4">
+
+          {/* Blind Box URI */}
+          <SectionCard
+            title="Blind Box URI"
+            subtitle="Placeholder metadata shown to holders before the collection is revealed. All tokens show this URI while blind.">
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#9bafc5" }}>
+                  Blind Box Base URI (IPFS)
+                </label>
+                <input type="text" value={blindBoxUri} onChange={e => setBlindBoxUri(e.target.value)}
+                  style={inputStyle} placeholder="ipfs://Qm…" />
+                <p className="text-xs mt-1" style={{ color: "#9bafc5" }}>
+                  Current: {config?.blind_box_uri
+                    ? <span className="font-mono">{config.blind_box_uri}</span>
+                    : "Not set"}
+                </p>
+              </div>
+              <div className="flex justify-end">
+                <button onClick={handleSetBlindBoxUri}
+                  disabled={saving === "blind-box" || !blindBoxUri}
+                  className="px-5 py-2.5 text-xs font-bold text-white rounded-xl"
+                  style={{ background: saving === "blind-box" || !blindBoxUri ? "#9bafc5" : "#41afeb" }}>
+                  {saving === "blind-box" ? "Submitting tx…" : "⛓ Set Blind Box URI On-Chain"}
+                </button>
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* Reveal Collection */}
           <SectionCard
             title="Reveal Collection"
             subtitle="One-time operation — all minted tokens switch to real metadata. Requires all waves closed first."
-            accent={onChain?.currentPhase === 1 ? "#7c3aed" : undefined}>
+            accent={alreadyRevealed ? undefined : "#7c3aed"}>
             <div className="space-y-4">
-              {onChain && onChain.currentPhase !== 1 && (
+              {/* Phase 0 (Whitelist) warning — reveal too early */}
+              {onChain && onChain.currentPhase === 0 && !alreadyRevealed && (
                 <div className="px-4 py-3 rounded-xl text-xs"
                   style={{ background: "#fffbeb", border: "1px solid #fde68a", color: "#d97706" }}>
-                  Current phase: <strong>{PHASE_NAMES[onChain.currentPhase]}</strong> — reveal is only available in PaidMint phase.
+                  Current phase: <strong>{PHASE_NAMES[0]}</strong> — typically reveal is done after paid mint completes.
                 </div>
               )}
-              {config?.reveal_count && config.reveal_count > 0 ? (
+              {alreadyRevealed ? (
                 <div className="px-4 py-3 rounded-xl" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
                   <p className="text-sm font-bold" style={{ color: "#16a34a" }}>
-                    Collection revealed ({config.reveal_count.toLocaleString()} tokens)
+                    Collection revealed ({(config?.reveal_count ?? 0).toLocaleString()} wave{config?.reveal_count !== 1 ? "s" : ""})
                   </p>
-                  {config.reveal_uri && (
+                  {config?.reveal_uri && (
                     <p className="text-xs font-mono mt-1" style={{ color: "#6b7280" }}>{config.reveal_uri}</p>
                   )}
                 </div>
@@ -111,9 +168,9 @@ export default function CollectionControlsTab({ onChain, config, events, onRefre
                   </div>
                   <div className="flex justify-end">
                     <button onClick={handleReveal}
-                      disabled={saving === "reveal" || !revealUri || onChain?.currentPhase !== 1}
+                      disabled={saving === "reveal" || !revealUri}
                       className="px-5 py-2.5 text-xs font-bold text-white rounded-xl"
-                      style={{ background: saving === "reveal" || !revealUri || onChain?.currentPhase !== 1 ? "#9bafc5" : "#7c3aed" }}>
+                      style={{ background: saving === "reveal" || !revealUri ? "#9bafc5" : "#7c3aed" }}>
                       {saving === "reveal" ? "Submitting tx…" : "⛓ Reveal Collection On-Chain"}
                     </button>
                   </div>
@@ -122,7 +179,8 @@ export default function CollectionControlsTab({ onChain, config, events, onRefre
             </div>
           </SectionCard>
 
-          <SectionCard title="Treasury Wallet" subtitle="ETH from mint sales is withdrawable to this address.">
+          {/* Treasury Wallet */}
+          <SectionCard title="Treasury Wallet" subtitle="ETH from mint sales is withdrawable to this address. Requires DEFAULT_ADMIN_ROLE.">
             <div className="space-y-3">
               <div className="flex gap-2">
                 <input type="text" value={treasury} onChange={e => setTreasury(e.target.value)}
@@ -146,12 +204,12 @@ export default function CollectionControlsTab({ onChain, config, events, onRefre
 
       {/* ─── EMERGENCY CONTROLS ─────────────────────────── */}
       <section>
-        <p className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: "#9bafc5" }}>Emergency Controls</p>
+        <GroupLabel>Emergency Controls</GroupLabel>
         <div className="bg-white rounded-2xl shadow-sm p-5" style={{ border: "1px solid #fecaca" }}>
           <div className="mb-4">
             <p className="text-sm font-bold" style={{ color: "#dc2626" }}>Contract Safety Controls</p>
             <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
-              Pause stops all mints and transfers. Withdraw pulls the ETH balance to the treasury wallet.
+              Pause stops all mints and transfers. Withdraw pulls the ETH balance to the treasury wallet. A confirmation prompt will appear before each action.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -176,7 +234,7 @@ export default function CollectionControlsTab({ onChain, config, events, onRefre
 
       {/* ─── AUDIT LOG ──────────────────────────────────── */}
       <section>
-        <p className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: "#9bafc5" }}>Audit Log</p>
+        <GroupLabel>Audit Log</GroupLabel>
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
           <div className="px-5 py-4" style={{ borderBottom: "1px solid #e5e7eb" }}>
             <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>Contract Events</h2>
