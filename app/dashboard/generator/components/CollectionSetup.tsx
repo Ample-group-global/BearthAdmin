@@ -1,6 +1,6 @@
 // @ts-nocheck
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useLayerFiles } from '../LayerFilesContext';
 
 // Client-side display name derivation — mirrors server-side getName in lib/studio/layers.ts
@@ -145,17 +145,31 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
   const [uploadDone,    setUploadDone]    = useState(false);
   const [uploadMsg,     setUploadMsg]     = useState('');
   const [activeFolder,  setActiveFolder]  = useState('');
+  const [errors,        setErrors]        = useState({});
   const folderRef = useRef(null);
   const { storeFiles } = useLayerFiles();
 
-  useEffect(() => {
-    fetch('/api/layers/root')
-      .then(r => r.json())
-      .then(d => { setActiveFolder(d.folder ?? ''); })
-      .catch(() => { setActiveFolder(''); });
-  }, []);
+  const set = (k, v) => {
+    onChange({ ...collection, [k]: v });
+    // Clear the error for this field as the user edits it
+    if (errors[k]) setErrors(prev => { const n = { ...prev }; delete n[k]; return n; });
+  };
 
-  const set = (k, v) => onChange({ ...collection, [k]: v });
+  function validate() {
+    const e = {};
+    if (!collection.name?.trim())   e.name   = 'Collection Name is required.';
+    if (!collection.symbol?.trim()) e.symbol  = 'Token Symbol is required.';
+    const s = Number(collection.supply);
+    if (!collection.supply || isNaN(s) || s < 1) e.supply = 'Collection Size must be at least 1.';
+    return e;
+  }
+
+  function handleSubmit() {
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+    setErrors({});
+    onNext?.();
+  }
 
   async function handleFolderUpload(files, replace = false) {
     if (!files.length) return;
@@ -244,23 +258,27 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
           <div className="setup-section-head">Collection Settings</div>
 
           <div className="setup-field">
-            <label>Collection Name</label>
+            <label>Collection Name <span style={{color:'#ef4444'}}>*</span></label>
             <input
               placeholder="No Name"
               value={collection.name}
               onChange={e => set('name', e.target.value)}
+              style={errors.name ? { borderColor: '#ef4444' } : undefined}
             />
+            {errors.name && <span className="field-error">{errors.name}</span>}
           </div>
 
           <div className="setup-field">
-            <label>Token Symbol</label>
+            <label>Token Symbol <span style={{color:'#ef4444'}}>*</span></label>
             <input
               placeholder="BRT"
               maxLength={10}
               value={collection.symbol}
               onChange={e => set('symbol', e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))}
+              style={errors.symbol ? { borderColor: '#ef4444' } : undefined}
             />
             <span className="field-hint">Short uppercase identifier (e.g. BAYC, AZUKI). Max 10 characters.</span>
+            {errors.symbol && <span className="field-error">{errors.symbol}</span>}
           </div>
 
           <div className="setup-field">
@@ -274,12 +292,14 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
 
           <div className="setup-row2">
             <div className="setup-field">
-              <label>Collection Size</label>
+              <label>Collection Size <span style={{color:'#ef4444'}}>*</span></label>
               <input
                 type="number" min="1" max="100000"
                 value={collection.supply}
                 onChange={e => set('supply', Math.max(1, +e.target.value))}
+                style={errors.supply ? { borderColor: '#ef4444' } : undefined}
               />
+              {errors.supply && <span className="field-error">{errors.supply}</span>}
             </div>
             <div className="setup-field">
               <label>Name of each NFT</label>
@@ -390,7 +410,7 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
 
           <button
             className="btn btn-primary btn-lg setup-continue-btn"
-            onClick={onNext}
+            onClick={handleSubmit}
             disabled={syncing}
           >
             {syncing ? (

@@ -82,12 +82,14 @@ export default function Page() {
       return;
     }
 
-    const url = cid ? `/api/layers?collectionId=${cid}` : '/api/layers';
-    fetch(url)
+    const effectiveCid = cid ?? collectionId;
+    if (!effectiveCid) return; // no upload and no saved collection — Organise stays empty
+
+    fetch(`/api/layers?collectionId=${effectiveCid}`)
       .then(r => r.json())
       .then((data: Layer[]) => { if (data.length) applyLayers(sortLayersByFolder(data)); })
       .catch(() => { /* layers load silently — page shows empty state */ });
-  }, [activeFolder]);
+  }, [activeFolder, collectionId]);
 
   useEffect(() => {
     // Load conflicts, weights, and server-side session (collectionId) in parallel
@@ -118,9 +120,12 @@ export default function Page() {
               name:        c.name        ?? prev.name,
               description: c.description ?? prev.description,
               symbol:      c.symbol      ?? prev.symbol,
-              blockchain:  c.network === 'sol' ? 'solana' : 'ethereum',
+              blockchain:  c.network === 'eth' ? 'ethereum' : c.network === 'sol' ? 'solana' : (c.network ?? 'ethereum'),
               width:       c.formatWidth  ?? prev.width,
               height:      c.formatHeight ?? prev.height,
+              supply:      c.supply       ?? prev.supply,
+              nameFormat:  c.nameFormat   ?? prev.nameFormat,
+              format:      c.formatType   ?? prev.format,
             }));
           })
           .catch(() => {});
@@ -128,25 +133,34 @@ export default function Page() {
         // No session cookie (e.g. incognito) — restore from most recent collection in DB
         fetch('/api/nft-gen/collections?limit=1')
           .then(r => r.ok ? r.json() : null)
-          .then(data => {
-            const c = (data?.collections ?? data)?.[0] ?? null;
+          .then(async data => {
+            const first = (data?.collections ?? data)?.[0] ?? null;
+            if (!first?.id) return;
+            setCollectionId(first.id);
+            loadLayers(undefined, first.id);
+            fetch('/api/session/collection', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ collectionId: first.id, name: first.name }),
+            }).catch(() => {});
+            // Fetch full record so supply/nameFormat/formatType are loaded
+            const fullResp = await fetch(`/api/nft-gen/collections/${first.id}`).catch(() => null);
+            if (!fullResp?.ok) return;
+            const fullData = await fullResp.json().catch(() => null);
+            const c = fullData?.collection ?? fullData;
             if (!c?.id) return;
-            setCollectionId(c.id);
             setCollection(prev => ({
               ...prev,
               name:        c.name        ?? prev.name,
               description: c.description ?? prev.description,
               symbol:      c.symbol      ?? prev.symbol,
-              blockchain:  c.network === 'sol' ? 'solana' : 'ethereum',
+              blockchain:  c.network === 'eth' ? 'ethereum' : c.network === 'sol' ? 'solana' : (c.network ?? 'ethereum'),
               width:       c.formatWidth  ?? prev.width,
               height:      c.formatHeight ?? prev.height,
+              supply:      c.supply       ?? prev.supply,
+              nameFormat:  c.nameFormat   ?? prev.nameFormat,
+              format:      c.formatType   ?? prev.format,
             }));
-            loadLayers(undefined, c.id);
-            fetch('/api/session/collection', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ collectionId: c.id, name: c.name }),
-            }).catch(() => {});
           })
           .catch(() => {});
       }
@@ -199,10 +213,13 @@ export default function Page() {
             name: collection.name || 'Bearth NFT Collection',
             description: collection.description,
             symbol: collection.symbol || 'BRT',
-            network: collection.blockchain === 'solana' ? 'sol' : 'eth',
+            network: collection.blockchain,
             formatWidth: collection.width ?? 2000,
             formatHeight: collection.height ?? 2000,
             shuffleOutput: true,
+            supply:     collection.supply,
+            nameFormat: collection.nameFormat,
+            formatType: collection.format,
           }),
         });
         const data = await r.json();
@@ -228,9 +245,12 @@ export default function Page() {
             name:         collection.name,
             description:  collection.description,
             symbol:       collection.symbol,
-            network:      collection.blockchain === 'solana' ? 'sol' : 'eth',
+            network:      collection.blockchain,
             formatWidth:  collection.width  ?? 2000,
             formatHeight: collection.height ?? 2000,
+            supply:       collection.supply,
+            nameFormat:   collection.nameFormat,
+            formatType:   collection.format,
           }),
         });
         await fetch('/api/session/collection', {
@@ -253,6 +273,27 @@ export default function Page() {
           throw new Error(d.error ?? 'Layer sync failed — please check your connection and try again.');
         }
         loadLayers(undefined, cid);
+
+        // Re-fetch collection from DB so form reflects what was actually stored
+        fetch(`/api/nft-gen/collections/${cid}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            const c = data?.collection ?? data;
+            if (!c?.id) return;
+            setCollection(prev => ({
+              ...prev,
+              name:        c.name        ?? prev.name,
+              description: c.description ?? prev.description,
+              symbol:      c.symbol      ?? prev.symbol,
+              blockchain:  c.network === 'eth' ? 'ethereum' : c.network === 'sol' ? 'solana' : (c.network ?? prev.blockchain),
+              width:       c.formatWidth  ?? prev.width,
+              height:      c.formatHeight ?? prev.height,
+              supply:      c.supply       ?? prev.supply,
+              nameFormat:  c.nameFormat   ?? prev.nameFormat,
+              format:      c.formatType   ?? prev.format,
+            }));
+          })
+          .catch(() => {});
       }
 
       goToStep('organize');

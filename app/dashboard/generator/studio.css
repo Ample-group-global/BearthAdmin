@@ -314,6 +314,7 @@
   background-repeat: no-repeat; background-position: right 10px center;
 }
 .studio-wrap .field-hint { font-size: 10px; color: var(--xdim); }
+.studio-wrap .field-error { font-size: 11px; color: #ef4444; margin-top: -2px; }
 .studio-wrap .format-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .studio-wrap .fmt-btn {
   padding: 6px 14px; border-radius: 7px; font-size: 11.5px; font-weight: 700; cursor: pointer;
