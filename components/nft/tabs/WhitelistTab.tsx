@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useWhitelist } from "@/app/dashboard/whitelist/useWhitelist";
 import { ToastContainer } from "@/app/dashboard/whitelist/Toast";
 import { useToast } from "@/app/dashboard/whitelist/useToast";
+import { ETH_ADDRESS_RE } from "@/lib/nft-constants";
 
 type WlTab = "addresses" | "add" | "bulk" | "merkle" | "test" | "export";
 
@@ -65,11 +66,19 @@ export default function WhitelistTab() {
     catch (e: unknown) { showToast(e instanceof Error ? e.message : "Error", "error"); }
   };
 
-  const handleAdd = () =>
-    wrap(async () => { await addAddress(newAddr.trim()); setNewAddr(""); }, "Address added");
+  const handleAdd = () => {
+    const addr = newAddr.trim();
+    if (!ETH_ADDRESS_RE.test(addr)) { showToast("Invalid Ethereum address — must be 0x + 40 hex", "error"); return; }
+    wrap(async () => { await addAddress(addr); setNewAddr(""); }, "Address added");
+  };
 
   const handleBulk = () => {
     const list = bulkText.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+    const invalid = list.filter(a => !ETH_ADDRESS_RE.test(a));
+    if (invalid.length > 0) {
+      showToast(`${invalid.length} invalid address(es) found — fix before importing`, "error");
+      return;
+    }
     wrap(async () => { await addAddressesBulk(list); setBulkText(""); }, `${list.length} addresses added`);
   };
 

@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { ErrBanner, OkBanner } from "@/components/nft/Banner";
 import { StatusBadge } from "@/components/nft/StatusBadge";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
+import Overlay from "@/components/nft/shared/Overlay";
+import WarningBanner from "@/components/nft/shared/WarningBanner";
+import { ETH_ADDRESS_RE } from "@/lib/nft-constants";
 
 interface OtcDeal {
   id: string;
@@ -36,7 +39,6 @@ export default function OtcTab() {
   const [showCreate, setShowCreate] = useState(false);
   const [settleId, setSettleId]   = useState<string | null>(null);
   const [settleTxHash, setSettleTxHash] = useState("");
-  const [selected, setSelected]   = useState<OtcDeal | null>(null);
 
   const [createForm, setCreateForm] = useState({
     buyer_name: "",
@@ -61,6 +63,7 @@ export default function OtcTab() {
 
   async function create() {
     if (!createForm.buyer_wallet) return setErr("Buyer wallet is required.");
+    if (!ETH_ADDRESS_RE.test(createForm.buyer_wallet)) return setErr("Buyer wallet must be a valid Ethereum address (0x + 40 hex).");
     setSaving(true); setErr(null);
     try {
       const nft_record_ids = createForm.nft_record_ids_text
@@ -112,12 +115,17 @@ export default function OtcTab() {
 
   async function cancel(id: string) {
     if (!confirm("Cancel this OTC deal? This cannot be undone.")) return;
-    await fetch(`/api/nft-sell/otc/${id}`, { method: "DELETE", credentials: "include" });
-    setOk("Deal cancelled");
-    load();
+    try {
+      const r = await fetch(`/api/nft-sell/otc/${id}`, { method: "DELETE", credentials: "include" });
+      const d = await r.json();
+      if (!r.ok) { setErr(d.error ?? "Failed to cancel deal"); return; }
+      setOk("Deal cancelled");
+      load();
+    } catch { setErr("Network error cancelling deal."); }
   }
 
   const settleTarget = deals.find(d => d.id === settleId) ?? null;
+
 
   const stats = {
     total:       deals.length,
@@ -125,14 +133,6 @@ export default function OtcTab() {
     transferred: deals.filter(d => d.status === "transferred").length,
   };
 
-  const Overlay = ({ children }: { children: React.ReactNode }) => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        {children}
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -204,7 +204,7 @@ export default function OtcTab() {
                     <div className="flex gap-2">
                       {(deal.status === "pending" || deal.status === "confirmed") && (
                         <button
-                          onClick={() => { setSettleId(deal.id); setSettleTxHash(""); setSelected(deal); setErr(null); }}
+                          onClick={() => { setSettleId(deal.id); setSettleTxHash(""); setErr(null); }}
                           className="text-xs px-2 py-1 rounded-lg font-medium"
                           style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>
                           Settle
@@ -301,7 +301,9 @@ export default function OtcTab() {
       {settleId && settleTarget && (
         <Overlay>
           <h2 className="text-base font-bold mb-1" style={{ color: "#24315f" }}>Settle OTC Deal</h2>
-          <p className="text-xs text-gray-400 mb-4">Mark this deal as transferred and optionally record the on-chain transaction hash.</p>
+          <WarningBanner variant="info" className="mb-4">
+            Settling calls <strong>contractReserveMint</strong> on-chain — NFTs are minted directly to the buyer wallet. Ensure payment has been received before proceeding.
+          </WarningBanner>
           <div className="space-y-3">
             <div className="px-3 py-2 rounded-lg text-xs" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
               <div className="text-gray-400 uppercase tracking-wide font-semibold mb-1" style={{ fontSize: "10px" }}>Deal Summary</div>
@@ -319,7 +321,7 @@ export default function OtcTab() {
           </div>
           {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}
           <div className="flex gap-3 mt-5">
-            <button onClick={() => { setSettleId(null); setSelected(null); }}
+            <button onClick={() => { setSettleId(null); setSettleTxHash(""); }}
               className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600">Cancel</button>
             <button onClick={settle} disabled={saving}
               className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"

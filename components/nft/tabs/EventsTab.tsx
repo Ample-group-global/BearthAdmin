@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { ErrBanner, OkBanner } from "@/components/nft/Banner";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
+import Overlay from "@/components/nft/shared/Overlay";
+import { ETH_ADDRESS_RE } from "@/lib/nft-constants";
 
 interface NftEvent {
   id: string;
@@ -84,6 +86,8 @@ export default function EventsTab() {
 
   async function addCheckin() {
     if (!selected) return;
+    if (!checkinForm.wallet_address) return setErr("Wallet address is required.");
+    if (!ETH_ADDRESS_RE.test(checkinForm.wallet_address)) return setErr("Wallet must be a valid Ethereum address (0x + 40 hex).");
     setSaving(true); setErr(null);
     try {
       const r = await fetch(`/api/nft-sell/events/${selected.id}/checkins`, {
@@ -115,13 +119,6 @@ export default function EventsTab() {
     } finally { setTagging(false); }
   }
 
-  const Overlay = ({ children }: { children: React.ReactNode }) => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-        {children}
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -231,7 +228,7 @@ export default function EventsTab() {
       </div>
 
       {showCreate && (
-        <Overlay>
+        <Overlay size="md">
           <h2 className="text-base font-bold mb-4" style={{ color: "#24315f" }}>New Physical Event</h2>
           <div className="space-y-3">
             <div>
@@ -267,7 +264,7 @@ export default function EventsTab() {
       )}
 
       {showCheckin && (
-        <Overlay>
+        <Overlay size="md">
           <h2 className="text-base font-bold mb-4" style={{ color: "#24315f" }}>Register Check-In</h2>
           <div className="space-y-3">
             <div>

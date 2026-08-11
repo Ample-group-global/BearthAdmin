@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { ErrBanner, OkBanner } from "@/components/nft/Banner";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
+import Overlay from "@/components/nft/shared/Overlay";
+import { ETH_ADDRESS_RE } from "@/lib/nft-constants";
 
 interface Season {
   id: string;
@@ -105,6 +107,9 @@ export default function SeasonsTab() {
 
   async function issuePass() {
     if (!selected) return;
+    if (issueForm.wallet_address && !ETH_ADDRESS_RE.test(issueForm.wallet_address)) {
+      return setErr("Wallet address must be a valid Ethereum address (0x + 40 hex).");
+    }
     setSaving(true); setErr(null);
     try {
       const r = await fetch(`/api/nft-sell/seasons/${selected.id}/passes`, {
@@ -142,13 +147,6 @@ export default function SeasonsTab() {
     } finally { setSaving(false); }
   }
 
-  const Overlay = ({ children }: { children: React.ReactNode }) => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        {children}
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -315,7 +313,7 @@ export default function SeasonsTab() {
       {showIssue && (
         <Overlay>
           <h2 className="text-base font-bold mb-1" style={{ color: "#24315f" }}>Issue Season Pass</h2>
-          <p className="text-xs text-gray-400 mb-4">Mints an on-chain NFT pass and records in DB.</p>
+          <p className="text-xs text-gray-400 mb-4">Saved to DB only — on-chain minting was removed from the contract.</p>
           <div className="space-y-3">
             <div>
               <label style={labelStyle}>Customer ID (UUID)</label>

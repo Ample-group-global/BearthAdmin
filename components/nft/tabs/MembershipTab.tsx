@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ErrBanner, OkBanner } from "@/components/nft/Banner";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
+import Overlay from "@/components/nft/shared/Overlay";
 
 interface MembershipTier {
   id: string;
@@ -113,13 +114,6 @@ export default function MembershipTab() {
     } finally { setVerifying(false); }
   }
 
-  const Overlay = ({ children }: { children: React.ReactNode }) => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-        {children}
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -230,7 +224,7 @@ export default function MembershipTab() {
       </div>
 
       {showCreate && (
-        <Overlay>
+        <Overlay size="md">
           <h2 className="text-base font-bold mb-4" style={{ color: "#24315f" }}>{editing ? "Edit Tier" : "New Membership Tier"}</h2>
           <div className="space-y-3">
             <div>

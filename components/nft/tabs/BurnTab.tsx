@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { ErrBanner, OkBanner } from "@/components/nft/Banner";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
+import WarningBanner from "@/components/nft/shared/WarningBanner";
+import { ETH_ADDRESS_RE } from "@/lib/nft-constants";
+
+// Set to true only after BearthBreeding.sol is deployed and wired to the API
+const BREEDING_CONTRACT_DEPLOYED = false;
 
 interface BurnRatio {
   id: string;
@@ -90,10 +95,12 @@ export default function BurnTab() {
   }
 
   async function executeBurn() {
+    if (!BREEDING_CONTRACT_DEPLOYED) { setErr("BearthBreeding contract is not yet deployed. Burn execution is disabled."); return; }
     const ids = burnIds.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
     if (!ids.length || !recipientWallet) {
       setErr("Both NFT record IDs and recipient wallet are required"); return;
     }
+    if (!ETH_ADDRESS_RE.test(recipientWallet)) { setErr("Recipient wallet must be a valid Ethereum address (0x + 40 hex)."); return; }
     if (!confirm(`Burn ${ids.length} NFT(s) and mint 1 upgraded NFT to ${recipientWallet}?\n\nThis action is irreversible on-chain.`)) return;
 
     setExecuting(true); setErr(null);
@@ -184,30 +191,39 @@ export default function BurnTab() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-5" style={{ border: "1px solid #e5e7eb" }}>
-          <h2 className="text-sm font-bold mb-4" style={{ color: "#24315f" }}>Execute Burn &amp; Upgrade</h2>
+          <h2 className="text-sm font-bold mb-3" style={{ color: "#24315f" }}>Execute Burn &amp; Upgrade</h2>
+          <WarningBanner variant="error" className="mb-4">
+            <strong>BearthBreeding contract not yet deployed.</strong> Burn ratio management is available, but execution is disabled until the contract is deployed and <code>BREEDING_CONTRACT_DEPLOYED</code> is set to <code>true</code>.
+          </WarningBanner>
           <div className="space-y-3">
             <div>
               <label style={labelStyle}>NFT Record UUIDs to Burn (comma or newline)</label>
               <textarea value={burnIds}
                 onChange={e => { setBurnIds(e.target.value); setBurnPreview(null); }}
                 rows={4} placeholder="uuid1, uuid2, uuid3…"
-                style={{ ...inputStyle, resize: "vertical" }} />
+                style={{ ...inputStyle, resize: "vertical", opacity: BREEDING_CONTRACT_DEPLOYED ? 1 : 0.5 }}
+                disabled={!BREEDING_CONTRACT_DEPLOYED} />
             </div>
             <div>
               <label style={labelStyle}>Recipient Wallet (receives upgraded NFT)</label>
               <input type="text" value={recipientWallet}
                 onChange={e => { setRecipientWallet(e.target.value); setBurnPreview(null); }}
-                placeholder="0x..." style={inputStyle} />
+                placeholder="0x..." style={{ ...inputStyle, opacity: BREEDING_CONTRACT_DEPLOYED ? 1 : 0.5 }}
+                disabled={!BREEDING_CONTRACT_DEPLOYED} />
             </div>
             <div>
               <label style={labelStyle}>Output Rarity (upgraded NFT tier)</label>
-              <select value={outputRarity} onChange={e => setOutputRarity(Number(e.target.value))} style={inputStyle}>
+              <select value={outputRarity} onChange={e => setOutputRarity(Number(e.target.value))}
+                style={{ ...inputStyle, opacity: BREEDING_CONTRACT_DEPLOYED ? 1 : 0.5 }}
+                disabled={!BREEDING_CONTRACT_DEPLOYED}>
                 {OUTPUT_RARITY_OPTS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
             </div>
-            <button onClick={previewBurn} className="w-full py-2 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700">
+            <button onClick={previewBurn} disabled={!BREEDING_CONTRACT_DEPLOYED}
+              className="w-full py-2 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700"
+              style={{ opacity: BREEDING_CONTRACT_DEPLOYED ? 1 : 0.4, cursor: BREEDING_CONTRACT_DEPLOYED ? "pointer" : "not-allowed" }}>
               Preview
             </button>
             {burnPreview && (
@@ -215,9 +231,9 @@ export default function BurnTab() {
                 {burnPreview}
               </div>
             )}
-            <button onClick={executeBurn} disabled={executing}
+            <button onClick={executeBurn} disabled={executing || !BREEDING_CONTRACT_DEPLOYED}
               className="w-full py-2 rounded-xl text-sm font-bold text-white"
-              style={{ background: "#dc2626", opacity: executing ? 0.6 : 1 }}>
+              style={{ background: "#dc2626", opacity: (executing || !BREEDING_CONTRACT_DEPLOYED) ? 0.4 : 1, cursor: BREEDING_CONTRACT_DEPLOYED ? "pointer" : "not-allowed" }}>
               {executing ? "Executing on-chain…" : "🔥 Execute Burn & Upgrade"}
             </button>
           </div>

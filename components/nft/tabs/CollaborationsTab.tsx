@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { ErrBanner, OkBanner } from "@/components/nft/Banner";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
+import Overlay from "@/components/nft/shared/Overlay";
+import { ETH_ADDRESS_RE } from "@/lib/nft-constants";
 
 interface Collaboration {
   id: string;
@@ -61,6 +63,9 @@ export default function CollaborationsTab() {
   }
 
   async function createCollab() {
+    if (form.partner_contract_address && !ETH_ADDRESS_RE.test(form.partner_contract_address)) {
+      return setErr("Partner contract address must be a valid Ethereum address (0x + 40 hex).");
+    }
     setSaving(true); setErr(null);
     try {
       const r = await fetch("/api/nft-sell/collaborations", {
@@ -82,8 +87,11 @@ export default function CollaborationsTab() {
 
   async function importWallets() {
     if (!selected) return;
-    const walletList = importText.split(/[,\n\s]+/).map(s => s.trim()).filter(s => s.startsWith("0x"));
-    if (!walletList.length) { setErr("No valid wallet addresses found"); return; }
+    const walletList = importText.split(/[,\n\s]+/).map(s => s.trim()).filter(s => ETH_ADDRESS_RE.test(s));
+    const allParsed = importText.split(/[,\n\s]+/).map(s => s.trim()).filter(Boolean);
+    const invalidCount = allParsed.length - walletList.length;
+    if (!walletList.length) { setErr("No valid Ethereum wallet addresses found (must be 0x + 40 hex)."); return; }
+    if (invalidCount > 0) { setErr(`${invalidCount} invalid address(es) skipped — only ${walletList.length} valid address(es) will be imported. Fix and retry if needed.`); return; }
 
     setSaving(true); setErr(null);
     try {
@@ -125,13 +133,6 @@ export default function CollaborationsTab() {
     wallets:  collabs.reduce((sum, c) => sum + (c.wallet_count ?? 0), 0),
   };
 
-  const Overlay = ({ children }: { children: React.ReactNode }) => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        {children}
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -330,7 +331,7 @@ export default function CollaborationsTab() {
               rows={8} placeholder="0xAbc..., 0xDef..."
               style={{ ...inputStyle, resize: "vertical" }} />
             <p className="text-xs text-gray-400 mt-1">
-              Preview: {importText.split(/[,\n\s]+/).filter(s => s.startsWith("0x")).length} valid addresses
+              Preview: {importText.split(/[,\n\s]+/).map(s => s.trim()).filter(s => ETH_ADDRESS_RE.test(s)).length} valid addresses
             </p>
           </div>
           {err && <ErrBanner msg={err} onDismiss={() => setErr(null)} />}

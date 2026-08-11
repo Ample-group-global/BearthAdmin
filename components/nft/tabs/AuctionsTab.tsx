@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { ErrBanner, OkBanner } from "@/components/nft/Banner";
 import { StatusBadge } from "@/components/nft/StatusBadge";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
+import Overlay from "@/components/nft/shared/Overlay";
+import WarningBanner from "@/components/nft/shared/WarningBanner";
+import { ETH_ADDRESS_RE } from "@/lib/nft-constants";
 
 interface AuctionSession {
   id: string;
@@ -62,6 +65,9 @@ export default function AuctionsTab() {
   useEffect(() => { load(); }, []);
 
   async function create() {
+    if (form.platform === "bearth" && form.contract_address && !ETH_ADDRESS_RE.test(form.contract_address)) {
+      return setErr("BearthAuction contract address must be a valid Ethereum address (0x + 40 hex).");
+    }
     setSaving(true); setErr(null);
     try {
       const body: Record<string, unknown> = { auction_mode: form.auction_mode, platform: form.platform };
@@ -85,6 +91,9 @@ export default function AuctionsTab() {
 
   async function settle() {
     if (!showSettle) return;
+    if (settleForm.winner_wallet && !ETH_ADDRESS_RE.test(settleForm.winner_wallet)) {
+      return setErr("Winner wallet must be a valid Ethereum address (0x + 40 hex).");
+    }
     setSaving(true); setErr(null);
     try {
       const r = await fetch(`/api/nft-sell/auctions/${showSettle.id}/settle`, {
@@ -99,6 +108,9 @@ export default function AuctionsTab() {
 
   async function syncBid() {
     if (!showSyncBid) return;
+    if (syncForm.current_bidder && !ETH_ADDRESS_RE.test(syncForm.current_bidder)) {
+      return setErr("Bidder wallet must be a valid Ethereum address (0x + 40 hex).");
+    }
     setSaving(true); setErr(null);
     try {
       const r = await fetch(`/api/nft-sell/auctions/${showSyncBid.id}/sync-bid`, {
@@ -113,8 +125,12 @@ export default function AuctionsTab() {
 
   async function cancel(id: string) {
     if (!confirm("Cancel this auction session?")) return;
-    await fetch(`/api/nft-sell/auctions/${id}`, { method: "DELETE", credentials: "include" });
-    load();
+    try {
+      const r = await fetch(`/api/nft-sell/auctions/${id}`, { method: "DELETE", credentials: "include" });
+      const d = await r.json();
+      if (!r.ok) { setErr(d.error ?? "Failed to cancel auction"); return; }
+      setOk("Auction cancelled"); load();
+    } catch { setErr("Network error cancelling auction."); }
   }
 
   const stats = {
@@ -123,11 +139,6 @@ export default function AuctionsTab() {
     settled: auctions.filter(a => a.status === "settled").length,
   };
 
-  const Overlay = ({ children }: { children: React.ReactNode }) => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">{children}</div>
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -220,6 +231,11 @@ export default function AuctionsTab() {
       {showCreate && (
         <Overlay>
           <h2 className="text-base font-bold mb-4" style={{ color: "#24315f" }}>New Auction Session</h2>
+          {form.platform === "bearth" && (
+            <WarningBanner variant="warn" className="mb-4">
+              <strong>BearthAuction.sol is not yet deployed.</strong> Selecting Bearth platform creates a DB-only tracking record — no on-chain auction contract will be activated until the contract is deployed.
+            </WarningBanner>
+          )}
           <div className="space-y-3">
             <div><label style={labelStyle}>Mode</label>
               <select value={form.auction_mode} onChange={e => setForm(f => ({ ...f, auction_mode: e.target.value }))} style={inputStyle}>

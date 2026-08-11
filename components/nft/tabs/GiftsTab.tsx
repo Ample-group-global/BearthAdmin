@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { ErrBanner, OkBanner } from "@/components/nft/Banner";
 import { StatusBadge } from "@/components/nft/StatusBadge";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
+import Overlay from "@/components/nft/shared/Overlay";
+import { ETH_ADDRESS_RE } from "@/lib/nft-constants";
 
 interface GiftOrder {
   id: string;
@@ -76,6 +78,8 @@ export default function GiftsTab() {
 
   async function createGift() {
     if (!createForm.recipient_wallet) return setErr("Recipient wallet is required.");
+    if (!ETH_ADDRESS_RE.test(createForm.recipient_wallet)) return setErr("Recipient wallet must be a valid Ethereum address (0x + 40 hex).");
+    if (createForm.sender_wallet && !ETH_ADDRESS_RE.test(createForm.sender_wallet)) return setErr("Sender wallet must be a valid Ethereum address (0x + 40 hex).");
     setSaving(true); setErr(null);
     try {
       const body: Record<string, unknown> = { recipient_wallet: createForm.recipient_wallet, is_airdrop: createForm.is_airdrop };
@@ -105,6 +109,8 @@ export default function GiftsTab() {
   async function batchAirdrop() {
     const wallets = airdropWallets.split(/[\n,]+/).map(w => w.trim()).filter(w => w.length > 0);
     if (wallets.length === 0) return setErr("At least one recipient wallet is required.");
+    const invalid = wallets.filter(w => !ETH_ADDRESS_RE.test(w));
+    if (invalid.length > 0) return setErr(`Invalid wallet address(es): ${invalid.slice(0, 3).join(", ")}${invalid.length > 3 ? ` (+${invalid.length - 3} more)` : ""}.`);
     setAirdropLoading(true); setErr(null);
     try {
       const body: Record<string, unknown> = { recipient_wallets: wallets };
@@ -137,8 +143,12 @@ export default function GiftsTab() {
 
   async function cancel(id: string) {
     if (!confirm("Cancel this gift order?")) return;
-    await fetch(`/api/nft-sell/gifts/${id}`, { method: "DELETE", credentials: "include" });
-    setOk("Gift order cancelled"); load();
+    try {
+      const r = await fetch(`/api/nft-sell/gifts/${id}`, { method: "DELETE", credentials: "include" });
+      const d = await r.json();
+      if (!r.ok) { setErr(d.error ?? "Failed to cancel gift"); return; }
+      setOk("Gift order cancelled"); load();
+    } catch { setErr("Network error cancelling gift."); }
   }
 
   const filteredGifts = subTab === "airdrop" ? gifts.filter(g => g.is_airdrop) : gifts.filter(g => !g.is_airdrop);
@@ -149,11 +159,6 @@ export default function GiftsTab() {
   };
   const airdropWalletCount = airdropWallets.split(/[\n,]+/).map(w => w.trim()).filter(Boolean).length;
 
-  const Overlay = ({ children }: { children: React.ReactNode }) => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">{children}</div>
-    </div>
-  );
 
   return (
     <div className="space-y-6">

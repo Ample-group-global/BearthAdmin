@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { ErrBanner, OkBanner } from "@/components/nft/Banner";
 import { StatusBadge } from "@/components/nft/StatusBadge";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
+import Overlay from "@/components/nft/shared/Overlay";
+import { ETH_ADDRESS_RE } from "@/lib/nft-constants";
 
 interface BulkOrder {
   id: string;
@@ -84,6 +86,7 @@ export default function BulkTab() {
   async function create() {
     if (!createForm.company_name) return setErr("Company name is required.");
     if (!createForm.buyer_wallet) return setErr("Buyer wallet is required.");
+    if (!ETH_ADDRESS_RE.test(createForm.buyer_wallet)) return setErr("Buyer wallet must be a valid Ethereum address (0x + 40 hex).");
     const qty = parseInt(createForm.quantity);
     if (isNaN(qty) || qty < 2) return setErr("Quantity must be at least 2.");
     setSaving(true); setErr(null);
@@ -127,8 +130,12 @@ export default function BulkTab() {
 
   async function cancel(id: string) {
     if (!confirm("Cancel this bulk order?")) return;
-    await fetch(`/api/nft-sell/bulk/${id}`, { method: "DELETE", credentials: "include" });
-    setOk("Bulk order cancelled"); load();
+    try {
+      const r = await fetch(`/api/nft-sell/bulk/${id}`, { method: "DELETE", credentials: "include" });
+      const d = await r.json();
+      if (!r.ok) { setErr(d.error ?? "Failed to cancel bulk order"); return; }
+      setOk("Bulk order cancelled"); load();
+    } catch { setErr("Network error cancelling bulk order."); }
   }
 
   const stats = {
@@ -138,11 +145,6 @@ export default function BulkTab() {
   };
   const autoTotal = computeTotals(createForm);
 
-  const Overlay = ({ children }: { children: React.ReactNode }) => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">{children}</div>
-    </div>
-  );
 
   return (
     <div className="space-y-6">
