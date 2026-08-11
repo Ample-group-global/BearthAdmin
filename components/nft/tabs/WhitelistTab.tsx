@@ -419,24 +419,22 @@ export default function WhitelistTab() {
               <h3 className="text-sm font-semibold" style={{ color: "#24315f" }}>Export Whitelist</h3>
               <p className="text-sm" style={{ color: "#9bafc5" }}>{addresses.length} addresses available to export</p>
               <div className="flex flex-wrap gap-3">
-                {(["csv", "json", "txt"] as const).map((fmt) => (
-                  <button key={fmt} onClick={() => handleExport(fmt)}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
-                    style={{ background: "white", border: "1px solid #e5e7eb", color: "#374151" }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = "#41afeb";
-                      (e.currentTarget as HTMLButtonElement).style.background = "rgba(65,175,235,0.06)";
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = "#e5e7eb";
-                      (e.currentTarget as HTMLButtonElement).style.background = "white";
-                    }}>
-                    <svg className="w-4 h-4" style={{ color: "#41afeb" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Download .{fmt.toUpperCase()}
-                  </button>
-                ))}
+                <button onClick={() => handleExport("csv")}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                  style={{ background: "white", border: "1px solid #e5e7eb", color: "#374151" }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = "#41afeb";
+                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(65,175,235,0.06)";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = "#e5e7eb";
+                    (e.currentTarget as HTMLButtonElement).style.background = "white";
+                  }}>
+                  <svg className="w-4 h-4" style={{ color: "#41afeb" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download .CSV
+                </button>
               </div>
             </div>
           )}
