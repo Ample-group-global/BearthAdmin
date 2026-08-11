@@ -30,7 +30,7 @@ import { test, expect } from '@playwright/test';
 import { isLocked, isPreviousLocked, lockPhase, PhaseId } from '../helpers/phase-lock';
 
 const PHASE_ID: PhaseId = 'phase-04';
-const TREASURY_WALLET = '0x8b98f7EC8Fb6D77C480Af7c98980353c33753EF4';
+const TREASURY_WALLET = '0x1121b0e2E7Fd3Edd0394B11BF431CB012B491870';
 
 test.describe.configure({ mode: 'serial' });
 

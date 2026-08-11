@@ -31,7 +31,7 @@ dotenvConfig({ path: path.join(process.cwd(), 'tests', '.env.test') });
 const PHASE_ID: PhaseId = 'phase-02.5';
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const CONTRACT_ADDRESS = '0x52eC59B0e6c381477B134e1b2c9F84bd7c328bE5';
+const CONTRACT_ADDRESS = '0x2096304986C63C5D5a7Dd8D83201D8015Fb19E28';
 const RPC_URL          = process.env.SEPOLIA_RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com';
 const BEARTH_API_URL   = 'http://localhost:8000';
 
