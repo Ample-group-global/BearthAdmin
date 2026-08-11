@@ -271,7 +271,7 @@ test.describe('Phase 6 — Dashboard (/dashboard)', () => {
 
     // The three quick action links from dashboard/page.tsx:
     // "Wave Management" → /nft/waves
-    // "Contract Operations" → /nft/selling
+    // "Contract Operations" → /nft/contractoperation
     // "NFT Records" → /nft/nftlist
     const waveLink = page.getByText('Wave Management', { exact: false });
     await expect(waveLink.first()).toBeVisible();

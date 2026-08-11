@@ -282,7 +282,7 @@ export default function DashboardPage() {
             <h2 className="text-sm font-semibold text-slate-700 mb-3">Quick Actions</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <QuickLink href="/nft/waves"   label="Wave Management"     desc="Schedule, pricing, reveal, whitelist"        color="bg-blue-600" />
-              <QuickLink href="/nft/selling" label="Contract Operations"  desc="Phase, royalty, SBT, membership, advanced"   color="bg-slate-700" />
+              <QuickLink href="/nft/contractoperation" label="Contract Operations"  desc="Phase, royalty, SBT, membership, advanced"   color="bg-slate-700" />
               <QuickLink href="/nft/nftlist" label="NFT Lists"             desc="Ownership, mint type, reveal status, sales"  color="bg-violet-600" />
             </div>
           </div>

@@ -1,11 +1,11 @@
 /**
- * PHASE 5 — Contract Operations Page (/nft/selling)
+ * PHASE 5 — Contract Operations Page (/nft/contractoperation)
  *
  * Purpose: Verify the Contract Operations page (NFT Selling) loads correctly,
  * all 6 tabs are accessible, key sections show expected UI elements, and
  * read-only data is displayed properly.
  *
- * Page: /nft/selling
+ * Page: /nft/contractoperation
  * Tabs (exact names from selling/page.tsx):
  *   1. Mint Operations
  *   2. Admin Sales
@@ -43,7 +43,7 @@ const PHASE_ID: PhaseId = 'phase-05';
 
 test.describe.configure({ mode: 'serial' });
 
-test.describe('Phase 5 — Contract Operations (/nft/selling)', () => {
+test.describe('Phase 5 — Contract Operations (/nft/contractoperation)', () => {
   let failCount = 0;
 
   test.beforeEach(async ({}, testInfo) => {
@@ -71,24 +71,24 @@ test.describe('Phase 5 — Contract Operations (/nft/selling)', () => {
   });
 
   // ─── P5-01: Page loads without error ─────────────────────────────────────
-  test('P5-01: /nft/selling page loads without error', async ({ page }) => {
+  test('P5-01: /nft/contractoperation page loads without error', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/nft/selling');
+    await page.goto('/nft/contractoperation');
     await page.waitForLoadState('networkidle');
 
     const body = await page.textContent('body') ?? '';
-    // Title is "NFT Selling" per the page h1
-    expect(body).toMatch(/NFT Selling/i);
+    // Title is "Contract Operations" per the page h1
+    expect(body).toMatch(/Contract Operations/i);
     // No fatal error state
     expect(body).not.toMatch(/unable to load|network error|failed to load collection/i);
 
-    console.log('P5-01: /nft/selling loaded ✓');
+    console.log('P5-01: /nft/contractoperation loaded ✓');
   });
 
   // ─── P5-02: Stats strip shows expected stat cards ─────────────────────────
   test('P5-02: Stats strip shows Phase, Minted, Progress, Revealed, Max/Wallet', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/nft/selling');
+    await page.goto('/nft/contractoperation');
     await page.waitForLoadState('networkidle');
 
     // The stats strip renders 5 cards when onChain data is available:
@@ -107,7 +107,7 @@ test.describe('Phase 5 — Contract Operations (/nft/selling)', () => {
   // ─── P5-03: All 6 tabs are clickable ─────────────────────────────────────
   test('P5-03: All 6 tabs are present and clickable', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/nft/selling');
+    await page.goto('/nft/contractoperation');
     await page.waitForLoadState('networkidle');
 
     // Tab names from TABS constant in selling/page.tsx:
@@ -136,7 +136,7 @@ test.describe('Phase 5 — Contract Operations (/nft/selling)', () => {
   // ─── P5-04: Mint Operations tab — VIP Management section ─────────────────
   test('P5-04: Mint Operations tab — VIP Management section and wallet input visible', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/nft/selling');
+    await page.goto('/nft/contractoperation');
     await page.waitForLoadState('networkidle');
 
     // The Mint Operations tab is the default — no click needed
@@ -158,7 +158,7 @@ test.describe('Phase 5 — Contract Operations (/nft/selling)', () => {
   // ─── P5-05: Purchase Limits section visible ───────────────────────────────
   test('P5-05: Mint Operations tab — Purchase Limits section with toggle visible', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/nft/selling');
+    await page.goto('/nft/contractoperation');
     await page.waitForLoadState('networkidle');
 
     // Purchase Limits section
@@ -176,7 +176,7 @@ test.describe('Phase 5 — Contract Operations (/nft/selling)', () => {
   // ─── P5-06: Admin Mint section visible ───────────────────────────────────
   test('P5-06: Mint Operations tab — Admin Mint section with recipient + quantity inputs', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/nft/selling');
+    await page.goto('/nft/contractoperation');
     await page.waitForLoadState('networkidle');
 
     // Admin Mint section heading
@@ -201,7 +201,7 @@ test.describe('Phase 5 — Contract Operations (/nft/selling)', () => {
   // ─── P5-07: Admin Sales tab — Record Admin Sale form visible ─────────────
   test('P5-07: Admin Sales tab — Record Admin Sale form with required fields visible', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/nft/selling');
+    await page.goto('/nft/contractoperation');
     await page.waitForLoadState('networkidle');
 
     // Switch to Admin Sales tab
@@ -234,7 +234,7 @@ test.describe('Phase 5 — Contract Operations (/nft/selling)', () => {
   // ─── P5-08: Collection & Controls tab — Reveal Collection section ─────────
   test('P5-08: Collection & Controls tab — Reveal Collection section shows current state', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/nft/selling');
+    await page.goto('/nft/contractoperation');
     await page.waitForLoadState('networkidle');
 
     // Switch to Collection & Controls tab
@@ -257,7 +257,7 @@ test.describe('Phase 5 — Contract Operations (/nft/selling)', () => {
   // ─── P5-09: Treasury Wallet section ──────────────────────────────────────
   test('P5-09: Collection & Controls tab — Treasury Wallet section is visible', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/nft/selling');
+    await page.goto('/nft/contractoperation');
     await page.waitForLoadState('networkidle');
 
     const ccTab = page.locator('button').filter({ hasText: 'Collection & Controls' }).first();
@@ -278,7 +278,7 @@ test.describe('Phase 5 — Contract Operations (/nft/selling)', () => {
   // ─── P5-10: Emergency Controls — Pause + Withdraw buttons visible (NOT clicked) ──
   test('P5-10: Collection & Controls tab — Emergency Controls buttons visible (not triggered)', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/nft/selling');
+    await page.goto('/nft/contractoperation');
     await page.waitForLoadState('networkidle');
 
     const ccTab = page.locator('button').filter({ hasText: 'Collection & Controls' }).first();
@@ -307,7 +307,7 @@ test.describe('Phase 5 — Contract Operations (/nft/selling)', () => {
   // ─── P5-11: Contract Events section renders ───────────────────────────────
   test('P5-11: Collection & Controls tab — Contract Events section renders', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/nft/selling');
+    await page.goto('/nft/contractoperation');
     await page.waitForLoadState('networkidle');
 
     const ccTab = page.locator('button').filter({ hasText: 'Collection & Controls' }).first();
@@ -329,7 +329,7 @@ test.describe('Phase 5 — Contract Operations (/nft/selling)', () => {
   // ─── P5-12: Royalty tab renders ───────────────────────────────────────────
   test('P5-12: Royalty tab renders without error', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/nft/selling');
+    await page.goto('/nft/contractoperation');
     await page.waitForLoadState('networkidle');
 
     const royaltyTab = page.locator('button').filter({ hasText: 'Royalty' }).first();
@@ -349,7 +349,7 @@ test.describe('Phase 5 — Contract Operations (/nft/selling)', () => {
   // ─── P5-13: Membership tab renders ───────────────────────────────────────
   test('P5-13: Membership tab renders without error', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/nft/selling');
+    await page.goto('/nft/contractoperation');
     await page.waitForLoadState('networkidle');
 
     const membershipTab = page.locator('button').filter({ hasText: 'Membership' }).first();
@@ -367,7 +367,7 @@ test.describe('Phase 5 — Contract Operations (/nft/selling)', () => {
   // ─── P5-14: Collection stats API returns valid data ───────────────────────
   test('P5-14: /api/nft-sell/collection returns valid config and onChain data', async ({ page }) => {
     test.setTimeout(30_000);
-    await page.goto('/nft/selling');
+    await page.goto('/nft/contractoperation');
     await page.waitForLoadState('networkidle');
 
     const res = await page.request.get('/api/nft-sell/collection');
