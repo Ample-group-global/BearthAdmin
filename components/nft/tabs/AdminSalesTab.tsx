@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Toggle } from "@/components/nft/Toggle";
 import { ErrBanner, TxBanner } from "@/components/nft/Banner";
 import { labelStyle, inputStyle, thStyle, tdStyle } from "@/components/nft/styles";
+import { ETH_ADDRESS_RE } from "@/lib/nft-constants";
 
 export interface SaleMode { code: string; label: string; category: string; }
 export interface Currency  { code: string; label: string; symbol: string; }
@@ -74,8 +75,9 @@ export default function AdminSalesTab({ saleModes, currencies }: Props) {
 
   const handleCreateSale = async () => {
     const qty = parseInt(saleForm.quantity, 10);
-    if (!saleForm.buyerAddress) { setOpError("Buyer address required."); return; }
-    if (!qty || qty < 1)        { setOpError("Quantity must be >= 1."); return; }
+    if (!saleForm.buyerAddress)                         { setOpError("Buyer address required."); return; }
+    if (!ETH_ADDRESS_RE.test(saleForm.buyerAddress))   { setOpError("Enter a valid Ethereum address (0x + 40 hex)."); return; }
+    if (!qty || qty < 1)                               { setOpError("Quantity must be >= 1."); return; }
     setSaving("sale"); setOpError(null); setSaleResult(null);
     try {
       const res = await fetch("/api/nft-sell/admin-sales", {

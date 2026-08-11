@@ -5,7 +5,7 @@ import { SectionCard } from "@/components/nft/SectionCard";
 import { Toggle } from "@/components/nft/Toggle";
 import { TxBanner, ErrBanner, OkBanner } from "@/components/nft/Banner";
 import { labelStyle, inputStyle } from "@/components/nft/styles";
-import { PHASE_NAMES, PHASE_COLORS, MERKLE_ROOT_RE } from "@/lib/nft-constants";
+import { PHASE_NAMES, PHASE_COLORS, MERKLE_ROOT_RE, ETH_ADDRESS_RE } from "@/lib/nft-constants";
 
 export interface OnChainInfo {
   currentPhase: number;
@@ -41,7 +41,7 @@ interface Props {
   onRefresh: () => Promise<void>;
 }
 
-const ETH_ADDR_RE = /^0x[a-fA-F0-9]{40}$/;
+
 
 function GroupLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -105,7 +105,7 @@ export default function MintOperationsTab({ onChain, config, onRefresh }: Props)
     }));
 
   const handleSetVIP = () => {
-    if (!ETH_ADDR_RE.test(vipAddress)) { setOpError("Enter a valid Ethereum address (0x + 40 hex)."); return; }
+    if (!ETH_ADDRESS_RE.test(vipAddress)) { setOpError("Enter a valid Ethereum address (0x + 40 hex)."); return; }
     doOp("vip", () => fetch(`/api/nft-sell/customers/${vipAddress}/vip`, {
       method: "PUT", credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -114,7 +114,7 @@ export default function MintOperationsTab({ onChain, config, onRefresh }: Props)
   };
 
   const handleBlockAccount = () => {
-    if (!ETH_ADDR_RE.test(blockAddress)) { setOpError("Enter a valid Ethereum address (0x + 40 hex)."); return; }
+    if (!ETH_ADDRESS_RE.test(blockAddress)) { setOpError("Enter a valid Ethereum address (0x + 40 hex)."); return; }
     const endpoint = blockAction ? "block-account" : "unblock-account";
     doOp("block", () => fetch(`/api/nft-sell/customers/${blockAddress}/${endpoint}`, {
       method: "POST", credentials: "include",
@@ -136,7 +136,7 @@ export default function MintOperationsTab({ onChain, config, onRefresh }: Props)
     }));
 
   const handleReserveMint = () => {
-    if (!ETH_ADDR_RE.test(mintTo)) { setOpError("Valid 0x wallet address required."); return; }
+    if (!ETH_ADDRESS_RE.test(mintTo)) { setOpError("Valid 0x wallet address required."); return; }
     const qty = parseInt(mintQty, 10);
     if (!qty || qty < 1) { setOpError("Quantity must be >= 1."); return; }
     doOp("admin-mint", () => fetch("/api/nft-sell/collection/admin-mint", {

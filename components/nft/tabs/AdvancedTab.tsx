@@ -6,8 +6,7 @@ import { ethers } from "ethers";
 import { useChain } from "@/lib/ChainContext";
 import BearthNFTArtifact from "@/lib/BearthGenesisNFT.abi.json";
 import { ipfsToGateway } from "@/lib/ipfs";
-
-const ETH_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
+import { ETH_ADDRESS_RE } from "@/lib/nft-constants";
 
 interface TxState { pending: boolean; hash: string; error: string; success: string; }
 const TX0: TxState = { pending: false, hash: "", error: "", success: "" };
@@ -109,8 +108,8 @@ export default function AdvancedTab() {
   const handleEmergencyTransfer = () => {
     const tid = Number(emergencyTokenId);
     if (!tid || tid < 1) { setTxEmergency({ ...TX0, error: "Valid token ID required." }); return; }
-    if (!ETH_ADDR_RE.test(emergencyFrom.trim())) { setTxEmergency({ ...TX0, error: "Valid 'from' address required." }); return; }
-    if (!ETH_ADDR_RE.test(emergencyTo.trim())) { setTxEmergency({ ...TX0, error: "Valid 'to' address required." }); return; }
+    if (!ETH_ADDRESS_RE.test(emergencyFrom.trim())) { setTxEmergency({ ...TX0, error: "Valid 'from' address required." }); return; }
+    if (!ETH_ADDRESS_RE.test(emergencyTo.trim())) { setTxEmergency({ ...TX0, error: "Valid 'to' address required." }); return; }
     if (!emergencyReason.trim()) { setTxEmergency({ ...TX0, error: "Reason is required." }); return; }
     contract && exec(setTxEmergency,
       contract.emergencyTransfer(BigInt(tid), emergencyFrom.trim(), emergencyTo.trim(), emergencyReason.trim()),

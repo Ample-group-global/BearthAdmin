@@ -7,6 +7,7 @@ import { ErrBanner } from "@/components/nft/Banner";
 import WhitelistTab from "@/components/nft/tabs/WhitelistTab";
 import PacksTab from "@/components/nft/tabs/PacksTab";
 import CollaborationsTab from "@/components/nft/tabs/CollaborationsTab";
+import MarketNote from "@/components/nft/shared/MarketNote";
 import RevealModal from "./components/WaveRevealModal";
 import TreasuryMoveModal from "./components/TreasuryMoveModal";
 import RevealScheduleEditModal from "./components/RevealScheduleEditModal";
@@ -358,7 +359,7 @@ export default function WavesPage() {
           </p>
         </div>
         <button
-          onClick={activeTab === "waves" ? () => { loadWaves(); loadRevealData(); } : undefined}
+          onClick={() => { loadWaves(); loadRevealData(); }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
           style={{ border: "1px solid #e5e7eb", color: "#6b7280", background: "white" }}>
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -370,10 +371,10 @@ export default function WavesPage() {
       <div className="ba-tabs" style={{ borderBottom: "1px solid #e5e7eb" }}>
         <div className="flex gap-0">
           {([
-            { key: "waves", label: "Waves" },
-            { key: "whitelist", label: "Whitelist" },
-            { key: "packs", label: "Mystery Packs" },
-            { key: "collaborations", label: "Collaborations" },
+            { key: "waves",          label: "Waves",          market: "primary" },
+            { key: "whitelist",      label: "Whitelist",      market: "primary" },
+            { key: "packs",          label: "Mystery Packs",  market: "primary" },
+            { key: "collaborations", label: "Collaborations", market: "both" },
           ] as const).map(tab => (
             <button
               key={tab.key}
@@ -381,6 +382,7 @@ export default function WavesPage() {
               className="flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors"
               style={activeTab === tab.key ? TAB_STYLE_ACTIVE : TAB_STYLE_INACTIVE}>
               {tab.label}
+              <MarketNote market={tab.market} />
             </button>
           ))}
         </div>

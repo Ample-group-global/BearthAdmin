@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { TxBanner, ErrBanner, OkBanner } from "@/components/nft/Banner";
 import { SectionCard } from "@/components/nft/SectionCard";
 import { labelStyle, inputStyle } from "@/components/nft/styles";
+import { ETH_ADDRESS_RE } from "@/lib/nft-constants";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,6 @@ type Tab = "eth-airdrop" | "erc20-airdrop" | "nft-airdrop" | "gift-orders";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const ETH_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
 function parseAddressList(raw: string): string[] {
   return raw
@@ -187,7 +187,7 @@ export default function GiftsPage() {
   const handleEthAirdrop = async () => {
     const recipients = parseAddressList(ethRecipients);
     if (!recipients.length) { setOpErr("Enter at least one recipient address."); return; }
-    const invalid = recipients.filter(a => !ETH_ADDR_RE.test(a));
+    const invalid = recipients.filter(a => !ETH_ADDRESS_RE.test(a));
     if (invalid.length) { setOpErr(`Invalid address(es): ${invalid.slice(0, 3).join(", ")}`); return; }
 
     if (ethMode === "variable") {
@@ -214,10 +214,10 @@ export default function GiftsPage() {
   // ── ERC20 airdrop ──────────────────────────────────────────────────────────
 
   const handleErc20Airdrop = async () => {
-    if (!ETH_ADDR_RE.test(erc20Token)) { setOpErr("Valid ERC20 token address required."); return; }
+    if (!ETH_ADDRESS_RE.test(erc20Token)) { setOpErr("Valid ERC20 token address required."); return; }
     const recipients = parseAddressList(erc20Recipients);
     if (!recipients.length) { setOpErr("Enter at least one recipient address."); return; }
-    const invalid = recipients.filter(a => !ETH_ADDR_RE.test(a));
+    const invalid = recipients.filter(a => !ETH_ADDRESS_RE.test(a));
     if (invalid.length) { setOpErr(`Invalid address(es): ${invalid.slice(0, 3).join(", ")}`); return; }
 
     if (erc20Mode === "variable") {
@@ -243,14 +243,14 @@ export default function GiftsPage() {
   // ── NFT airdrop ────────────────────────────────────────────────────────────
 
   const handleNftAirdrop = async () => {
-    if (!ETH_ADDR_RE.test(nftToken)) { setOpErr("Valid NFT contract address required."); return; }
+    if (!ETH_ADDRESS_RE.test(nftToken)) { setOpErr("Valid NFT contract address required."); return; }
     const recipients = parseAddressList(nftRecipients);
     const tokenIds   = parseAddressList(nftTokenIds).map(Number);
     if (!recipients.length) { setOpErr("Enter at least one recipient address."); return; }
     if (tokenIds.length !== recipients.length) {
       setOpErr(`Token ID count must match recipient count (${recipients.length}).`); return;
     }
-    const invalid = recipients.filter(a => !ETH_ADDR_RE.test(a));
+    const invalid = recipients.filter(a => !ETH_ADDRESS_RE.test(a));
     if (invalid.length) { setOpErr(`Invalid address(es): ${invalid.slice(0, 3).join(", ")}`); return; }
     await doOp(() => fetch("/api/nft-sell/airdrop/nft", {
       method: "POST", credentials: "include",
@@ -262,7 +262,7 @@ export default function GiftsPage() {
   // ── Gift order handlers ────────────────────────────────────────────────────
 
   const handleCreateGift = async () => {
-    if (!ETH_ADDR_RE.test(giftWallet)) { setOpErr("Valid recipient wallet address required."); return; }
+    if (!ETH_ADDRESS_RE.test(giftWallet)) { setOpErr("Valid recipient wallet address required."); return; }
     const ok = await doOp(() => fetch("/api/nft-sell/gifts", {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -282,7 +282,7 @@ export default function GiftsPage() {
   const handleBatchGift = async () => {
     const wallets = parseAddressList(batchWallets);
     if (!wallets.length) { setOpErr("Enter at least one wallet address."); return; }
-    const invalid = wallets.filter(a => !ETH_ADDR_RE.test(a));
+    const invalid = wallets.filter(a => !ETH_ADDRESS_RE.test(a));
     if (invalid.length) { setOpErr(`Invalid address(es): ${invalid.slice(0, 3).join(", ")}`); return; }
     await doOp(() => fetch("/api/nft-sell/gifts/airdrop", {
       method: "POST", credentials: "include",

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { TxBanner, ErrBanner } from "@/components/nft/Banner";
 import { Toggle } from "@/components/nft/Toggle";
 import { labelStyle, inputStyle, thStyle } from "@/components/nft/styles";
+import { ETH_ADDRESS_RE } from "@/lib/nft-constants";
 
 interface RoyaltyConfig {
   royalty_pct_bps: number;
@@ -21,7 +22,7 @@ interface Marketplace {
   synced_at: string | null;
 }
 
-const ETH_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
+
 
 export default function RoyaltyTab() {
   const [royalty, setRoyalty]     = useState<RoyaltyConfig | null>(null);
@@ -78,7 +79,7 @@ export default function RoyaltyTab() {
     if (isNaN(pctNum) || pctNum < 0 || pctNum > 10) {
       setRoyaltyError("Royalty must be 0–10%."); setSavingRoyalty(false); return;
     }
-    if (!ETH_ADDR_RE.test(receiver)) {
+    if (!ETH_ADDRESS_RE.test(receiver)) {
       setRoyaltyError("Enter a valid Ethereum address (0x + 40 hex)."); setSavingRoyalty(false); return;
     }
     try {
@@ -111,7 +112,7 @@ export default function RoyaltyTab() {
 
   const handleSetTransferValidator = async () => {
     setSavingValidator(true); setValidatorError(null); setValidatorTx(null);
-    if (!ETH_ADDR_RE.test(validatorAddr)) {
+    if (!ETH_ADDRESS_RE.test(validatorAddr)) {
       setValidatorError("Enter a valid Ethereum address (0x + 40 hex)."); setSavingValidator(false); return;
     }
     try {
@@ -129,7 +130,7 @@ export default function RoyaltyTab() {
 
   const handleSaveMarketplace = async () => {
     setSavingMkt(true); setMktError(null); setMktTx(null);
-    if (!ETH_ADDR_RE.test(mktAddr)) {
+    if (!ETH_ADDRESS_RE.test(mktAddr)) {
       setMktError("Enter a valid Ethereum address (0x + 40 hex)."); setSavingMkt(false); return;
     }
     try {

@@ -13,6 +13,7 @@ import EventsTab from "@/components/nft/tabs/EventsTab";
 import BurnTab from "@/components/nft/tabs/BurnTab";
 import NftImage from "@/components/nft/NftImage";
 import WatchdogBanner from "@/components/nft/shared/WatchdogBanner";
+import MarketNote from "@/components/nft/shared/MarketNote";
 import TestnetResetConfirm from "./components/TestnetResetConfirm";
 import WaveRevealPanel from "./components/WaveRevealPanel";
 import NftFiltersRow from "./components/NftFiltersRow";
@@ -279,7 +280,7 @@ export default function NftPage() {
   const silentRecPoll = useCallback(async () => {
     try {
       const res = await fetch("/api/nft-sell/collection/stats", { credentials: "include" });
-      if (!res.ok) { const d = await res.json().catch(() => ({})); setSbtMsg(d.error ?? "SBT update failed"); return; }
+      if (!res.ok) return;
       const d = await res.json();
       setRecWatchUpdated(new Date());
       if (d.blindBoxImageUrl) setBlindBoxImageUrl(d.blindBoxImageUrl);
@@ -287,7 +288,7 @@ export default function NftPage() {
         setRecWatchAlert(`${d.totalMinted - prevRecMintedRef.current} new NFT${d.totalMinted - prevRecMintedRef.current > 1 ? "s" : ""} minted on-chain. Refresh records to see latest.`);
       }
       prevRecMintedRef.current = d.totalMinted ?? prevRecMintedRef.current;
-    } catch { setSbtMsg("Network error"); }
+    } catch { /* silent poll — do not surface network errors */ }
   }, []);
 
   useInterval(silentRecPoll, 30_000);
@@ -331,7 +332,7 @@ export default function NftPage() {
       setRevealMsg(`Wave ${waveFilter} revealed! Tx: ${String(d.txHash).slice(0, 12)}…`);
       fetch("/api/nft-sell/waves", { credentials: "include" })
         .then(r => r.json()).then(d2 => setWaves(d2.waves ?? [])).catch(() => { });
-      loadRecords(search, offset, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter);
+      loadRecords(search, offset, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter, rarityTierFilter);
     } catch { setRevealMsg("Network error during reveal"); }
     finally { setRevealing(false); }
   };
@@ -350,7 +351,7 @@ export default function NftPage() {
       const d = await res.json();
       if (!res.ok) { setSbtMsg(d.error ?? "SBT update failed"); console.groupEnd(); return; }
       setSbtMsg(`SBT ${enable ? "enabled" : "disabled"} — Tx: ${String(d.txHash).slice(0, 12)}…`);
-      loadRecords(search, offset, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter);
+      loadRecords(search, offset, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter, rarityTierFilter);
       setViewRecord(r => r ? { ...r, tokenSbt: enable } : null);
     } catch { setSbtMsg("Network error"); }
     finally { setSbtBusy(false); console.groupEnd(); }
@@ -757,7 +758,8 @@ export default function NftPage() {
       <div className="ba-tabs" style={{ borderBottom: "1px solid #e5e7eb" }}>
         <div className="flex gap-1">
           {(["nftlist", "otc", "bulk", "gifts", "auctions", "seasons", "events", "burn"] as const).map(tab => {
-            const LABELS: Record<string, string> = { records: "Records", otc: "OTC Deals", bulk: "Bulk Ops", gifts: "Gifts", auctions: "Auctions", seasons: "Season Passes", events: "Events", burn: "Burn to Mint" };
+            const LABELS:  Record<string, string>                           = { nftlist: "Records", otc: "OTC Deals", bulk: "Bulk Ops", gifts: "Gifts", auctions: "Auctions", seasons: "Season Passes", events: "Events", burn: "Burn to Mint" };
+            const MARKETS: Record<string, "primary" | "secondary" | "both"> = { nftlist: "both", otc: "primary", bulk: "primary", gifts: "primary", auctions: "both", seasons: "primary", events: "both", burn: "both" };
             const label = LABELS[tab] ?? tab;
             const isActive = activeTab === tab;
             return (
@@ -772,7 +774,10 @@ export default function NftPage() {
                   cursor: "pointer",
                   outline: "none",
                 }}>
-                {label}
+                <span className="flex items-center gap-1.5">
+                  {label}
+                  <MarketNote market={MARKETS[tab] ?? "both"} />
+                </span>
                 {isActive && (
                   <span style={{
                     position: "absolute", bottom: -1, left: 0, right: 0,

@@ -10,11 +10,19 @@ import CollectionControlsTab, { type ContractEvent }                   from "@/c
 import RoyaltyTab    from "@/components/nft/tabs/RoyaltyTab";
 import MembershipTab from "@/components/nft/tabs/MembershipTab";
 import AdvancedTab   from "@/components/nft/tabs/AdvancedTab";
+import MarketNote    from "@/components/nft/shared/MarketNote";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const TABS = ["Mint Operations", "Admin Sales", "Collection & Controls", "Royalty", "Membership", "Advanced"] as const;
-type Tab = typeof TABS[number];
+const TABS: { key: string; label: string; market: "primary" | "secondary" | "both" }[] = [
+  { key: "Mint Operations",       label: "Mint Operations",       market: "primary" },
+  { key: "Admin Sales",           label: "Admin Sales",           market: "primary" },
+  { key: "Collection & Controls", label: "Collection & Controls", market: "both" },
+  { key: "Royalty",               label: "Royalty",               market: "secondary" },
+  { key: "Membership",            label: "Membership",            market: "both" },
+  { key: "Advanced",              label: "Advanced",              market: "both" },
+];
+type Tab = "Mint Operations" | "Admin Sales" | "Collection & Controls" | "Royalty" | "Membership" | "Advanced";
 
 // ─── Page-level sub-components ────────────────────────────────────────────────
 
@@ -195,14 +203,17 @@ export default function ContractOperationPage() {
         {error && <ErrBanner msg={error} />}
 
         {/* Tabs */}
-        <div className="flex gap-1 border-b" style={{ borderColor: "#e5e7eb" }}>
+        <div className="flex gap-1 border-b flex-wrap" style={{ borderColor: "#e5e7eb" }}>
           {TABS.map(t => (
-            <button key={t} onClick={() => setTab(t)}
+            <button key={t.key} onClick={() => setTab(t.key as Tab)}
               className="px-4 py-2 text-xs font-semibold rounded-t-lg -mb-px transition-colors"
-              style={tab === t
+              style={tab === t.key
                 ? { background: "white", color: "#41afeb", border: "1px solid #e5e7eb", borderBottom: "1px solid white" }
                 : { color: "#9bafc5", border: "1px solid transparent" }}>
-              {t}
+              <span className="flex items-center gap-1.5">
+                {t.label}
+                <MarketNote market={t.market} />
+              </span>
             </button>
           ))}
         </div>
