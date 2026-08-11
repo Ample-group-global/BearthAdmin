@@ -252,34 +252,29 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
   return (
     <div className="setup-page">
 
-      {/* Session restore banner — shown when a previous collection is auto-loaded from DB */}
+      {/* Session restore banner — informational only; destructive reset is in the footer */}
       {sessionRestored && collectionId && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-          padding: '10px 16px', marginBottom: 16,
-          background: 'rgba(65,175,235,0.08)', border: '1px solid rgba(65,175,235,0.25)',
-          borderRadius: 10, fontSize: 13, color: '#2e9fd8',
+          padding: '9px 14px', marginBottom: 16,
+          background: 'rgba(65,175,235,0.07)', border: '1px solid rgba(65,175,235,0.22)',
+          borderRadius: 8, fontSize: 12.5, color: '#2e9fd8',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>↩</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
             <span>
-              <strong>Previous session resumed</strong> — your collection and layers are ready.
-              Go to the <strong>Organize</strong> tab to review your layers.
+              <strong>Previous session resumed.</strong> Your collection and layers are loaded — switch to the <strong>Organize</strong> tab to continue.
+              To start over, use <strong>Start a new collection</strong> below.
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            <button
-              className="link-btn"
-              style={{ fontSize: 12, color: '#2e9fd8', fontWeight: 600 }}
-              onClick={() => { onDismissRestore?.(); }}
-            >Dismiss</button>
-            <span style={{ color: 'rgba(65,175,235,0.4)' }}>·</span>
-            <button
-              className="link-btn"
-              style={{ fontSize: 12, color: '#ef4444', fontWeight: 600 }}
-              onClick={onReset}
-            >Start fresh</button>
-          </div>
+          <button
+            onClick={() => onDismissRestore?.()}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9bafc5', padding: '0 2px', fontSize: 16, lineHeight: 1, flexShrink: 0 }}
+            title="Dismiss"
+            aria-label="Dismiss session restore notice"
+          >×</button>
         </div>
       )}
 
@@ -452,8 +447,6 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
             ) : 'Save & Continue'}
           </button>
           <div className="setup-footer-links">
-            <button className="link-btn" onClick={onReset}>Reset collection</button>
-            <span className="link-sep">·</span>
             <button className="link-btn" onClick={onReset}>Start a new collection</button>
           </div>
         </div>
