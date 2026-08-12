@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
@@ -37,14 +37,19 @@ function waveState(w: WaveSchedule): "revealed" | "ready_reveal" | "reveal_sched
 }
 
 function deriveWaveDisplayStatus(w: Wave): string {
+  const now = Date.now();
   if (w.waveRevealed) return "revealed";
   if (w.waveClosed) {
-    const now = Date.now();
     if (w.revealScheduledAt && new Date(w.revealScheduledAt).getTime() <= now) return "ready_reveal";
     if (w.revealScheduledAt && new Date(w.revealScheduledAt).getTime() > now) return "reveal_scheduled";
     return "closed";
   }
-  if (w.status === "active" && w.scheduledEnd && new Date(w.scheduledEnd) < new Date()) return "ended";
+  if (w.status === "active" && w.scheduledEnd && new Date(w.scheduledEnd).getTime() < now) return "ended";
+  // Time-based fallback: scheduled_start passed but DB not yet updated (auto-trigger lag)
+  if (w.scheduledStart && new Date(w.scheduledStart).getTime() <= now) {
+    if (!w.scheduledEnd || new Date(w.scheduledEnd).getTime() > now) return "active";
+    return "ended";
+  }
   return w.status;
 }
 
@@ -125,7 +130,10 @@ export default function WavesPage() {
 
   const silentWavePoll = useCallback(async () => {
     try {
-      const res = await fetch("/api/nft-sell/waves", { credentials: "include" });
+      const [res, sr] = await Promise.all([
+        fetch("/api/nft-sell/waves", { credentials: "include" }),
+        fetch("/api/nft-sell/waves/schedule-status", { credentials: "include" }),
+      ]);
       if (!res.ok) return;
       const d = await res.json();
       const updated: Wave[] = d.waves ?? [];
@@ -141,12 +149,39 @@ export default function WavesPage() {
         setWaveWatchAlert(`${readyToReveal.length} wave${readyToReveal.length > 1 ? "s" : ""} ready to reveal: ${readyToReveal.map(w => `Wave ${w.waveNumber}`).join(", ")}`);
       }
 
-      // silently refresh wave list if data changed
+      // silently refresh wave list and progress stepper together
       setWaves(updated);
+      if (sr.ok) {
+        const sd = await sr.json();
+        setRevealWaves(sd.waves ?? []);
+      }
     } catch { /* silent */ }
   }, []);
 
   useInterval(silentWavePoll, 30_000);
+
+  // Precision event timer: fire silentWavePoll at the exact millisecond each
+  // scheduled event (start / end / reveal) arrives so the UI transitions
+  // immediately without waiting for the next 30-second poll tick.
+  useEffect(() => {
+    const now = Date.now();
+    const times: number[] = [];
+    for (const w of revealWaves) {
+      if (w.scheduled_start) times.push(new Date(w.scheduled_start).getTime());
+      if (w.scheduled_end)   times.push(new Date(w.scheduled_end).getTime());
+      if (w.reveal_scheduled_at) times.push(new Date(w.reveal_scheduled_at).getTime());
+    }
+    for (const w of waves) {
+      if (w.scheduledStart)    times.push(new Date(w.scheduledStart).getTime());
+      if (w.scheduledEnd)      times.push(new Date(w.scheduledEnd).getTime());
+      if (w.revealScheduledAt) times.push(new Date(w.revealScheduledAt).getTime());
+    }
+    const upcoming = times.filter(t => t > now);
+    if (upcoming.length === 0) return;
+    const next = Math.min(...upcoming);
+    const id = setTimeout(() => silentWavePoll(), next - now + 200);
+    return () => clearTimeout(id);
+  }, [revealWaves, waves, silentWavePoll]);
 
   useEffect(() => {
     loadWaves();
@@ -234,7 +269,7 @@ export default function WavesPage() {
         headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
       if (!res.ok) { const d = await res.json(); setSaveError(d.error ?? "Save failed."); return; }
-      setEditWave(null); loadWaves();
+      setEditWave(null); loadWaves(); loadRevealData();
     } catch { setSaveError("Network error."); }
     finally { setSaving(false); }
   };
