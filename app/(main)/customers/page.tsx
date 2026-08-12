@@ -2,7 +2,11 @@
 
 import { useEffect, useState, useRef } from "react";
 import DataTable, { type ColumnDef } from "@/components/DataTable";
-import CustomerReportTab from "@/components/customers/CustomerReportTab";
+import { useWhitelist } from "@/app/dashboard/whitelist/useWhitelist";
+import { useToast } from "@/app/dashboard/whitelist/useToast";
+import { ToastContainer } from "@/app/dashboard/whitelist/Toast";
+
+const ETH_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
 interface Customer {
   id: string;
@@ -47,7 +51,7 @@ function truncateAddress(addr: string) {
 }
 
 export default function CustomersPage() {
-  const [activeTab, setActiveTab] = useState<"customers" | "report">("customers");
+  const [activeTab, setActiveTab] = useState<"customers" | "wallets">("customers");
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [total, setTotal] = useState(0);
@@ -69,12 +73,151 @@ export default function CustomersPage() {
   const [modalMaximized, setModalMaximized] = useState(false);
   const [modalMinimized, setModalMinimized] = useState(false);
 
-  // Wallet modal
+  // Wallet modal (per-customer)
   const [walletCustomer, setWalletCustomer] = useState<Customer | null>(null);
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [walletsLoading, setWalletsLoading] = useState(false);
   const [walletsError, setWalletsError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Wallets tab (all customer wallets flat list)
+  interface AllWallet {
+    userId: string;
+    userCode: string;
+    fullName: string;
+    email: string;
+    walletId: string;
+    address: string;
+    isWhitelisted: boolean;
+    isBlocked: boolean;
+    isVip: boolean;
+    walletTotalMinted: number;
+    addedAt: string;
+  }
+  const [allWallets, setAllWallets] = useState<AllWallet[]>([]);
+  const [allWalletsLoading, setAllWalletsLoading] = useState(false);
+  const [allWalletsError, setAllWalletsError] = useState<string | null>(null);
+  const [walletSearch, setWalletSearch] = useState("");
+  const [walletCopiedId, setWalletCopiedId] = useState<string | null>(null);
+
+  // Whitelist integration (merged into Wallet Status tab)
+  const {
+    addresses: wlAddresses, stats: wlStats, isLoading: wlLoading,
+    addAddress, addAddressesBulk, removeAddress, exportWhitelist,
+    addAddressLoading, addAddressesLoading, removeAddressLoading,
+  } = useWhitelist();
+  const { toasts, showToast, removeToast } = useToast();
+  const [wlModal, setWlModal] = useState<null | "add" | "bulk">(null);
+  const [wlAddInput, setWlAddInput] = useState("");
+  const [wlBulkInput, setWlBulkInput] = useState("");
+  const [wlActionAddr, setWlActionAddr] = useState<string | null>(null);
+  const [vipActionAddr, setVipActionAddr] = useState<string | null>(null);
+  const [blockActionAddr, setBlockActionAddr] = useState<string | null>(null);
+
+  const loadAllWallets = () => {
+    setAllWalletsLoading(true);
+    setAllWalletsError(null);
+    fetch("/api/customers/wallet-status", { credentials: "include" })
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error ?? `Error ${r.status}`);
+        setAllWallets(d.wallets ?? []);
+      })
+      .catch((e: Error) => setAllWalletsError(e.message || "Failed to load wallet data."))
+      .finally(() => setAllWalletsLoading(false));
+  };
+
+  // Whitelist handlers
+  const handleWlAdd = async () => {
+    if (!ETH_ADDR_RE.test(wlAddInput.trim())) { showToast("Invalid ETH address", "error"); return; }
+    try {
+      await addAddress(wlAddInput.trim());
+      showToast("Address added to whitelist", "success");
+      setWlModal(null); setWlAddInput("");
+      loadAllWallets();
+    } catch (e: unknown) { showToast((e as Error).message || "Failed to add", "error"); }
+  };
+
+  const handleWlBulk = async () => {
+    const lines = wlBulkInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+    const invalid = lines.filter((a) => !ETH_ADDR_RE.test(a));
+    if (invalid.length) { showToast(`${invalid.length} invalid address${invalid.length > 1 ? "es" : ""}`, "error"); return; }
+    if (!lines.length) { showToast("No addresses to import", "warning"); return; }
+    try {
+      await addAddressesBulk(lines);
+      showToast(`${lines.length} address${lines.length > 1 ? "es" : ""} imported`, "success");
+      setWlModal(null); setWlBulkInput("");
+      loadAllWallets();
+    } catch (e: unknown) { showToast((e as Error).message || "Failed to import", "error"); }
+  };
+
+  const handleWlRemoveRow = async (address: string) => {
+    setWlActionAddr(address);
+    try {
+      await removeAddress(address);
+      showToast("Removed from whitelist", "success");
+      loadAllWallets();
+    } catch (e: unknown) { showToast((e as Error).message || "Remove failed", "error"); }
+    finally { setWlActionAddr(null); }
+  };
+
+  const handleWlAddRow = async (address: string) => {
+    setWlActionAddr(address);
+    try {
+      await addAddress(address);
+      showToast("Added to whitelist", "success");
+      loadAllWallets();
+    } catch (e: unknown) { showToast((e as Error).message || "Add failed", "error"); }
+    finally { setWlActionAddr(null); }
+  };
+
+  const handleExportWl = async (fmt: "csv" | "json" | "txt") => {
+    try {
+      const blob = await exportWhitelist(fmt);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `whitelist.${fmt}`; a.click();
+      URL.revokeObjectURL(url);
+    } catch { showToast("Export failed", "error"); }
+  };
+
+  const handleToggleVip = async (address: string, currentIsVip: boolean) => {
+    setVipActionAddr(address);
+    try {
+      const res = await fetch(`/api/nft-sell/customers/${address}/vip`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isVip: !currentIsVip }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "VIP update failed"); }
+      showToast(!currentIsVip ? "VIP granted successfully" : "VIP revoked successfully", "success");
+      loadAllWallets();
+    } catch (e: unknown) { showToast((e as Error).message || "VIP update failed", "error"); }
+    finally { setVipActionAddr(null); }
+  };
+
+  const handleToggleBlock = async (address: string, currentIsBlocked: boolean) => {
+    setBlockActionAddr(address);
+    try {
+      const method = currentIsBlocked ? "DELETE" : "POST";
+      const res = await fetch(`/api/wallets/${address}/block`, {
+        method,
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        ...(currentIsBlocked ? {} : { body: JSON.stringify({ onChain: true }) }),
+      });
+      const d = await res.json();
+      if (!res.ok && res.status !== 207) throw new Error(d.error || d.onChainError || "Block update failed");
+      if (res.status === 207) {
+        showToast(`DB ${currentIsBlocked ? "unblocked" : "blocked"} — on-chain failed: ${d.onChainError ?? "unknown"}`, "warning");
+      } else {
+        showToast(currentIsBlocked ? "Wallet unblocked on-chain" : "Wallet blocked on-chain", "success");
+      }
+      loadAllWallets();
+    } catch (e: unknown) { showToast((e as Error).message || "Block update failed", "error"); }
+    finally { setBlockActionAddr(null); }
+  };
 
   // Referrer dropdown
   const [referrers, setReferrers] = useState<Referrer[]>([]);
@@ -395,19 +538,243 @@ export default function CustomersPage() {
 
       {/* Tab bar */}
       <div className="flex border-b" style={{ borderColor: "#e5e7eb" }}>
-        {(["customers", "report"] as const).map((t) => (
-          <button key={t} onClick={() => setActiveTab(t)}
-            className="px-4 py-2.5 text-sm font-medium capitalize border-b-2 -mb-px transition-colors"
+        {(["customers", "wallets"] as const).map((t) => (
+          <button key={t}
+            onClick={() => {
+              setActiveTab(t);
+              if (t === "wallets" && allWallets.length === 0 && !allWalletsLoading) loadAllWallets();
+            }}
+            className="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors"
             style={{
               borderColor: activeTab === t ? "#41afeb" : "transparent",
               color: activeTab === t ? "#41afeb" : "#9bafc5",
             }}>
-            {t === "customers" ? "Customers" : "Report"}
+            {t === "customers" ? "Customers" : "Wallet Status"}
           </button>
         ))}
       </div>
 
-      {activeTab === "report" && <CustomerReportTab />}
+      {activeTab === "wallets" && (() => {
+        const filtered = allWallets.filter((w) => {
+          const q = walletSearch.toLowerCase().trim();
+          if (!q) return true;
+          return (
+            w.fullName.toLowerCase().includes(q) ||
+            w.userCode.toLowerCase().includes(q) ||
+            w.address.toLowerCase().includes(q) ||
+            (w.email ?? "").toLowerCase().includes(q)
+          );
+        });
+        const wlCount = wlAddresses.length;
+        return (
+          <div className="space-y-4">
+            {/* ── Whitelist Stats Bar ── */}
+            <div className="grid grid-cols-2 gap-3" style={{ maxWidth: 480 }}>
+              {([
+                { label: "WL Addresses", value: wlLoading ? "…" : String(wlCount), color: "#41afeb" },
+                { label: "Last Updated", value: wlLoading ? "…" : (wlStats?.lastUpdated ? new Date(wlStats.lastUpdated).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"), color: "#6b7280" },
+              ] as { label: string; value: string; color: string; mono?: boolean }[]).map((s) => (
+                <div key={s.label} className="bg-white rounded-xl p-3.5 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
+                  <p className="text-xs" style={{ color: "#9bafc5" }}>{s.label}</p>
+                  <p className={`text-sm font-bold mt-0.5 truncate${s.mono ? " font-mono" : ""}`} style={{ color: s.color }} title={s.value}>{s.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* ── Action Buttons ── */}
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => { setWlModal("add"); setWlAddInput(""); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: "#41afeb" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#2e9fd8")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "#41afeb")}>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                Add Address
+              </button>
+              <button onClick={() => { setWlModal("bulk"); setWlBulkInput(""); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ border: "1px solid #e5e7eb", color: "#374151", background: "white" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#f9fafb")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "white")}>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                Bulk Import
+              </button>
+              <button onClick={() => handleExportWl("csv")}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ border: "1px solid #e5e7eb", color: "#374151", background: "white" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#f9fafb")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "white")}>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>
+                Export CSV
+              </button>
+            </div>
+
+            {/* ── Search + Refresh ── */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="relative flex-1 max-w-sm">
+                <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#9bafc5" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input type="text" placeholder="Search by name, wallet, email..." value={walletSearch}
+                  onChange={(e) => setWalletSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none bg-white"
+                  style={{ border: "1px solid #e5e7eb", color: "#111827" }} />
+              </div>
+              <button onClick={loadAllWallets} disabled={allWalletsLoading}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold"
+                style={{ border: "1px solid #e5e7eb", color: "#6b7280", background: "white" }}>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </button>
+              <span className="text-xs" style={{ color: "#9bafc5" }}>{filtered.length} wallet{filtered.length !== 1 ? "s" : ""}</span>
+            </div>
+
+            {allWalletsError && (
+              <div className="p-3 rounded-lg text-sm" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>{allWalletsError}</div>
+            )}
+
+            {allWalletsLoading ? (
+              <div className="flex items-center justify-center h-40" style={{ color: "#9bafc5" }}>
+                <svg className="w-4 h-4 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Loading wallets…
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-16 text-sm" style={{ color: "#9bafc5" }}>
+                {walletSearch ? "No wallets match your search." : "No customer wallets found."}
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm overflow-x-auto" style={{ border: "1px solid #e5e7eb" }}>
+                <table className="w-full text-sm min-w-max">
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid #f3f4f6", background: "#fafafa" }}>
+                      {["Customer", "Code", "Wallet Address", "Whitelisted", "Blocked", "VIP", "Minted", "Added", "WL Action"].map((h) => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "#9bafc5" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((w) => (
+                      <tr key={w.walletId} className="transition-colors" style={{ borderBottom: "1px solid #f9fafb" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "#f9fafb")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="font-medium" style={{ color: "#111827" }}>{w.fullName || "—"}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="font-mono text-xs font-semibold" style={{ color: "#41afeb" }}>{w.userCode}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs" style={{ color: "#24315f" }} title={w.address}>
+                              {w.address.slice(0, 8)}…{w.address.slice(-6)}
+                            </span>
+                            <button
+                              onClick={() => { navigator.clipboard?.writeText(w.address); setWalletCopiedId(w.walletId); setTimeout(() => setWalletCopiedId(null), 2000); }}
+                              className="flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium transition-colors"
+                              style={walletCopiedId === w.walletId ? { background: "rgba(22,163,74,0.1)", color: "#16a34a" } : { background: "rgba(65,175,235,0.08)", color: "#41afeb" }}
+                              title="Copy full address">
+                              {walletCopiedId === w.walletId
+                                ? <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                              }
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {w.isWhitelisted ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                              Listed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: "rgba(156,163,175,0.1)", color: "#9ca3af" }}>Not Listed</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {blockActionAddr === w.address ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold" style={{ background: "#f3f4f6", color: "#9bafc5" }}>
+                              <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                              Wait…
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleToggleBlock(w.address, w.isBlocked)}
+                              title={w.isBlocked ? "Click to unblock this wallet" : "Click to block this wallet"}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer"
+                              style={w.isBlocked
+                                ? { background: "rgba(220,38,38,0.08)", color: "#dc2626", borderColor: "rgba(220,38,38,0.25)" }
+                                : { background: "rgba(22,163,74,0.08)", color: "#16a34a", borderColor: "rgba(22,163,74,0.25)" }}
+                              onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.transform = "scale(0.97)"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "scale(1)"; }}
+                            >
+                              {w.isBlocked ? (
+                                <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>Blocked</>
+                              ) : (
+                                <><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#16a34a" }} />Active</>
+                              )}
+                            </button>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {vipActionAddr === w.address ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold" style={{ background: "#f3f4f6", color: "#9bafc5" }}>
+                              <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                              Wait…
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleToggleVip(w.address, w.isVip)}
+                              title={w.isVip ? "Click to revoke VIP" : "Click to grant VIP"}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer"
+                              style={w.isVip
+                                ? { background: "rgba(245,158,11,0.1)", color: "#d97706", borderColor: "rgba(245,158,11,0.3)" }
+                                : { background: "rgba(156,163,175,0.08)", color: "#6b7280", borderColor: "rgba(156,163,175,0.25)" }}
+                              onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.transform = "scale(0.97)"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "scale(1)"; }}
+                            >
+                              {w.isVip ? "★ VIP" : "Normal"}
+                            </button>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-center">
+                          <span className="font-semibold text-xs" style={{ color: w.walletTotalMinted > 0 ? "#7c3aed" : "#9ca3af" }}>{w.walletTotalMinted ?? 0}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: "#9bafc5" }}>
+                          {w.addedAt ? new Date(w.addedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {wlActionAddr === w.address ? (
+                            <span className="text-xs" style={{ color: "#9bafc5" }}>…</span>
+                          ) : w.isWhitelisted ? (
+                            <button onClick={() => handleWlRemoveRow(w.address)} disabled={removeAddressLoading}
+                              className="px-2 py-0.5 rounded text-xs font-semibold transition-colors"
+                              style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626" }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(220,38,38,0.15)")}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(220,38,38,0.08)")}>
+                              Remove WL
+                            </button>
+                          ) : (
+                            <button onClick={() => handleWlAddRow(w.address)} disabled={addAddressLoading}
+                              className="px-2 py-0.5 rounded text-xs font-semibold transition-colors"
+                              style={{ background: "rgba(22,163,74,0.08)", color: "#16a34a" }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(22,163,74,0.15)")}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(22,163,74,0.08)")}>
+                              + Add WL
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {activeTab === "customers" && (<>
       {/* Search */}
@@ -940,6 +1307,76 @@ export default function CustomersPage() {
         </div>
       )}
 
+      {/* ── Add Address Modal ─────────────────────────────────────────── */}
+      {wlModal === "add" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)" }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold" style={{ color: "#24315f" }}>Add Address to Whitelist</h3>
+              <button onClick={() => setWlModal(null)} style={{ color: "#9bafc5" }}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: "#24315f" }}>Wallet Address</label>
+              <input type="text" value={wlAddInput} onChange={(e) => setWlAddInput(e.target.value)} placeholder="0x…"
+                className="w-full px-3 py-2 rounded-lg text-sm font-mono outline-none"
+                style={{ border: `1px solid ${wlAddInput && !ETH_ADDR_RE.test(wlAddInput.trim()) ? "#dc2626" : "#e5e7eb"}` }} />
+              {wlAddInput && !ETH_ADDR_RE.test(wlAddInput.trim()) && (
+                <p className="text-xs mt-1" style={{ color: "#dc2626" }}>Must be a valid 0x… Ethereum address (42 chars)</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setWlModal(null)} className="px-4 py-2 text-sm rounded-lg" style={{ border: "1px solid #e5e7eb", color: "#6b7280" }}>Cancel</button>
+              <button onClick={handleWlAdd} disabled={addAddressLoading || !ETH_ADDR_RE.test(wlAddInput.trim())}
+                className="px-4 py-2 text-sm font-bold text-white rounded-lg"
+                style={{ background: addAddressLoading || !ETH_ADDR_RE.test(wlAddInput.trim()) ? "#9bafc5" : "#41afeb" }}>
+                {addAddressLoading ? "Adding…" : "Add Address"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk Import Modal ─────────────────────────────────────────── */}
+      {wlModal === "bulk" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)" }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold" style={{ color: "#24315f" }}>Bulk Import Addresses</h3>
+              <button onClick={() => setWlModal(null)} style={{ color: "#9bafc5" }}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: "#24315f" }}>Addresses (one per line or comma-separated)</label>
+              <textarea value={wlBulkInput} onChange={(e) => setWlBulkInput(e.target.value)}
+                placeholder={"0x1234…\n0xabcd…\n0xefab…"} rows={8}
+                className="w-full px-3 py-2 rounded-lg text-xs font-mono outline-none resize-none"
+                style={{ border: "1px solid #e5e7eb" }} />
+              {(() => {
+                const lines = wlBulkInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+                const invalid = lines.filter((a) => !ETH_ADDR_RE.test(a));
+                if (!lines.length) return null;
+                return (
+                  <p className="text-xs mt-1" style={{ color: invalid.length ? "#dc2626" : "#16a34a" }}>
+                    {lines.length} address{lines.length !== 1 ? "es" : ""}{invalid.length ? ` — ${invalid.length} invalid` : " — all valid"}
+                  </p>
+                );
+              })()}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setWlModal(null)} className="px-4 py-2 text-sm rounded-lg" style={{ border: "1px solid #e5e7eb", color: "#6b7280" }}>Cancel</button>
+              <button onClick={handleWlBulk} disabled={addAddressesLoading || !wlBulkInput.trim()}
+                className="px-4 py-2 text-sm font-bold text-white rounded-lg"
+                style={{ background: addAddressesLoading || !wlBulkInput.trim() ? "#9bafc5" : "#41afeb" }}>
+                {addAddressesLoading ? "Importing…" : "Import All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Activate / Deactivate confirm ────────────────────────────── */}
       {confirmToggle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)" }}>
@@ -968,6 +1405,7 @@ export default function CustomersPage() {
           </div>
         </div>
       )}
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 }

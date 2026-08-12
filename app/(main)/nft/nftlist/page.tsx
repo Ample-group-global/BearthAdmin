@@ -626,12 +626,12 @@ export default function NftPage() {
         const isReserved = r.deliveryStatusCode === "treasury_pending" || (r.tokenId == null && r.waveRevealScheduledAt != null);
         const latest =
           r.deliveredAt && (r.deliveryStatusCode === "treasury_wallet" || r.deliveryStatusCode === "transferred") ? { label: "Treasury Wallet", date: r.deliveredAt, color: "#0e7490" } :
-          r.deliveredAt ? { label: "Delivered", date: r.deliveredAt, color: "#15803d" } :
-            r.soldAt ? { label: "Sold", date: r.soldAt, color: "#a16207" } :
-              r.revealedAt ? { label: "Revealed", date: r.revealedAt, color: "#7c3aed" } :
-                r.mintedAt ? { label: "Minted", date: r.mintedAt, color: "#2563eb" } :
-                  isReserved ? { label: "Reserved", date: r.waveRevealScheduledAt, color: "#b45309" } :
-                    null;
+            r.deliveredAt ? { label: "Delivered", date: r.deliveredAt, color: "#15803d" } :
+              r.soldAt ? { label: "Sold", date: r.soldAt, color: "#a16207" } :
+                r.revealedAt ? { label: "Revealed", date: r.revealedAt, color: "#7c3aed" } :
+                  r.mintedAt ? { label: "Minted", date: r.mintedAt, color: "#2563eb" } :
+                    isReserved ? { label: "Reserved", date: r.waveRevealScheduledAt, color: "#b45309" } :
+                      null;
         if (!latest) return <span className="text-xs" style={{ color: "#d1d5db" }}>—</span>;
         return (
           <div>
@@ -936,9 +936,6 @@ export default function NftPage() {
               onChange={e => {
                 const tier = e.target.value;
                 setRarityTierFilter(tier);
-                // Only auto-set Artwork to "revealed" if no artwork filter is currently active.
-                // If user already has "treasury_wallet" (or any other filter), keep it —
-                // those NFTs also have rarity data populated.
                 const noRarityStages = ["pre_mint", "reserved"];
                 const forceReveal = tier && (!revealFilter || noRarityStages.includes(revealFilter));
                 const newReveal = forceReveal ? "revealed" : revealFilter;

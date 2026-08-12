@@ -11,7 +11,14 @@ export const RARITY_TIERS = [
   { id: 4, label: "Legendary", color: "#d97706", defaultBps: 40000 },
 ] as const;
 
-export const PHASE_NAMES = ["Whitelist", "PaidMint", "Revealed"] as const;
+export const PHASE_NAMES = ["Free Mint", "Paid Mint"] as const;
+
+// Maps DB/contract phase strings to display labels. Only 2 phases exist (Free/Paid).
+// "Revealed" is a wave status, not a phase — falls through to raw value via ?? fallback.
+export const PHASE_DISPLAY: Record<string, string> = {
+  Whitelist: "Free Mint",
+  PaidMint:  "Paid Mint",
+};
 
 export const PHASE_COLORS: Record<string, { bg: string; color: string }> = {
   Whitelist: { bg: "rgba(124,58,237,0.1)",  color: "#7c3aed" },

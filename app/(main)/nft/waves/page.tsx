@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useInterval } from "@/lib/useInterval";
 import { ErrBanner } from "@/components/nft/Banner";
-import WhitelistTab from "@/components/nft/tabs/WhitelistTab";
+
 import PacksTab from "@/components/nft/tabs/PacksTab";
 import CollaborationsTab from "@/components/nft/tabs/CollaborationsTab";
 import RevealModal from "./components/WaveRevealModal";
@@ -15,7 +15,7 @@ import WaveManageModal from "./components/WaveManageModal";
 import WaveProgressStepper from "./components/WaveProgressStepper";
 import TxSuccessModal from "@/components/nft/shared/TxSuccessModal";
 import { Wave, WaveSchedule, SaleMethod, OnChainWaveInfo, WaveManageForm } from "./wave-types";
-import { STATE_META, PHASE_LABELS, PHASE_COLORS, toLocalDateTimeInput, fmtDatetime as fmtFull } from "@/lib/nft-utils";
+import { STATE_META, toLocalDateTimeInput, fmtDatetime as fmtFull } from "@/lib/nft-utils";
 
 function waveState(w: WaveSchedule): "revealed" | "ready_reveal" | "reveal_scheduled" | "active" | "ended" | "ended_zero" | "upcoming" | "not_scheduled" {
   const now = Date.now();
@@ -55,7 +55,7 @@ export default function WavesPage() {
   const highlightRef = useRef<HTMLDivElement>(null);
 
 
-  const [activeTab, setActiveTab] = useState<"waves" | "whitelist" | "packs" | "collaborations">("waves");
+  const [activeTab, setActiveTab] = useState<"waves" | "packs" | "collaborations">("waves");
 
 
   const [waves, setWaves] = useState<Wave[]>([]);
@@ -91,10 +91,7 @@ export default function WavesPage() {
   const [treasurySuccessData, setTreasurySuccessData] = useState<{ txHash: string; waveNum: number } | null>(null);
 
   const [revealWaves, setRevealWaves] = useState<WaveSchedule[]>([]);
-  const [revealPhase, setRevealPhase] = useState<number | null>(null);
   const [revealLoading, setRevealLoading] = useState(false);
-  const [phaseSaving, setPhaseSaving] = useState(false);
-  const [phaseErr, setPhaseErr] = useState<string | null>(null);
   const [revealErr, setRevealErr] = useState<string | null>(null);
   const [revealWave, setRevealWave] = useState<WaveSchedule | null>(null);
   const [revealSuccessData, setRevealSuccessData] = useState<{ txHash: string; waveNum: number } | null>(null);
@@ -174,40 +171,15 @@ export default function WavesPage() {
   const loadRevealData = useCallback(async () => {
     setRevealLoading(true); setRevealErr(null);
     try {
-      const [wr, sr] = await Promise.all([
-        fetch("/api/nft-sell/waves/schedule-status", { credentials: "include" }),
-        fetch("/api/nft-sell/scheduler/status", { credentials: "include" }),
-      ]);
+      const wr = await fetch("/api/nft-sell/waves/schedule-status", { credentials: "include" });
       const wd = await wr.json();
       setRevealWaves(wd.waves ?? []);
-      if (sr.ok) {
-        const sd = await sr.json();
-        if (sd.configured) setRevealPhase(sd.currentPhase ?? null);
-      }
     } catch {
       setRevealErr("Failed to load wave data");
     } finally {
       setRevealLoading(false);
     }
   }, []);
-
-  const handleAdvancePhase = async () => {
-    if (revealPhase === null || revealPhase >= 2) return;
-    const nextPhase = revealPhase + 1;
-    const nextLabel = PHASE_LABELS[nextPhase] ?? `Phase ${nextPhase}`;
-    setPhaseSaving(true); setPhaseErr(null);
-    try {
-      const res = await fetch("/api/nft-sell/collection/phase", {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phase: nextPhase }),
-      });
-      const d = await res.json();
-      if (!res.ok) { setPhaseErr(d.error ?? "Phase advance failed"); return; }
-      setRevealPhase(nextPhase);
-    } catch { setPhaseErr("Network error."); }
-    finally { setPhaseSaving(false); }
-  };
 
   const saveRevealDate = async () => {
     if (!scheduleEditWave) return;
@@ -409,8 +381,7 @@ export default function WavesPage() {
         <div className="flex gap-0">
           {/* Hidden: "packs" (Mystery Packs — no on-chain mint in reveal flow, design gap pending) */}
           {([
-            { key: "waves",          label: "Waves" },
-            { key: "whitelist",      label: "Whitelist" },
+            { key: "waves", label: "Waves" },
             { key: "collaborations", label: "Collaborations" },
           ] as const).map(tab => (
             <button
@@ -435,7 +406,7 @@ export default function WavesPage() {
       {watchUpdated && (
         <div className="flex items-center gap-1.5 text-xs" style={{ color: "#9bafc5" }}>
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
-          Live Â· last checked {watchUpdated.toLocaleTimeString()}
+          Live · last checked {watchUpdated.toLocaleTimeString()}
         </div>
       )}
 
@@ -478,59 +449,6 @@ export default function WavesPage() {
 
           {error && <ErrBanner msg={error} onDismiss={() => setError(null)} />}
           {revealErr && <ErrBanner msg={revealErr} onDismiss={() => setRevealErr(null)} />}
-
-          {/* Phase Control */}
-          {revealPhase !== null && (
-            <div className="bg-white rounded-xl p-4 shadow-sm space-y-3" style={{ border: "1px solid #e5e7eb" }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "#9bafc5" }}>Contract Phase</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: "#9bafc5" }}>Whitelist → PaidMint → Revealed (one-way, irreversible)</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {[0, 1, 2].map(idx => {
-                  const isPast    = idx < revealPhase;
-                  const isCurrent = idx === revealPhase;
-                  const c = PHASE_COLORS[idx] ?? { color: "#9bafc5", bg: "#f3f4f6" };
-                  return (
-                    <div key={idx} className="p-3 rounded-xl"
-                      style={{
-                        border: `1px solid ${isCurrent ? c.color : "#e5e7eb"}`,
-                        background: isCurrent ? c.bg : isPast ? "#f9fafb" : "white",
-                        opacity: isPast ? 0.5 : 1,
-                      }}>
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{ background: isPast ? "#9bafc5" : c.color }} />
-                        <span className="text-xs font-bold" style={{ color: isPast ? "#9bafc5" : c.color }}>
-                          {PHASE_LABELS[idx] ?? `Phase ${idx}`}
-                        </span>
-                      </div>
-                      <p className="text-[10px] mt-1" style={{ color: "#9bafc5" }}>
-                        {isPast ? "Complete" : isCurrent ? "Current phase" : "Next phase"}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-              {phaseErr && (
-                <p className="text-xs px-3 py-2 rounded-lg" style={{ background: "rgba(220,38,38,0.06)", color: "#dc2626" }}>{phaseErr}</p>
-              )}
-              {revealPhase < 2 && (
-                <div className="flex items-center justify-between">
-                  <p className="text-xs" style={{ color: "#d97706" }}>
-                    Advancing to <strong>{PHASE_LABELS[revealPhase + 1]}</strong> is irreversible.
-                  </p>
-                  <button onClick={handleAdvancePhase} disabled={phaseSaving}
-                    className="px-4 py-1.5 text-xs font-bold text-white rounded-xl"
-                    style={{ background: phaseSaving ? "#9bafc5" : "#7c3aed" }}>
-                    {phaseSaving ? "Submitting…" : `⛓ Advance to ${PHASE_LABELS[revealPhase + 1]}`}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Collection Reveal Progress */}
           {revealWaves.length > 0 && (
@@ -595,7 +513,6 @@ export default function WavesPage() {
         </>
       )}
 
-      {activeTab === "whitelist" && <WhitelistTab />}
       {activeTab === "packs" && <PacksTab />}
       {activeTab === "collaborations" && <CollaborationsTab />}
 

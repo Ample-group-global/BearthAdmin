@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useInterval } from "@/lib/useInterval";
 import { ErrBanner, TxBanner } from "@/components/nft/Banner";
-import { PHASE_COLORS } from "@/lib/nft-constants";
 import MintOperationsTab, { type OnChainInfo, type CollectionConfig } from "@/components/nft/tabs/MintOperationsTab";
 import AdminSalesTab,     { type SaleMode, type Currency }             from "@/components/nft/tabs/AdminSalesTab";
 import CollectionControlsTab, { type ContractEvent }                   from "@/components/nft/tabs/CollectionControlsTab";
@@ -22,19 +21,6 @@ const TABS: { key: string; label: string }[] = [
   { key: "Advanced",              label: "Advanced" },
 ];
 type Tab = "Mint Operations" | "Admin Sales" | "Collection & Controls" | "Royalty" | "Membership" | "Advanced";
-
-// ─── Page-level sub-components ────────────────────────────────────────────────
-
-function PhaseBadge({ phase }: { phase: string }) {
-  const c = PHASE_COLORS[phase] ?? PHASE_COLORS.Whitelist;
-  return (
-    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold"
-      style={{ background: c.bg, color: c.color }}>
-      <span className="w-2 h-2 rounded-full inline-block" style={{ background: c.color }} />
-      {phase}
-    </span>
-  );
-}
 
 // ─── Main Page (thin orchestrator) ───────────────────────────────────────────
 
@@ -91,8 +77,8 @@ export default function ContractOperationPage() {
       const oc: OnChainInfo | null = d.onChain ?? null;
       if (!oc) return;
       if (prevPhaseRef.current !== null && oc.currentPhase !== prevPhaseRef.current) {
-        const names = ["Whitelist", "PaidMint", "Revealed"];
-        setWatchAlert(`Phase changed on-chain: ${names[prevPhaseRef.current] ?? prevPhaseRef.current} → ${names[oc.currentPhase] ?? oc.currentPhase}`);
+        const phaseLabel = (p: number) => ["Free Mint", "Paid Mint"][p] ?? `Phase ${p}`;
+        setWatchAlert(`Contract state changed: ${phaseLabel(prevPhaseRef.current)} → ${phaseLabel(oc.currentPhase)}`);
         setOnChain(oc);
       }
       if (prevMintedRef.current !== null && oc.totalMinted !== prevMintedRef.current) {
@@ -105,10 +91,6 @@ export default function ContractOperationPage() {
   }, []);
 
   useInterval(silentPoll, 60_000);
-
-  // ── Derived ──
-  const phaseName    = config?.current_phase ?? "Whitelist";
-  const mintProgress = onChain ? Math.round((onChain.totalMinted / onChain.maxSupply) * 100) : 0;
 
   // ── Loading ──
   if (loading) return (
@@ -128,7 +110,7 @@ export default function ContractOperationPage() {
       {/* ── Sticky header strip ── */}
       <div className="flex-shrink-0 px-5 pt-5 pb-0 space-y-4" style={{ background: "#f0f2f7" }}>
 
-        {/* Title + phase + refresh */}
+        {/* Title + refresh */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-lg font-bold" style={{ color: "#24315f" }}>Contract Operations</h1>
@@ -136,52 +118,15 @@ export default function ContractOperationPage() {
               BearthGenesisNFT · Phase control · access control · reveal · emergency
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            {config && <PhaseBadge phase={phaseName} />}
-            <button onClick={load}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
-              style={{ border: "1px solid #e5e7eb", color: "#6b7280", background: "white" }}>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Refresh
-            </button>
-          </div>
+          <button onClick={load}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
+            style={{ border: "1px solid #e5e7eb", color: "#6b7280", background: "white" }}>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
         </div>
-
-        {/* Stats strip */}
-        {onChain && (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {[
-              { label: "Phase",      value: phaseName,                                                                        color: PHASE_COLORS[phaseName]?.color ?? "#41afeb" },
-              { label: "Minted",     value: `${onChain.totalMinted.toLocaleString()} / ${onChain.maxSupply.toLocaleString()}`, color: "#41afeb" },
-              { label: "Progress",   value: `${mintProgress}%`,                                                               color: mintProgress === 100 ? "#16a34a" : "#d97706" },
-              { label: "Revealed",   value: String(onChain.revealCount),                                                       color: "#7c3aed" },
-              { label: "Max/Wallet", value: onChain.purchaseLimitEnabled ? String(onChain.normalMaxPerWallet) : "Unlimited",   color: "#24315f" },
-            ].map(s => (
-              <div key={s.label} className="bg-white rounded-xl px-3 py-2.5 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
-                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#9bafc5" }}>{s.label}</p>
-                <p className="text-sm font-bold mt-0.5" style={{ color: s.color }}>{s.value}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Mint progress bar */}
-        {onChain && (
-          <div className="bg-white rounded-xl px-4 py-3 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#9bafc5" }}>Mint Progress</span>
-              <span className="text-xs font-bold" style={{ color: "#24315f" }}>
-                {onChain.totalMinted.toLocaleString()} / {onChain.maxSupply.toLocaleString()}
-              </span>
-            </div>
-            <div className="h-1.5 rounded-full" style={{ background: "#e5e7eb" }}>
-              <div className="h-1.5 rounded-full transition-all"
-                style={{ width: `${mintProgress}%`, background: mintProgress === 100 ? "#16a34a" : "#41afeb" }} />
-            </div>
-          </div>
-        )}
 
         {/* Watchdog alerts */}
         {watchAlert && (

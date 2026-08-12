@@ -63,15 +63,13 @@ export const TIER_COLORS: Record<string, string> = {
 // ─── Contract Phase Maps (waves page) ─────────────────────────────────────────
 
 export const PHASE_LABELS: Record<number, string> = {
-  0: "Whitelist",
-  1: "PaidMint",
-  2: "Revealed",
+  0: "Free Mint",
+  1: "Paid Mint",
 };
 
 export const PHASE_COLORS: Record<number, { color: string; bg: string }> = {
   0: { color: "#7c3aed", bg: "rgba(124,58,237,0.1)" },
   1: { color: "#41afeb", bg: "rgba(65,175,235,0.1)" },
-  2: { color: "#16a34a", bg: "rgba(22,163,74,0.1)" },
 };
 
 // ─── Wave Reveal State Meta (waves page — reveal progress stepper) ────────────
