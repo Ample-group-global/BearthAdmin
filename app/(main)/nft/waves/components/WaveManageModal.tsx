@@ -59,6 +59,7 @@ interface OnChainWaveInfo {
   startTime: number;
   endTime: number;
   closed: boolean;
+  purchaseLimit?: number;
 }
 
 interface WaveManageForm {
