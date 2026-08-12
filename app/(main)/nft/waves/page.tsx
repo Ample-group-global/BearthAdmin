@@ -73,7 +73,7 @@ export default function WavesPage() {
   const [form, setForm] = useState<WaveManageForm>({
     defaultPriceEth: "", saleMethod: "", scheduledStart: "",
     scheduledEnd: "", status: "", unsoldStrategy: "auto_treasury",
-    whitelistRequired: false,
+    revealStrategy: "auto", whitelistRequired: false,
   });
 
   // On-chain action modal
@@ -216,6 +216,7 @@ export default function WavesPage() {
       scheduledEnd: w.scheduledEnd ? toLocalDateTimeInput(new Date(w.scheduledEnd)) : "",
       status: w.status ?? "upcoming",
       unsoldStrategy: (w.unsoldStrategy ?? "auto_treasury") as 'auto_treasury' | 'manual',
+      revealStrategy: (w.revealStrategy ?? "auto") as 'auto' | 'manual',
       whitelistRequired: w.whitelistRequired ?? false,
     });
     setSaveError(null);
@@ -232,6 +233,7 @@ export default function WavesPage() {
         scheduledEnd: form.scheduledEnd ? new Date(form.scheduledEnd).toISOString() : null,
         status: form.status || null,
         unsoldStrategy: form.unsoldStrategy,
+        revealStrategy: form.revealStrategy,
         whitelistRequired: form.whitelistRequired,
       };
       const res = await fetch(`/api/waves/${editWave.id}`, {

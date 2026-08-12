@@ -24,9 +24,11 @@ export interface Wave {
   priceLocked?: boolean;
   waveClosed?: boolean;
   waveRevealed?: boolean;
+  waveRevealTriggered?: boolean;
   waveRevealUri?: string | null;
   closeAction?: string | null;
   unsoldStrategy?: "auto_treasury" | "manual";
+  revealStrategy?: "auto" | "manual";
   whitelistRequired?: boolean;
   syncedAt?: string | null;
   createdAt: string;
@@ -82,5 +84,6 @@ export interface WaveManageForm {
   scheduledStart: string;
   scheduledEnd: string;
   unsoldStrategy: "auto_treasury" | "manual";
+  revealStrategy: "auto" | "manual";
   whitelistRequired: boolean;
 }

@@ -29,9 +29,11 @@ interface Wave {
   priceLocked?: boolean;
   waveClosed?: boolean;
   waveRevealed?: boolean;
+  waveRevealTriggered?: boolean;
   waveRevealUri?: string | null;
   closeAction?: string | null;
   unsoldStrategy?: "auto_treasury" | "manual";
+  revealStrategy?: "auto" | "manual";
   whitelistRequired?: boolean;
   syncedAt?: string | null;
   createdAt: string;
@@ -64,6 +66,7 @@ interface WaveManageForm {
   scheduledStart: string;
   scheduledEnd: string;
   unsoldStrategy: "auto_treasury" | "manual";
+  revealStrategy: "auto" | "manual";
   whitelistRequired: boolean;
 }
 
@@ -553,7 +556,72 @@ export default function WaveManageModal({
             </div>
           )}
 
-          {/* Reveal status */}
+          {/* ── Reveal Strategy ── */}
+          <div>
+            <label className="text-xs font-semibold mb-2 block" style={{ color: "#374151" }}>
+              Reveal Strategy
+            </label>
+            <p className="text-[11px] mb-2.5" style={{ color: "#9bafc5" }}>
+              Controls whether reveal fires automatically at the scheduled time or only when you manually trigger it.
+            </p>
+            <div className="flex gap-2">
+              {/* Auto Reveal */}
+              <button
+                disabled={!!editWave.waveRevealed || !!editWave.waveRevealTriggered}
+                onClick={() => !editWave.waveRevealed && !editWave.waveRevealTriggered && setForm(f => ({ ...f, revealStrategy: "auto" }))}
+                className="flex-1 flex flex-col gap-1 px-3 py-2.5 rounded-xl text-left transition-all"
+                style={{
+                  border: `1.5px solid ${form.revealStrategy === "auto" ? "#41afeb" : "#e5e7eb"}`,
+                  background: form.revealStrategy === "auto" ? "rgba(65,175,235,0.06)" : "white",
+                  opacity: editWave.waveRevealed || editWave.waveRevealTriggered ? 0.5 : 1,
+                  cursor: editWave.waveRevealed || editWave.waveRevealTriggered ? "not-allowed" : "pointer",
+                }}>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
+                    style={{ borderColor: form.revealStrategy === "auto" ? "#41afeb" : "#d1d5db" }}>
+                    {form.revealStrategy === "auto" && (
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#41afeb" }} />
+                    )}
+                  </span>
+                  <span className="text-xs font-semibold" style={{ color: "#24315f" }}>Auto Reveal</span>
+                </div>
+                <p className="text-[10px] ml-5" style={{ color: "#9bafc5" }}>
+                  System automatically reveals this wave at the scheduled reveal date. No admin action needed.
+                </p>
+              </button>
+              {/* Manual Reveal */}
+              <button
+                disabled={!!editWave.waveRevealed || !!editWave.waveRevealTriggered}
+                onClick={() => !editWave.waveRevealed && !editWave.waveRevealTriggered && setForm(f => ({ ...f, revealStrategy: "manual" }))}
+                className="flex-1 flex flex-col gap-1 px-3 py-2.5 rounded-xl text-left transition-all"
+                style={{
+                  border: `1.5px solid ${form.revealStrategy === "manual" ? "#7c3aed" : "#e5e7eb"}`,
+                  background: form.revealStrategy === "manual" ? "rgba(124,58,237,0.05)" : "white",
+                  opacity: editWave.waveRevealed || editWave.waveRevealTriggered ? 0.5 : 1,
+                  cursor: editWave.waveRevealed || editWave.waveRevealTriggered ? "not-allowed" : "pointer",
+                }}>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
+                    style={{ borderColor: form.revealStrategy === "manual" ? "#7c3aed" : "#d1d5db" }}>
+                    {form.revealStrategy === "manual" && (
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#7c3aed" }} />
+                    )}
+                  </span>
+                  <span className="text-xs font-semibold" style={{ color: "#24315f" }}>Manual Reveal</span>
+                </div>
+                <p className="text-[10px] ml-5" style={{ color: "#9bafc5" }}>
+                  Auto-trigger is skipped even if a reveal date is set. Admin must click &quot;Reveal Now&quot; in the Waves table to reveal.
+                </p>
+              </button>
+            </div>
+            {(editWave.waveRevealed || editWave.waveRevealTriggered) && (
+              <p className="text-[10px] mt-1.5" style={{ color: "#9bafc5" }}>
+                Strategy is locked — this wave&apos;s reveal is already in progress or complete.
+              </p>
+            )}
+          </div>
+
+          {/* ── Reveal Status (contextual, below strategy) ── */}
           {editWave.waveRevealed ? (
             <div className="px-4 py-3 rounded-xl text-xs flex items-center gap-2"
               style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.3)", color: "#16a34a" }}>
@@ -562,15 +630,24 @@ export default function WaveManageModal({
               </svg>
               This wave has been revealed
             </div>
-          ) : (
+          ) : form.revealStrategy === "manual" ? (
             <div className="px-4 py-3 rounded-xl text-xs flex items-center gap-2"
               style={{ background: "rgba(124,58,237,0.05)", border: "1px solid rgba(124,58,237,0.2)", color: "#7c3aed" }}>
+              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Manual mode — auto-trigger will skip this wave. Use &quot;Reveal Now&quot; in the Waves table when ready.
+            </div>
+          ) : (
+            <div className="px-4 py-3 rounded-xl text-xs flex items-center gap-2"
+              style={{ background: "rgba(65,175,235,0.05)", border: "1px solid rgba(65,175,235,0.2)", color: "#2e9fd8" }}>
               <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               {editWave.revealScheduledAt
-                ? `Reveal scheduled for ${new Date(editWave.revealScheduledAt).toLocaleString()} — system will auto-reveal`
-                : `No reveal date set — use the "Set Date" button in the Waves table`}
+                ? `Auto-reveal scheduled for ${new Date(editWave.revealScheduledAt).toLocaleString()}`
+                : `Auto mode — set a reveal date via the "Set Date" button in the Waves table`}
             </div>
           )}
         </div>
