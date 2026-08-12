@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { useInterval } from "@/lib/useInterval";
 import DataTable, { type ColumnDef } from "@/components/DataTable";
 import { ErrBanner } from "@/components/nft/Banner";
@@ -120,7 +121,16 @@ function RevealBadge({ revealed }: { revealed: boolean }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+const ETH_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
+
 export default function NftPage() {
+  // ── URL-driven wallet filter ──────────────────────────────────────────────
+  const searchParams = useSearchParams();
+  const rawWallet = searchParams.get("wallet") ?? "";
+  const initialWallet = ETH_ADDR_RE.test(rawWallet) ? rawWallet : "";
+  const [ownerFilter, setOwnerFilter] = useState<string>(initialWallet);
+  const ownerFilterRef = useRef<string>(initialWallet);
+
   // ── Tab ──────────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<"nftlist" | "otc" | "bulk" | "gifts" | "auctions" | "seasons" | "events" | "burn">("nftlist");
 
@@ -194,6 +204,7 @@ export default function NftPage() {
     console.log("q:", q, "off:", off, "wave:", wave, "status:", status, "revealed:", revealed);
     setLoading(true); setError(null);
     const params = new URLSearchParams({ search: q, limit: String(PAGE_SIZE), offset: String(off) });
+    if (ownerFilterRef.current) params.set("owner_address", ownerFilterRef.current);
     if (status) params.set("delivery_status", status);
     if (stage) params.set("stage", stage);
     if (revealed === "pre_mint") {
@@ -872,6 +883,29 @@ export default function NftPage() {
               </button>
             ))}
           </div>
+
+          {/* ── Wallet deep-link banner ── */}
+          {ownerFilter && (
+            <div className="flex items-center justify-between px-4 py-2.5 rounded-xl text-sm"
+              style={{ background: "rgba(65,175,235,0.07)", border: "1px solid rgba(65,175,235,0.25)", color: "#2e9fd8" }}>
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+                <span className="font-semibold">Wallet filter:</span>
+                <span className="font-mono text-xs">{ownerFilter.slice(0, 8)}…{ownerFilter.slice(-6)}</span>
+                <span className="text-xs opacity-70">— showing only NFTs held by this address</span>
+              </span>
+              <button
+                onClick={() => {
+                  setOwnerFilter("");
+                  ownerFilterRef.current = "";
+                  setOffset(0);
+                  loadRecords(search, 0, statusFilter, stageFilter, revealFilter, waveFilter, sortKey, sortDir, mintedFrom, mintedTo, mintTypeFilter, rarityTierFilter);
+                }}
+                className="ml-4 text-xs opacity-60 hover:opacity-100 font-bold">✕ Clear</button>
+            </div>
+          )}
 
           {/* ── Filters ── */}
           <div className="flex flex-wrap items-center gap-2">

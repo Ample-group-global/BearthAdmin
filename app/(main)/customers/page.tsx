@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import DataTable, { type ColumnDef } from "@/components/DataTable";
 import { useWhitelist } from "@/app/dashboard/whitelist/useWhitelist";
 import { useToast } from "@/app/dashboard/whitelist/useToast";
@@ -51,6 +52,7 @@ function truncateAddress(addr: string) {
 }
 
 export default function CustomersPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"customers" | "wallets">("customers");
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -668,9 +670,15 @@ export default function CustomersPage() {
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs" style={{ color: "#24315f" }} title={w.address}>
+                            <button
+                              onClick={() => router.push(`/nft/nftlist?wallet=${encodeURIComponent(w.address)}`)}
+                              title={`View NFTs held by ${w.address}`}
+                              className="font-mono text-xs transition-all"
+                              style={{ color: "#24315f", background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "underline", textDecorationStyle: "dotted", textUnderlineOffset: "3px" }}
+                              onMouseEnter={e => { e.currentTarget.style.color = "#41afeb"; e.currentTarget.style.textDecorationStyle = "solid"; }}
+                              onMouseLeave={e => { e.currentTarget.style.color = "#24315f"; e.currentTarget.style.textDecorationStyle = "dotted"; }}>
                               {w.address.slice(0, 8)}…{w.address.slice(-6)}
-                            </span>
+                            </button>
                             <button
                               onClick={() => { navigator.clipboard?.writeText(w.address); setWalletCopiedId(w.walletId); setTimeout(() => setWalletCopiedId(null), 2000); }}
                               className="flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium transition-colors"
@@ -703,18 +711,21 @@ export default function CustomersPage() {
                             <button
                               onClick={() => handleToggleBlock(w.address, w.isBlocked)}
                               title={w.isBlocked ? "Click to unblock this wallet" : "Click to block this wallet"}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer"
                               style={w.isBlocked
-                                ? { background: "rgba(220,38,38,0.08)", color: "#dc2626", borderColor: "rgba(220,38,38,0.25)" }
-                                : { background: "rgba(22,163,74,0.08)", color: "#16a34a", borderColor: "rgba(22,163,74,0.25)" }}
-                              onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.transform = "scale(0.97)"; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "scale(1)"; }}
+                                ? { background: "rgba(220,38,38,0.08)", color: "#dc2626", border: "1.5px dashed rgba(220,38,38,0.4)" }
+                                : { background: "rgba(22,163,74,0.08)", color: "#16a34a", border: "1.5px dashed rgba(22,163,74,0.4)" }}
+                              onMouseEnter={(e) => { e.currentTarget.style.filter = "brightness(0.88)"; e.currentTarget.style.transform = "scale(0.96)"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.filter = ""; e.currentTarget.style.transform = ""; }}
                             >
                               {w.isBlocked ? (
-                                <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>Blocked</>
+                                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
                               ) : (
-                                <><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#16a34a" }} />Active</>
+                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#16a34a" }} />
                               )}
+                              <span>{w.isBlocked ? "Blocked" : "Active"}</span>
+                              {/* swap icon — signals this is a toggle */}
+                              <svg className="w-2.5 h-2.5 flex-shrink-0 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" /></svg>
                             </button>
                           )}
                         </td>
@@ -728,14 +739,16 @@ export default function CustomersPage() {
                             <button
                               onClick={() => handleToggleVip(w.address, w.isVip)}
                               title={w.isVip ? "Click to revoke VIP" : "Click to grant VIP"}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer"
                               style={w.isVip
-                                ? { background: "rgba(245,158,11,0.1)", color: "#d97706", borderColor: "rgba(245,158,11,0.3)" }
-                                : { background: "rgba(156,163,175,0.08)", color: "#6b7280", borderColor: "rgba(156,163,175,0.25)" }}
-                              onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.transform = "scale(0.97)"; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "scale(1)"; }}
+                                ? { background: "rgba(245,158,11,0.1)", color: "#d97706", border: "1.5px dashed rgba(245,158,11,0.45)" }
+                                : { background: "rgba(156,163,175,0.08)", color: "#6b7280", border: "1.5px dashed rgba(156,163,175,0.4)" }}
+                              onMouseEnter={(e) => { e.currentTarget.style.filter = "brightness(0.88)"; e.currentTarget.style.transform = "scale(0.96)"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.filter = ""; e.currentTarget.style.transform = ""; }}
                             >
-                              {w.isVip ? "★ VIP" : "Normal"}
+                              <span>{w.isVip ? "★ VIP" : "Normal"}</span>
+                              {/* swap icon — signals this is a toggle */}
+                              <svg className="w-2.5 h-2.5 flex-shrink-0 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" /></svg>
                             </button>
                           )}
                         </td>
