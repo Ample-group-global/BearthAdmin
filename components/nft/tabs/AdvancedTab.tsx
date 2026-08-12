@@ -195,11 +195,12 @@ export default function AdvancedTab() {
           <div className="flex gap-2">
             <input value={checkTokenId} onChange={e => { setCheckTokenId(e.target.value); setCheckMeta(null); setCheckError(""); }}
               type="number" min="1" placeholder="e.g. 42"
-              className={inputCls + " w-40"} style={{ borderColor: "#e5e7eb" }} />
+              className="w-40 px-3 py-1.5 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"
+              style={{ borderColor: "#e5e7eb" }} />
             <button
               onClick={handleCheckMetadata}
               disabled={checkLoading || !contract || !checkTokenId}
-              className={btnCls(false, checkLoading || !contract || !checkTokenId)}>
+              className={btnCls(false, checkLoading || !contract || !checkTokenId) + " whitespace-nowrap"}>
               {checkLoading ? "Fetching…" : "Verify On-Chain"}
             </button>
           </div>
