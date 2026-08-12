@@ -47,6 +47,11 @@ export default function WhitelistTab() {
   const [wlTab, setWlTab] = useState<WlTab>("addresses");
   const [search, setSearch] = useState("");
   const [newAddr, setNewAddr] = useState("");
+  const [newRoleCode, setNewRoleCode] = useState("customer");
+  const [newFirstName, setNewFirstName] = useState("");
+  const [newLastName, setNewLastName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [registerLoading, setRegisterLoading] = useState(false);
   const [bulkText, setBulkText] = useState("");
   const [merkleInput, setMerkleInput] = useState("");
   const [testAddr, setTestAddr] = useState("");
@@ -66,10 +71,30 @@ export default function WhitelistTab() {
     catch (e: unknown) { showToast(e instanceof Error ? e.message : "Error", "error"); }
   };
 
-  const handleAdd = () => {
+  const handleRegister = async () => {
     const addr = newAddr.trim();
     if (!ETH_ADDRESS_RE.test(addr)) { showToast("Invalid Ethereum address — must be 0x + 40 hex", "error"); return; }
-    wrap(async () => { await addAddress(addr); setNewAddr(""); }, "Address added");
+    if (!newFirstName.trim()) { showToast("First name is required", "error"); return; }
+    setRegisterLoading(true);
+    try {
+      const res = await fetch("/api/whitelist/register", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          address: addr, role_code: newRoleCode,
+          first_name: newFirstName.trim(), last_name: newLastName.trim() || undefined,
+          email: newEmail.trim() || undefined,
+        }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string; isNewUser?: boolean; roleCode?: string };
+      if (!res.ok) throw new Error(data.error ?? "Registration failed");
+      setNewAddr(""); setNewFirstName(""); setNewLastName(""); setNewEmail(""); setNewRoleCode("customer");
+      showToast(`Wallet registered as ${data.roleCode ?? newRoleCode}${data.isNewUser ? " (new user created)" : " (linked to existing user)"}`, "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error", "error");
+    } finally {
+      setRegisterLoading(false);
+    }
   };
 
   const handleBulk = () => {
@@ -281,21 +306,75 @@ export default function WhitelistTab() {
             </div>
           )}
 
-          {/* ── Add Single ── */}
+          {/* ── Add Single (Register Wallet) ── */}
           {wlTab === "add" && (
             <div className="max-w-md space-y-4">
-              <h3 className="text-sm font-semibold" style={{ color: "#24315f" }}>Add Single Address</h3>
               <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "#6b7280" }}>Ethereum Address</label>
+                <h3 className="text-sm font-semibold" style={{ color: "#24315f" }}>Register Wallet</h3>
+                <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
+                  Every whitelisted wallet must belong to a registered user. Select the user type, fill in their details, then register.
+                </p>
+              </div>
+
+              {/* User Type */}
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "#6b7280" }}>User Type</label>
+                <select
+                  value={newRoleCode}
+                  onChange={(e) => setNewRoleCode(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#41afeb] bg-white"
+                  style={{ border: "1px solid #e5e7eb", color: "#24315f" }}>
+                  <option value="customer">Customer — can mint NFTs</option>
+                  <option value="technical_team">Team Member — internal / testing</option>
+                  <option value="ext_referrer">Partner — referral / collaboration</option>
+                </select>
+              </div>
+
+              {/* Wallet Address */}
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "#6b7280" }}>Wallet Address <span style={{ color: "#dc2626" }}>*</span></label>
                 <input value={newAddr} onChange={(e) => setNewAddr(e.target.value)}
                   placeholder="0x..."
                   className={inputCls}
                   style={inputStyle} />
               </div>
-              <button onClick={handleAdd} disabled={addAddressLoading || !newAddr.trim()}
+
+              {/* First Name */}
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "#6b7280" }}>First Name <span style={{ color: "#dc2626" }}>*</span></label>
+                <input value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)}
+                  placeholder="e.g. John"
+                  className={inputCls}
+                  style={inputStyle} />
+              </div>
+
+              {/* Last Name + Email in a row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "#6b7280" }}>Last Name</label>
+                  <input value={newLastName} onChange={(e) => setNewLastName(e.target.value)}
+                    placeholder="Optional"
+                    className={inputCls}
+                    style={inputStyle} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "#6b7280" }}>Email</label>
+                  <input value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="Optional"
+                    type="email"
+                    className={inputCls}
+                    style={inputStyle} />
+                </div>
+              </div>
+
+              <div className="pt-1 p-3 rounded-lg text-xs" style={{ background: "rgba(65,175,235,0.06)", border: "1px solid rgba(65,175,235,0.2)", color: "#1e6fa8" }}>
+                If email matches an existing user, the wallet is linked to that user instead of creating a new one.
+              </div>
+
+              <button onClick={handleRegister} disabled={registerLoading || !newAddr.trim() || !newFirstName.trim()}
                 className={btnPrimary}
                 style={btnPrimaryStyle}>
-                {addAddressLoading ? "Adding..." : "Add Address"}
+                {registerLoading ? "Registering..." : "Register & Add to Whitelist"}
               </button>
             </div>
           )}
