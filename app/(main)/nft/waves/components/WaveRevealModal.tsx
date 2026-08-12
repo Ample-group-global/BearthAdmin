@@ -17,7 +17,6 @@ interface WaveSchedule {
   is_revealed: boolean;
   wave_revealed_at: string | null;
   sold_count: number;
-  minted_count: number;
   quantity: number;
 }
 

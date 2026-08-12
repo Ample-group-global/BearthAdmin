@@ -13,7 +13,6 @@ import EventsTab from "@/components/nft/tabs/EventsTab";
 import BurnTab from "@/components/nft/tabs/BurnTab";
 import NftImage from "@/components/nft/NftImage";
 import WatchdogBanner from "@/components/nft/shared/WatchdogBanner";
-import MarketNote from "@/components/nft/shared/MarketNote";
 import TestnetResetConfirm from "./components/TestnetResetConfirm";
 import WaveRevealPanel from "./components/WaveRevealPanel";
 import NftFiltersRow from "./components/NftFiltersRow";
@@ -757,9 +756,9 @@ export default function NftPage() {
       {/* ── Tab Bar ── */}
       <div className="ba-tabs" style={{ borderBottom: "1px solid #e5e7eb" }}>
         <div className="flex gap-1">
-          {(["nftlist", "otc", "bulk", "gifts", "auctions", "seasons", "events", "burn"] as const).map(tab => {
-            const LABELS:  Record<string, string>                           = { nftlist: "Records", otc: "OTC Deals", bulk: "Bulk Ops", gifts: "Gifts", auctions: "Auctions", seasons: "Season Passes", events: "Events", burn: "Burn to Mint" };
-            const MARKETS: Record<string, "primary" | "secondary" | "both"> = { nftlist: "both", otc: "primary", bulk: "primary", gifts: "primary", auctions: "both", seasons: "primary", events: "both", burn: "both" };
+          {/* Hidden: "auctions" (BearthAuction contract not deployed), "seasons" (mintSeasonPass removed from contract), "burn" (BearthBreeding not deployed) */}
+          {(["nftlist", "otc", "bulk", "gifts", "events"] as const).map(tab => {
+            const LABELS: Record<string, string> = { nftlist: "Records", otc: "OTC Deals", bulk: "Bulk Ops", gifts: "Gifts", events: "Events" };
             const label = LABELS[tab] ?? tab;
             const isActive = activeTab === tab;
             return (
@@ -776,7 +775,6 @@ export default function NftPage() {
                 }}>
                 <span className="flex items-center gap-1.5">
                   {label}
-                  <MarketNote market={MARKETS[tab] ?? "both"} />
                 </span>
                 {isActive && (
                   <span style={{

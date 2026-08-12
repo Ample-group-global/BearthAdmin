@@ -10,17 +10,16 @@ import CollectionControlsTab, { type ContractEvent }                   from "@/c
 import RoyaltyTab    from "@/components/nft/tabs/RoyaltyTab";
 import MembershipTab from "@/components/nft/tabs/MembershipTab";
 import AdvancedTab   from "@/components/nft/tabs/AdvancedTab";
-import MarketNote    from "@/components/nft/shared/MarketNote";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const TABS: { key: string; label: string; market: "primary" | "secondary" | "both" }[] = [
-  { key: "Mint Operations",       label: "Mint Operations",       market: "primary" },
-  { key: "Admin Sales",           label: "Admin Sales",           market: "primary" },
-  { key: "Collection & Controls", label: "Collection & Controls", market: "both" },
-  { key: "Royalty",               label: "Royalty",               market: "secondary" },
-  { key: "Membership",            label: "Membership",            market: "both" },
-  { key: "Advanced",              label: "Advanced",              market: "both" },
+const TABS: { key: string; label: string }[] = [
+  { key: "Mint Operations",       label: "Mint Operations" },
+  { key: "Admin Sales",           label: "Admin Sales" },
+  { key: "Collection & Controls", label: "Collection & Controls" },
+  { key: "Royalty",               label: "Royalty" },
+  { key: "Membership",            label: "Membership" },
+  { key: "Advanced",              label: "Advanced" },
 ];
 type Tab = "Mint Operations" | "Admin Sales" | "Collection & Controls" | "Royalty" | "Membership" | "Advanced";
 
@@ -212,7 +211,6 @@ export default function ContractOperationPage() {
                 : { color: "#9bafc5", border: "1px solid transparent" }}>
               <span className="flex items-center gap-1.5">
                 {t.label}
-                <MarketNote market={t.market} />
               </span>
             </button>
           ))}

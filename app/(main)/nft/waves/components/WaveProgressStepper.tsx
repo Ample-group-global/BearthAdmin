@@ -15,7 +15,6 @@ interface WaveSchedule {
   is_revealed: boolean;
   wave_revealed_at: string | null;
   sold_count: number;
-  minted_count: number;
   quantity: number;
 }
 
@@ -31,7 +30,12 @@ function waveState(w: WaveSchedule): "revealed" | "ready_reveal" | "reveal_sched
     if ((w.sold_count ?? 0) === 0) return "ended_zero";
     return "ended";
   }
-  if (w.scheduled_start && new Date(w.scheduled_start).getTime() > now) return "upcoming";
+  // Time-window fallback: scheduler may not have fired yet (up to 30s lag)
+  if (w.scheduled_start && new Date(w.scheduled_start).getTime() <= now) {
+    if (!w.scheduled_end || new Date(w.scheduled_end).getTime() > now) return "active";
+    return "ended"; // both start and end passed but DB flags not yet updated
+  }
+  if (w.scheduled_start) return "upcoming";
   return "not_scheduled";
 }
 

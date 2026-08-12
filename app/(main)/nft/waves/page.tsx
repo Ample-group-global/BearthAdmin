@@ -7,7 +7,6 @@ import { ErrBanner } from "@/components/nft/Banner";
 import WhitelistTab from "@/components/nft/tabs/WhitelistTab";
 import PacksTab from "@/components/nft/tabs/PacksTab";
 import CollaborationsTab from "@/components/nft/tabs/CollaborationsTab";
-import MarketNote from "@/components/nft/shared/MarketNote";
 import RevealModal from "./components/WaveRevealModal";
 import TreasuryMoveModal from "./components/TreasuryMoveModal";
 import RevealScheduleEditModal from "./components/RevealScheduleEditModal";
@@ -28,7 +27,12 @@ function waveState(w: WaveSchedule): "revealed" | "ready_reveal" | "reveal_sched
     if ((w.sold_count ?? 0) === 0) return "ended_zero";
     return "ended";
   }
-  if (w.scheduled_start && new Date(w.scheduled_start).getTime() > now) return "upcoming";
+  // Time-window fallback: scheduler may not have fired yet (up to 30s lag)
+  if (w.scheduled_start && new Date(w.scheduled_start).getTime() <= now) {
+    if (!w.scheduled_end || new Date(w.scheduled_end).getTime() > now) return "active";
+    return "ended"; // both start and end passed but DB flags not yet updated
+  }
+  if (w.scheduled_start) return "upcoming";
   return "not_scheduled";
 }
 
@@ -370,11 +374,11 @@ export default function WavesPage() {
       </div>
       <div className="ba-tabs" style={{ borderBottom: "1px solid #e5e7eb" }}>
         <div className="flex gap-0">
+          {/* Hidden: "packs" (Mystery Packs — no on-chain mint in reveal flow, design gap pending) */}
           {([
-            { key: "waves",          label: "Waves",          market: "primary" },
-            { key: "whitelist",      label: "Whitelist",      market: "primary" },
-            { key: "packs",          label: "Mystery Packs",  market: "primary" },
-            { key: "collaborations", label: "Collaborations", market: "both" },
+            { key: "waves",          label: "Waves" },
+            { key: "whitelist",      label: "Whitelist" },
+            { key: "collaborations", label: "Collaborations" },
           ] as const).map(tab => (
             <button
               key={tab.key}
@@ -382,7 +386,6 @@ export default function WavesPage() {
               className="flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors"
               style={activeTab === tab.key ? TAB_STYLE_ACTIVE : TAB_STYLE_INACTIVE}>
               {tab.label}
-              <MarketNote market={tab.market} />
             </button>
           ))}
         </div>
