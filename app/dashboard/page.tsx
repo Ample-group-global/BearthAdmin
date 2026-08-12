@@ -24,6 +24,7 @@ interface WaveRow {
   waveClosed: boolean;
   status: string;
   treasuryPendingCount: number;
+  reservedCount?: number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
