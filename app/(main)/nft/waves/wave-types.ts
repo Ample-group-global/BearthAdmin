@@ -21,6 +21,8 @@ export interface Wave {
   nftCount: number;
   soldCount?: number;
   treasuryPendingCount?: number;
+  reservedCount?: number;
+  treasuryWalletCount?: number;
   priceLocked?: boolean;
   waveClosed?: boolean;
   waveRevealed?: boolean;

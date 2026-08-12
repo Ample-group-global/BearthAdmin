@@ -169,9 +169,9 @@ export default function DashboardPage() {
   const minted = stats?.totalMinted ?? 0;
   const revealed = stats?.revealed ?? 0;
   const inTreasury = stats?.treasuryWalletCount ?? 0;
-  const treasuryPending = waves.reduce((s, w) => s + (w.treasuryPendingCount ?? 0), 0);
+  const reserved = waves.reduce((s, w) => s + (w.reservedCount ?? 0) + (w.treasuryPendingCount ?? 0), 0);
   const blindBox = Math.max(0, minted - revealed - inTreasury);
-  const preMint = Math.max(0, max - minted - treasuryPending);
+  const preMint = Math.max(0, max - minted - reserved);
 
   return (
     <div className="ba-page space-y-5">
@@ -258,7 +258,7 @@ export default function DashboardPage() {
               <SnapshotRow label="Pre-mint (Available)" count={preMint} total={max} color="#94a3b8" />
               <SnapshotRow label="Blind Box (Minted)" count={blindBox} total={max} color="#41afeb" />
               <SnapshotRow label="Revealed" count={revealed} total={max} color="#7c3aed" />
-              <SnapshotRow label="Treasury Pending (Unsold)" count={treasuryPending} total={max} color="#d97706" />
+              <SnapshotRow label="Reserved" count={reserved} total={max} color="#d97706" />
               <SnapshotRow label="In Treasury Wallet" count={inTreasury} total={max} color="#16a34a" />
             </div>
           </div>
