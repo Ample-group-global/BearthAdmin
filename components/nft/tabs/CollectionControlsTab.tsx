@@ -4,7 +4,7 @@ import { useState } from "react";
 import { SectionCard } from "@/components/nft/SectionCard";
 import { TxBanner, ErrBanner } from "@/components/nft/Banner";
 import { inputStyle, thStyle, tdStyle } from "@/components/nft/styles";
-import { PHASE_NAMES, ETH_ADDRESS_RE } from "@/lib/nft-constants";
+import { ETH_ADDRESS_RE } from "@/lib/nft-constants";
 import type { OnChainInfo, CollectionConfig } from "./MintOperationsTab";
 
 export interface ContractEvent {
@@ -33,7 +33,6 @@ export default function CollectionControlsTab({ onChain, config, events, onRefre
   const [saving,      setSaving]      = useState<string | null>(null);
   const [tx,          setTx]          = useState<string | null>(null);
   const [opError,     setOpError]     = useState<string | null>(null);
-  const [revealUri,   setRevealUri]   = useState("");
   const [blindBoxUri, setBlindBoxUri] = useState(config?.blind_box_uri ?? "");
   const [treasury,    setTreasury]    = useState(config?.treasury_wallet ?? "");
 
@@ -47,15 +46,6 @@ export default function CollectionControlsTab({ onChain, config, events, onRefre
       await onRefresh();
     } catch { setOpError("Network error."); }
     finally { setSaving(null); }
-  };
-
-  const handleReveal = () => {
-    if (!revealUri.startsWith("ipfs://")) { setOpError("Reveal URI must start with ipfs://"); return; }
-    doOp("reveal", () => fetch("/api/nft-sell/collection/reveal", {
-      method: "POST", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ revealUri }),
-    }));
   };
 
   const handleSetBlindBoxUri = () => {
@@ -92,8 +82,6 @@ export default function CollectionControlsTab({ onChain, config, events, onRefre
     ));
   };
 
-  const alreadyRevealed = (config?.reveal_count ?? 0) > 0;
-
   return (
     <div className="space-y-7">
       {tx      && <TxBanner  txHash={tx}   onDismiss={() => setTx(null)} />}
@@ -129,53 +117,6 @@ export default function CollectionControlsTab({ onChain, config, events, onRefre
                   {saving === "blind-box" ? "Submitting tx…" : "⛓ Set Blind Box URI On-Chain"}
                 </button>
               </div>
-            </div>
-          </SectionCard>
-
-          {/* Reveal Collection */}
-          <SectionCard
-            title="Reveal Collection"
-            subtitle="One-time operation — all minted tokens switch to real metadata. Requires all waves closed first."
-            accent={alreadyRevealed ? undefined : "#7c3aed"}>
-            <div className="space-y-4">
-              {/* Phase 0 (Whitelist) warning — reveal too early */}
-              {onChain && onChain.currentPhase === 0 && !alreadyRevealed && (
-                <div className="px-4 py-3 rounded-xl text-xs"
-                  style={{ background: "#fffbeb", border: "1px solid #fde68a", color: "#d97706" }}>
-                  Current phase: <strong>{PHASE_NAMES[0]}</strong> — typically reveal is done after paid mint completes.
-                </div>
-              )}
-              {alreadyRevealed ? (
-                <div className="px-4 py-3 rounded-xl" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
-                  <p className="text-sm font-bold" style={{ color: "#16a34a" }}>
-                    Collection revealed ({(config?.reveal_count ?? 0).toLocaleString()} wave{config?.reveal_count !== 1 ? "s" : ""})
-                  </p>
-                  {config?.reveal_uri && (
-                    <p className="text-xs font-mono mt-1" style={{ color: "#6b7280" }}>{config.reveal_uri}</p>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#9bafc5" }}>
-                      Reveal Base URI (IPFS)
-                    </label>
-                    <input type="text" value={revealUri} onChange={e => setRevealUri(e.target.value)}
-                      style={inputStyle} placeholder="ipfs://Qm…" />
-                    <p className="text-xs mt-1" style={{ color: "#9bafc5" }}>
-                      Upload all 9,999 metadata JSON files to IPFS first, then paste the base URI here
-                    </p>
-                  </div>
-                  <div className="flex justify-end">
-                    <button onClick={handleReveal}
-                      disabled={saving === "reveal" || !revealUri}
-                      className="px-5 py-2.5 text-xs font-bold text-white rounded-xl"
-                      style={{ background: saving === "reveal" || !revealUri ? "#9bafc5" : "#7c3aed" }}>
-                      {saving === "reveal" ? "Submitting tx…" : "⛓ Reveal Collection On-Chain"}
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </SectionCard>
 
