@@ -5,7 +5,7 @@ import { SectionCard } from "@/components/nft/SectionCard";
 import { Toggle } from "@/components/nft/Toggle";
 import { TxBanner, ErrBanner, OkBanner } from "@/components/nft/Banner";
 import { labelStyle, inputStyle } from "@/components/nft/styles";
-import { PHASE_NAMES, PHASE_COLORS, MERKLE_ROOT_RE, ETH_ADDRESS_RE } from "@/lib/nft-constants";
+import { MERKLE_ROOT_RE, ETH_ADDRESS_RE } from "@/lib/nft-constants";
 
 export interface OnChainInfo {
   currentPhase: number;
@@ -56,11 +56,6 @@ export default function MintOperationsTab({ onChain, config, onRefresh }: Props)
   const [opError, setOpError] = useState<string | null>(null);
   const [opOk,    setOpOk]    = useState<string | null>(null);
 
-  // Phase
-  const [phaseTarget, setPhaseTarget] = useState<number>(
-    onChain ? Math.min(onChain.currentPhase + 1, 2) : 1
-  );
-
   // VIP
   const [vipAddress, setVipAddress] = useState("");
   const [vipStatus,  setVipStatus]  = useState(true);
@@ -96,13 +91,6 @@ export default function MintOperationsTab({ onChain, config, onRefresh }: Props)
     } catch { setOpError("Network error."); }
     finally { setSaving(null); }
   };
-
-  const handleSetPhase = () =>
-    doOp("phase", () => fetch("/api/nft-sell/collection/phase", {
-      method: "POST", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phase: phaseTarget }),
-    }));
 
   const handleSetVIP = () => {
     if (!ETH_ADDRESS_RE.test(vipAddress)) { setOpError("Enter a valid Ethereum address (0x + 40 hex)."); return; }
@@ -161,59 +149,7 @@ export default function MintOperationsTab({ onChain, config, onRefresh }: Props)
       {opError && <ErrBanner msg={opError}  onDismiss={() => setOpError(null)} />}
       {opOk   && <OkBanner  msg={opOk}     onDismiss={() => setOpOk(null)} />}
 
-      {/* ─── PHASE MANAGEMENT ─────────────────────────── */}
-      <section>
-        <GroupLabel>Phase Management</GroupLabel>
-        <SectionCard
-          title="Phase Control"
-          subtitle="Advance the mint phase on-chain. Order: Whitelist → PaidMint → Revealed (one-way, irreversible).">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {PHASE_NAMES.map((name, idx) => {
-                const current   = onChain ? onChain.currentPhase : -1;
-                const isPast    = idx < current;
-                const isCurrent = idx === current;
-                const c = PHASE_COLORS[name];
-                return (
-                  <button key={name}
-                    onClick={() => setPhaseTarget(idx)}
-                    disabled={idx <= current}
-                    className="p-3 rounded-xl text-left space-y-1 transition-all"
-                    style={{
-                      border: `1px solid ${phaseTarget === idx && idx > current ? c.color : "#e5e7eb"}`,
-                      background: isPast ? "#f9fafb" : isCurrent ? `${c.color}10` : phaseTarget === idx ? `${c.color}08` : "white",
-                      opacity: idx < current ? 0.5 : 1,
-                      cursor: idx <= current ? "not-allowed" : "pointer",
-                    }}>
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ background: isPast ? "#9bafc5" : c.color }} />
-                      <span className="text-xs font-bold" style={{ color: isPast ? "#9bafc5" : c.color }}>{name}</span>
-                    </div>
-                    <p className="text-[10px]" style={{ color: "#9bafc5" }}>
-                      {isPast ? "Complete" : isCurrent ? "Current phase" : "Next phase"}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-            {onChain && phaseTarget > onChain.currentPhase && (
-              <div className="px-4 py-3 rounded-xl text-xs"
-                style={{ background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.2)", color: "#d97706" }}>
-                This will advance from <strong>{PHASE_NAMES[onChain.currentPhase]}</strong> → <strong>{PHASE_NAMES[phaseTarget]}</strong>. This is irreversible.
-              </div>
-            )}
-            <div className="flex justify-end">
-              <button onClick={handleSetPhase}
-                disabled={saving === "phase" || !onChain || phaseTarget <= onChain.currentPhase}
-                className="px-5 py-2 text-xs font-bold text-white rounded-xl"
-                style={{ background: saving === "phase" || !onChain || phaseTarget <= onChain.currentPhase ? "#9bafc5" : "#7c3aed" }}>
-                {saving === "phase" ? "Submitting…" : `⛓ Advance to ${PHASE_NAMES[phaseTarget]}`}
-              </button>
-            </div>
-          </div>
-        </SectionCard>
-      </section>
+      {/* Phase Management moved to NFT Waves page */}
 
       {/* ─── ACCESS CONTROL ───────────────────────────── */}
       <section>

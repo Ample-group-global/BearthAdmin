@@ -73,7 +73,7 @@ export default function WavesPage() {
   const [form, setForm] = useState<WaveManageForm>({
     defaultPriceEth: "", saleMethod: "", scheduledStart: "",
     scheduledEnd: "", status: "", unsoldStrategy: "auto_treasury",
-    revealStrategy: "auto", whitelistRequired: false,
+    revealStrategy: "auto", whitelistRequired: true,
   });
 
   // On-chain action modal
@@ -93,6 +93,8 @@ export default function WavesPage() {
   const [revealWaves, setRevealWaves] = useState<WaveSchedule[]>([]);
   const [revealPhase, setRevealPhase] = useState<number | null>(null);
   const [revealLoading, setRevealLoading] = useState(false);
+  const [phaseSaving, setPhaseSaving] = useState(false);
+  const [phaseErr, setPhaseErr] = useState<string | null>(null);
   const [revealErr, setRevealErr] = useState<string | null>(null);
   const [revealWave, setRevealWave] = useState<WaveSchedule | null>(null);
   const [revealSuccessData, setRevealSuccessData] = useState<{ txHash: string; waveNum: number } | null>(null);
@@ -189,6 +191,24 @@ export default function WavesPage() {
     }
   }, []);
 
+  const handleAdvancePhase = async () => {
+    if (revealPhase === null || revealPhase >= 2) return;
+    const nextPhase = revealPhase + 1;
+    const nextLabel = PHASE_LABELS[nextPhase] ?? `Phase ${nextPhase}`;
+    setPhaseSaving(true); setPhaseErr(null);
+    try {
+      const res = await fetch("/api/nft-sell/collection/phase", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phase: nextPhase }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setPhaseErr(d.error ?? "Phase advance failed"); return; }
+      setRevealPhase(nextPhase);
+    } catch { setPhaseErr("Network error."); }
+    finally { setPhaseSaving(false); }
+  };
+
   const saveRevealDate = async () => {
     if (!scheduleEditWave) return;
     const matched = waves.find(w => w.waveNumber === scheduleEditWave.wave_number);
@@ -218,7 +238,7 @@ export default function WavesPage() {
       status: w.status ?? "upcoming",
       unsoldStrategy: (w.unsoldStrategy ?? "auto_treasury") as 'auto_treasury' | 'manual',
       revealStrategy: (w.revealStrategy ?? "auto") as 'auto' | 'manual',
-      whitelistRequired: w.whitelistRequired ?? false,
+      whitelistRequired: w.whitelistRequired ?? true,
     });
     setSaveError(null);
   };
@@ -459,13 +479,56 @@ export default function WavesPage() {
           {error && <ErrBanner msg={error} onDismiss={() => setError(null)} />}
           {revealErr && <ErrBanner msg={revealErr} onDismiss={() => setRevealErr(null)} />}
 
-          {/* Contract phase badge */}
+          {/* Phase Control */}
           {revealPhase !== null && (
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1.5 rounded-full text-xs font-bold"
-                style={{ background: PHASE_COLORS[revealPhase]?.bg ?? "#f3f4f6", color: PHASE_COLORS[revealPhase]?.color ?? "#6b7280" }}>
-                Contract: {PHASE_LABELS[revealPhase] ?? `Phase ${revealPhase}`}
-              </span>
+            <div className="bg-white rounded-xl p-4 shadow-sm space-y-3" style={{ border: "1px solid #e5e7eb" }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "#9bafc5" }}>Contract Phase</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: "#9bafc5" }}>Whitelist → PaidMint → Revealed (one-way, irreversible)</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[0, 1, 2].map(idx => {
+                  const isPast    = idx < revealPhase;
+                  const isCurrent = idx === revealPhase;
+                  const c = PHASE_COLORS[idx] ?? { color: "#9bafc5", bg: "#f3f4f6" };
+                  return (
+                    <div key={idx} className="p-3 rounded-xl"
+                      style={{
+                        border: `1px solid ${isCurrent ? c.color : "#e5e7eb"}`,
+                        background: isCurrent ? c.bg : isPast ? "#f9fafb" : "white",
+                        opacity: isPast ? 0.5 : 1,
+                      }}>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ background: isPast ? "#9bafc5" : c.color }} />
+                        <span className="text-xs font-bold" style={{ color: isPast ? "#9bafc5" : c.color }}>
+                          {PHASE_LABELS[idx] ?? `Phase ${idx}`}
+                        </span>
+                      </div>
+                      <p className="text-[10px] mt-1" style={{ color: "#9bafc5" }}>
+                        {isPast ? "Complete" : isCurrent ? "Current phase" : "Next phase"}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+              {phaseErr && (
+                <p className="text-xs px-3 py-2 rounded-lg" style={{ background: "rgba(220,38,38,0.06)", color: "#dc2626" }}>{phaseErr}</p>
+              )}
+              {revealPhase < 2 && (
+                <div className="flex items-center justify-between">
+                  <p className="text-xs" style={{ color: "#d97706" }}>
+                    Advancing to <strong>{PHASE_LABELS[revealPhase + 1]}</strong> is irreversible.
+                  </p>
+                  <button onClick={handleAdvancePhase} disabled={phaseSaving}
+                    className="px-4 py-1.5 text-xs font-bold text-white rounded-xl"
+                    style={{ background: phaseSaving ? "#9bafc5" : "#7c3aed" }}>
+                    {phaseSaving ? "Submitting…" : `⛓ Advance to ${PHASE_LABELS[revealPhase + 1]}`}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
