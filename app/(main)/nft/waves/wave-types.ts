@@ -30,6 +30,7 @@ export interface Wave {
   unsoldStrategy?: "auto_treasury" | "manual";
   revealStrategy?: "auto" | "manual";
   whitelistRequired?: boolean;
+  maxPerWallet?: number;
   syncedAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -42,6 +43,7 @@ export interface Wave {
     closed: boolean;
     active: boolean;
     revealed: boolean;
+    purchaseLimit?: number;
   } | null;
 }
 
@@ -52,6 +54,7 @@ export interface OnChainWaveInfo {
   startTime: number;
   endTime: number;
   closed: boolean;
+  purchaseLimit?: number;
 }
 
 export interface SaleMethod {

@@ -35,6 +35,7 @@ interface Wave {
   unsoldStrategy?: "auto_treasury" | "manual";
   revealStrategy?: "auto" | "manual";
   whitelistRequired?: boolean;
+  maxPerWallet?: number;
   syncedAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -47,6 +48,7 @@ interface Wave {
     closed: boolean;
     active: boolean;
     revealed: boolean;
+    purchaseLimit?: number;
   } | null;
 }
 
@@ -92,6 +94,9 @@ interface WaveManageModalProps {
   setChainPrice: (v: string) => void;
   onSetScheduleOnChain: () => void;
   onSetPriceOnChain: () => void;
+  purchaseLimitInput: string;
+  setPurchaseLimitInput: (v: string) => void;
+  onSetPurchaseLimitOnChain: () => void;
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -120,6 +125,9 @@ export default function WaveManageModal({
   setChainPrice,
   onSetScheduleOnChain: handleSetScheduleOnChain,
   onSetPriceOnChain: handleSetPriceOnChain,
+  purchaseLimitInput,
+  setPurchaseLimitInput,
+  onSetPurchaseLimitOnChain: handleSetPurchaseLimitOnChain,
 }: WaveManageModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
@@ -648,6 +656,62 @@ export default function WaveManageModal({
               {editWave.revealScheduledAt
                 ? `Auto-reveal scheduled for ${new Date(editWave.revealScheduledAt).toLocaleString()}`
                 : `Auto mode — set a reveal date via the "Set Date" button in the Waves table`}
+            </div>
+          )}
+
+          {/* ── Per-Wave Purchase Limit ── */}
+          {editWave.waveNumber > 1 && (
+            <div className="space-y-3 p-4 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold" style={{ color: "#24315f" }}>Per-Wave Purchase Limit</p>
+                  <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
+                    Caps how many NFTs one wallet can buy in <strong>this wave</strong>.
+                    Set to 0 to use the global limit from Contract Operations.
+                  </p>
+                </div>
+                {chainOnChain?.purchaseLimit != null && (
+                  <div className="flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-bold"
+                    style={{
+                      background: chainOnChain.purchaseLimit > 0 ? "rgba(65,175,235,0.1)" : "#f3f4f6",
+                      color: chainOnChain.purchaseLimit > 0 ? "#41afeb" : "#9bafc5",
+                      border: `1px solid ${chainOnChain.purchaseLimit > 0 ? "rgba(65,175,235,0.3)" : "#e5e7eb"}`,
+                    }}>
+                    On-chain: {chainOnChain.purchaseLimit > 0 ? `${chainOnChain.purchaseLimit} / wallet` : "Global limit"}
+                  </div>
+                )}
+              </div>
+              {editWave.waveRevealed ? (
+                <div className="px-3 py-2 rounded-lg text-xs" style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
+                  Wave revealed — purchase limit cannot be changed.
+                </div>
+              ) : (
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <label style={labelStyle}>Max per wallet (0 = use global)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={purchaseLimitInput}
+                      onChange={e => setPurchaseLimitInput(e.target.value)}
+                      style={inputStyle}
+                      placeholder="0 = global limit" />
+                  </div>
+                  <button
+                    onClick={handleSetPurchaseLimitOnChain}
+                    disabled={chainSaving === "purchase-limit"}
+                    className="px-4 py-2 text-xs font-bold text-white rounded-lg flex-shrink-0"
+                    style={{ background: chainSaving === "purchase-limit" ? "#9bafc5" : "#41afeb" }}>
+                    {chainSaving === "purchase-limit" ? "Submitting…" : "Set On-Chain"}
+                  </button>
+                </div>
+              )}
+              {chainOnChain?.purchaseLimit != null && chainOnChain.purchaseLimit > 0 && (
+                <p className="text-[10px]" style={{ color: "#9bafc5" }}>
+                  Global purchase limit is bypassed for this wave — wallets are capped at {chainOnChain.purchaseLimit} NFT{chainOnChain.purchaseLimit !== 1 ? "s" : ""} here.
+                </p>
+              )}
             </div>
           )}
         </div>

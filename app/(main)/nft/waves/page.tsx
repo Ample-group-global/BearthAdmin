@@ -86,6 +86,7 @@ export default function WavesPage() {
 
   // Chain form fields
   const [chainPrice, setChainPrice] = useState("");
+  const [purchaseLimitInput, setPurchaseLimitInput] = useState("");
   const [treasuryMoveWave, setTreasuryMoveWave] = useState<Wave | null>(null);
   const [treasurySuccessData, setTreasurySuccessData] = useState<{ txHash: string; waveNum: number } | null>(null);
 
@@ -252,6 +253,7 @@ export default function WavesPage() {
     openEdit(w);
     setChainWave(w); setChainError(null); setChainTx(null); setChainOnChain(null);
     setChainPrice(w.defaultPriceEth != null ? String(w.defaultPriceEth) : "");
+    setPurchaseLimitInput(w.maxPerWallet != null ? String(w.maxPerWallet) : "0");
     setChainLoading(true);
     fetch(`/api/nft-sell/waves/${w.waveNumber}`, { credentials: "include" })
       .then(r => r.json())
@@ -310,6 +312,15 @@ export default function WavesPage() {
     }));
   };
 
+  const handleSetPurchaseLimitOnChain = () => {
+    const limit = parseInt(purchaseLimitInput, 10);
+    if (isNaN(limit) || limit < 0) { setChainError("Enter a valid limit (0 = use global limit)."); return; }
+    chainOp("purchase-limit", () => fetch(`/api/nft-sell/waves/${chainWave!.waveNumber}/purchase-limit`, {
+      method: "PUT", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ maxPerWallet: limit }),
+    }));
+  };
 
   function handleRevealSuccess(txHash: string, waveNum: number) {
     console.group("[WavesPage] handleRevealSuccess");
@@ -598,6 +609,9 @@ export default function WavesPage() {
           setChainPrice={setChainPrice}
           onSetScheduleOnChain={handleSetScheduleOnChain}
           onSetPriceOnChain={handleSetPriceOnChain}
+          purchaseLimitInput={purchaseLimitInput}
+          setPurchaseLimitInput={setPurchaseLimitInput}
+          onSetPurchaseLimitOnChain={handleSetPurchaseLimitOnChain}
         />
       )}
 
