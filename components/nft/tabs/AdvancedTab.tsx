@@ -178,7 +178,19 @@ export default function AdvancedTab() {
         <TxStatus tx={txEmergency} onClear={() => setTxEmergency(TX0)} />
       </Card>
 
-      <Card title="Check Token Metadata" note="Reads tokenURI from contract and fetches the JSON metadata.">
+      <Card
+        title="On-Chain Metadata Verifier"
+        note="Reads tokenURI directly from the live contract and fetches the IPFS JSON — use this to detect DB ↔ chain desync. If NFT Lists shows Revealed but this returns a blind box URI, a sync issue exists.">
+        <div className="px-3 py-2.5 rounded-lg text-xs flex items-start gap-2"
+          style={{ background: "#f0f9ff", border: "1px solid #bae6fd", color: "#0369a1" }}>
+          <svg className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>
+            This reads from the <strong>contract</strong>, not the database. NFT Lists reads from the DB — they can diverge
+            if a reveal was not pushed on-chain, if the IPFS file is missing, or if a token was minted via adminMint() (tokenWave=0 bug).
+          </span>
+        </div>
         <Inp label="Token ID">
           <div className="flex gap-2">
             <input value={checkTokenId} onChange={e => { setCheckTokenId(e.target.value); setCheckMeta(null); setCheckError(""); }}
@@ -188,15 +200,18 @@ export default function AdvancedTab() {
               onClick={handleCheckMetadata}
               disabled={checkLoading || !contract || !checkTokenId}
               className={btnCls(false, checkLoading || !contract || !checkTokenId)}>
-              {checkLoading ? "Fetching…" : "Fetch Metadata"}
+              {checkLoading ? "Fetching…" : "Verify On-Chain"}
             </button>
           </div>
         </Inp>
         {checkError && <p className="text-xs text-red-600">{checkError}</p>}
         {checkMeta && (
-          <pre className="text-xs rounded-lg p-3 overflow-auto max-h-64" style={{ background: "#f8fafc", border: "1px solid #e5e7eb", color: "#374151" }}>
-            {JSON.stringify(checkMeta, null, 2)}
-          </pre>
+          <div className="space-y-2">
+            <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#9bafc5" }}>Raw IPFS Metadata</p>
+            <pre className="text-xs rounded-lg p-3 overflow-auto max-h-64" style={{ background: "#f8fafc", border: "1px solid #e5e7eb", color: "#374151" }}>
+              {JSON.stringify(checkMeta, null, 2)}
+            </pre>
+          </div>
         )}
       </Card>
     </div>
