@@ -146,7 +146,7 @@ export default function AdvancedTab() {
         These operations are potentially irreversible. Use only when necessary.
       </div>
 
-      <Card title="Emergency Transfer" note="Force-transfer a specific NFT. Requires EMERGENCY_ROLE. Intended for lost-wallet recovery.">
+      <Card title="Emergency Transfer" note="Force-transfer a specific NFT. Requires EMERGENCY_ROLE. Intended for lost-NFT recovery.">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Inp label="Token ID">
             <input type="number" value={emergencyTokenId} onChange={e => setEmergencyTokenId(e.target.value)}
