@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { ErrBanner } from "@/components/nft/Banner";
@@ -169,7 +169,7 @@ export default function TreasuryMoveModal({
                 <span className="text-xs" style={{ color: "#9bafc5" }}>Fetching wallet balance…</span>
               </div>
             ) : gasInfo ? (
-              <div className="divide-y" style={{ divideColor: "#f3f4f6" }}>
+              <div className="divide-y divide-gray-100">
                 {/* Balance row */}
                 <div className="flex items-center justify-between px-3.5 py-2.5">
                   <span className="text-xs" style={{ color: "#6b7280" }}>Signer wallet balance</span>
