@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ErrBanner } from "@/components/nft/Banner";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -48,6 +48,13 @@ interface Wave {
   } | null;
 }
 
+interface GasEstimate {
+  walletAddress: string;
+  balanceEth: number;
+  estimatedGasEth: number;
+  sufficient: boolean;
+}
+
 // ─── TreasuryMoveModal ─────────────────────────────────────────────────────────
 
 export default function TreasuryMoveModal({
@@ -61,6 +68,18 @@ export default function TreasuryMoveModal({
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [gasInfo, setGasInfo] = useState<GasEstimate | null>(null);
+  const [gasLoading, setGasLoading] = useState(true);
+
+  // Fetch wallet balance + gas estimate on mount
+  useEffect(() => {
+    setGasLoading(true);
+    fetch(`/api/nft-sell/waves/${wave.waveNumber}/treasury-close-estimate`, { credentials: "include" })
+      .then(r => r.json())
+      .then((d: GasEstimate) => setGasInfo(d))
+      .catch(() => setGasInfo(null))
+      .finally(() => setGasLoading(false));
+  }, [wave.waveNumber]);
 
   const handleSubmit = async () => {
     setSaving(true);
@@ -94,12 +113,15 @@ export default function TreasuryMoveModal({
     }
   };
 
-  const pendingCount = wave.treasuryPendingCount ?? 0;
-  const actionLabel = saving ? "Transferring…" : "Confirm Transfer";
+  const pendingCount  = wave.treasuryPendingCount ?? 0;
+  const actionLabel   = saving ? "Transferring…" : "Confirm Transfer";
+  const canSubmit     = !saving && (gasInfo?.sufficient !== false);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" style={{ border: "1px solid #e5e7eb" }}>
+
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid #e5e7eb" }}>
           <div>
             <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>
@@ -134,6 +156,54 @@ export default function TreasuryMoveModal({
             </div>
           </div>
 
+          {/* Wallet balance + gas estimate */}
+          <div className="rounded-xl overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
+            <div className="px-3.5 py-2" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#6b7280" }}>
+                Gas Check
+              </p>
+            </div>
+            {gasLoading ? (
+              <div className="px-3.5 py-3 flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#41afeb", borderTopColor: "transparent" }} />
+                <span className="text-xs" style={{ color: "#9bafc5" }}>Fetching wallet balance…</span>
+              </div>
+            ) : gasInfo ? (
+              <div className="divide-y" style={{ divideColor: "#f3f4f6" }}>
+                {/* Balance row */}
+                <div className="flex items-center justify-between px-3.5 py-2.5">
+                  <span className="text-xs" style={{ color: "#6b7280" }}>Signer wallet balance</span>
+                  <span className="text-xs font-mono font-semibold" style={{ color: gasInfo.sufficient ? "#15803d" : "#dc2626" }}>
+                    {gasInfo.balanceEth.toFixed(6)} ETH
+                  </span>
+                </div>
+                {/* Gas estimate row */}
+                <div className="flex items-center justify-between px-3.5 py-2.5">
+                  <span className="text-xs" style={{ color: "#6b7280" }}>Estimated gas cost</span>
+                  <span className="text-xs font-mono font-semibold" style={{ color: "#374151" }}>
+                    ~{gasInfo.estimatedGasEth.toFixed(6)} ETH
+                  </span>
+                </div>
+                {/* Status row */}
+                <div className="flex items-center justify-between px-3.5 py-2.5"
+                  style={{ background: gasInfo.sufficient ? "rgba(21,128,61,0.05)" : "rgba(220,38,38,0.05)" }}>
+                  <span className="text-xs font-semibold" style={{ color: gasInfo.sufficient ? "#15803d" : "#dc2626" }}>
+                    {gasInfo.sufficient ? "✓ Sufficient funds" : "✗ Insufficient funds — top up wallet before proceeding"}
+                  </span>
+                  {!gasInfo.sufficient && (
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(220,38,38,0.1)", color: "#dc2626" }}>
+                      Need {(gasInfo.estimatedGasEth - gasInfo.balanceEth).toFixed(6)} ETH more
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="px-3.5 py-3">
+                <span className="text-xs" style={{ color: "#9bafc5" }}>Could not fetch gas estimate</span>
+              </div>
+            )}
+          </div>
+
           {/* Gas warning */}
           <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs"
             style={{ background: "rgba(217,119,6,0.07)", border: "1px solid rgba(217,119,6,0.2)", color: "#92400e" }}>
@@ -153,9 +223,9 @@ export default function TreasuryMoveModal({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={saving}
+              disabled={!canSubmit}
               className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white"
-              style={{ background: saving ? "#9bafc5" : "#16a34a", cursor: saving ? "not-allowed" : "pointer" }}>
+              style={{ background: !canSubmit ? "#9bafc5" : "#16a34a", cursor: !canSubmit ? "not-allowed" : "pointer" }}>
               {actionLabel}
             </button>
           </div>
