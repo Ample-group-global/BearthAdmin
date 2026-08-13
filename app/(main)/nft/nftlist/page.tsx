@@ -21,9 +21,7 @@ import NftHistoryModal from "./components/NftHistoryModal";
 import { fmtDatetime as fmt, TIER_COLORS } from "@/lib/nft-utils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
 const PAGE_SIZE = 20;
-
 // ─── Types — Records tab ──────────────────────────────────────────────────────
 
 interface NftRecord {
@@ -91,9 +89,15 @@ function artworkId(r: NftRecord): number | null {
 }
 function StatusBadge({ code, name }: { code: string; name: string }) {
   const colors: Record<string, { bg: string; color: string }> = {
+    pending: { bg: "rgba(100,116,139,0.1)", color: "#64748b" },
+    sold: { bg: "rgba(37,99,235,0.1)", color: "#2563eb" },
+    reserved: { bg: "rgba(217,119,6,0.1)", color: "#d97706" },
+    treasury_pending: { bg: "rgba(180,83,9,0.1)", color: "#b45309" },
+    treasury_wallet: { bg: "rgba(14,116,144,0.1)", color: "#0e7490" },
+    transferred: { bg: "rgba(99,102,241,0.1)", color: "#6366f1" },
+    pool_assigned: { bg: "rgba(16,185,129,0.1)", color: "#10b981" },
+    revealed: { bg: "rgba(124,58,237,0.1)", color: "#7c3aed" },
     delivered: { bg: "rgba(22,163,74,0.1)", color: "#16a34a" },
-    sold: { bg: "rgba(124,58,237,0.1)", color: "#7c3aed" },
-    pending: { bg: "rgba(7, 4, 1, 0.1)", color: "#d97706" },
   };
   const c = colors[code] ?? { bg: "rgba(156,163,175,0.1)", color: "#6b7280" };
   return (
@@ -140,6 +144,7 @@ export default function NftPage() {
   const [totalAll, setTotalAll] = useState(0);
   const [preMintCount, setPreMintCount] = useState(0);
   const [reservedCount, setReservedCount] = useState(0);
+  const [treasuryPendingCount, setTreasuryPendingCount] = useState(0);
   const [treasuryWalletCount, setTreasuryWalletCount] = useState(0);
   const [blindCount, setBlindCount] = useState(0);
   const [revealedCount, setRevealedCount] = useState(0);
@@ -205,18 +210,19 @@ export default function NftPage() {
     setLoading(true); setError(null);
     const params = new URLSearchParams({ search: q, limit: String(PAGE_SIZE), offset: String(off) });
     if (ownerFilterRef.current) params.set("owner_address", ownerFilterRef.current);
-    if (status) params.set("delivery_status", status);
     if (stage) params.set("stage", stage);
     if (revealed === "pre_mint") {
       params.set("delivery_status", "pending");
+    } else if (revealed === "sold") {
+      params.set("delivery_status", "sold");
     } else if (revealed === "reserved") {
-      params.set("delivery_status", "treasury_pending");
-    } else if (revealed === "minted") {
-      params.set("minted", "true");
-    } else if (revealed === "revealed") {
-      params.set("delivery_status", "revealed");
+      params.set("delivery_status", "unsold");
     } else if (revealed === "treasury_wallet") {
       params.set("delivery_status", "treasury_wallet");
+    } else if (revealed === "revealed") {
+      params.set("delivery_status", "revealed");
+    } else if (status) {
+      params.set("delivery_status", status);
     }
     if (wave) params.set("wave_number", wave);
     if (mFrom) params.set("minted_from", mFrom);
@@ -235,6 +241,7 @@ export default function NftPage() {
         setTotalAll(data.totalAll ?? 0);
         setPreMintCount(data.preMintCount ?? 0);
         setReservedCount(data.reservedCount ?? 0);
+        setTreasuryPendingCount(data.treasuryPendingCount ?? 0);
         setTreasuryWalletCount(data.treasuryWalletCount ?? 0);
         setBlindCount(data.blindCount ?? 0);
         setRevealedCount(data.revealedCount ?? 0);
@@ -512,13 +519,13 @@ export default function NftPage() {
       render: r => {
         const code = r.deliveryStatusCode;
         if (code === "delivered") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#dcfce7", color: "#15803d" }}>✓ Delivered</span>;
-        if (code === "sold") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#fef9c3", color: "#a16207" }}>💰 Sold</span>;
-        if (code === "treasury_pending") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>◈ Reserved</span>;
+        if (code === "sold") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#eff6ff", color: "#2563eb" }}>⬡ Blind Box</span>;
+        if (code === "reserved") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>◈ Reserved</span>;
+        if (code === "treasury_pending") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" }}>⏳ Treasury Pending</span>;
+        if (code === "pool_assigned") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" }}>⬡ Reveal Pool</span>;
         if (code === "treasury_wallet" || code === "transferred") return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#ecfeff", color: "#0e7490", border: "1px solid #a5f3fc" }}>🏛 Treasury Wallet</span>;
         if (r.isRevealed) return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#f5f3ff", color: "#7c3aed" }}>✦ Revealed</span>;
         if (r.tokenId != null) return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#eff6ff", color: "#2563eb" }}>⬡ Minted</span>;
-        // Unminted NFT with a reveal scheduled = wave closed, NFT is unsold → Reserved
-        if (r.tokenId == null && r.waveRevealScheduledAt != null) return <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>◈ Reserved</span>;
         return <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: "#f8fafc", color: "#94a3b8", border: "1px solid #e2e8f0" }}>○ Pre-mint</span>;
       },
     },
@@ -823,27 +830,21 @@ export default function NftPage() {
                 filter: () => { setRevealFilter("pre_mint"); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "pre_mint", ""); },
               },
               {
-                label: "Reserved", value: reservedCount, color: "#b45309", bg: "#fffbeb", pct: totalAll ? Math.round(reservedCount / totalAll * 100) : 0,
-                sub: "Unsold · awaiting treasury",
+                label: "Reserved", value: reservedCount + treasuryPendingCount, color: "#b45309", bg: "#fffbeb", pct: totalAll ? Math.round((reservedCount + treasuryPendingCount) / totalAll * 100) : 0,
+                sub: "Wave unsold · pending treasury transfer",
                 icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
-                filter: () => { setRevealFilter("reserved"); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "reserved", ""); },
+                filter: () => { setRevealFilter("unsold"); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "unsold", ""); },
               },
               {
-                label: "Minted", value: mintedCount, color: "#2563eb", bg: "#eff6ff", pct: totalAll ? Math.round(mintedCount / totalAll * 100) : 0,
-                sub: "On-chain tokens",
-                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>,
-                filter: () => { setRevealFilter("minted"); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "minted", ""); },
+                label: "Minted Blind Box (Sold)", value: soldCount, color: "#2563eb", bg: "#eff6ff", pct: totalAll ? Math.round(soldCount / totalAll * 100) : 0,
+                sub: "Minted · pending reveal",
+                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>,
+                filter: () => { setRevealFilter("sold"); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "sold", ""); },
               },
               {
                 label: "Revealed", value: revealedCount, color: "#7c3aed", bg: "#f5f3ff", pct: totalAll ? Math.round(revealedCount / totalAll * 100) : 0,
-                sub: "Artwork unlocked",
+                sub: "Artwork unlocked · in wallet",
                 icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
-                filter: () => { setRevealFilter("revealed"); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "revealed", ""); },
-              },
-              {
-                label: "Customer Wallets", value: customerWalletCount, color: "#0891b2", bg: "#ecfeff", pct: totalAll ? Math.round(customerWalletCount / totalAll * 100) : 0,
-                sub: "Owned by customers",
-                icon: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
                 filter: () => { setRevealFilter("revealed"); setStatusFilter(""); setWaveFilter(""); applyFilter("", stageFilter, "revealed", ""); },
               },
               {
@@ -932,14 +933,13 @@ export default function NftPage() {
               ))}
             </select>
 
-            {/* Artwork state — matches NFT lifecycle badge language */}
+            {/* NFT lifecycle status filter */}
             <select value={revealFilter}
               onChange={e => {
                 const newReveal = e.target.value;
                 setRevealFilter(newReveal);
-                // Only clear rarity tier for stages that have no rarity data (pre_mint / reserved)
-                // revealed + treasury_wallet NFTs both have rarity populated
-                const noRarityStages = ["pre_mint", "reserved"];
+                // Clear rarity tier for pre-reveal stages (no rarity data yet)
+                const noRarityStages = ["pre_mint", "sold", "unsold"];
                 if (rarityTierFilter && noRarityStages.includes(newReveal)) {
                   setRarityTierFilter("");
                   applyFilter(statusFilter, stageFilter, newReveal, waveFilter, mintedFrom, mintedTo, mintTypeFilter, "");
@@ -949,11 +949,12 @@ export default function NftPage() {
               }}
               className="py-2 px-3 rounded-xl text-sm bg-white outline-none"
               style={{ border: "1px solid #e5e7eb", color: revealFilter ? "#111827" : "#9bafc5" }}>
-              <option value="">All Artwork</option>
+              <option value="">All Statuses</option>
               <option value="pre_mint">⬡ Pre-mint</option>
+              <option value="sold">⬡ Blind Box (Minted)</option>
               <option value="reserved">◈ Reserved</option>
+              <option value="treasury_wallet">🏛 In Treasury</option>
               <option value="revealed">✦ Revealed</option>
-              <option value="treasury_wallet">🏛 Treasury Wallet</option>
             </select>
 
             <select value={mintTypeFilter}
@@ -970,7 +971,7 @@ export default function NftPage() {
               onChange={e => {
                 const tier = e.target.value;
                 setRarityTierFilter(tier);
-                const noRarityStages = ["pre_mint", "reserved"];
+                const noRarityStages = ["pre_mint", "sold", "unsold"];
                 const forceReveal = tier && (!revealFilter || noRarityStages.includes(revealFilter));
                 const newReveal = forceReveal ? "revealed" : revealFilter;
                 if (forceReveal) setRevealFilter("revealed");

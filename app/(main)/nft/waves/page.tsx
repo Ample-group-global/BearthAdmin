@@ -4,7 +4,6 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useInterval } from "@/lib/useInterval";
 import { ErrBanner } from "@/components/nft/Banner";
-
 import PacksTab from "@/components/nft/tabs/PacksTab";
 import CollaborationsTab from "@/components/nft/tabs/CollaborationsTab";
 import RevealModal from "./components/WaveRevealModal";
@@ -78,7 +77,7 @@ export default function WavesPage() {
   const [form, setForm] = useState<WaveManageForm>({
     defaultPriceEth: "", saleMethod: "", scheduledStart: "",
     scheduledEnd: "", status: "", unsoldStrategy: "auto_treasury",
-    revealStrategy: "auto", whitelistRequired: true,
+    revealStrategy: "auto", whitelistRequired: true, revealUri: "",
   });
 
   // On-chain action modal
@@ -168,12 +167,12 @@ export default function WavesPage() {
     const times: number[] = [];
     for (const w of revealWaves) {
       if (w.scheduled_start) times.push(new Date(w.scheduled_start).getTime());
-      if (w.scheduled_end)   times.push(new Date(w.scheduled_end).getTime());
+      if (w.scheduled_end) times.push(new Date(w.scheduled_end).getTime());
       if (w.reveal_scheduled_at) times.push(new Date(w.reveal_scheduled_at).getTime());
     }
     for (const w of waves) {
-      if (w.scheduledStart)    times.push(new Date(w.scheduledStart).getTime());
-      if (w.scheduledEnd)      times.push(new Date(w.scheduledEnd).getTime());
+      if (w.scheduledStart) times.push(new Date(w.scheduledStart).getTime());
+      if (w.scheduledEnd) times.push(new Date(w.scheduledEnd).getTime());
       if (w.revealScheduledAt) times.push(new Date(w.revealScheduledAt).getTime());
     }
     const upcoming = times.filter(t => t > now);
@@ -246,6 +245,7 @@ export default function WavesPage() {
       unsoldStrategy: (w.unsoldStrategy ?? "auto_treasury") as 'auto_treasury' | 'manual',
       revealStrategy: (w.revealStrategy ?? "auto") as 'auto' | 'manual',
       whitelistRequired: w.whitelistRequired ?? true,
+      revealUri: w.waveRevealUri ?? "",
     });
     setSaveError(null);
   };
@@ -254,15 +254,21 @@ export default function WavesPage() {
     if (!editWave) return;
     setSaving(true); setSaveError(null);
     try {
+      const schedLocked = editWave.waveClosed ||
+        editWave.status === "active" ||
+        !!(editWave.scheduledStart && new Date(editWave.scheduledStart) <= new Date());
       const body: Record<string, unknown> = {
         defaultPriceEth: form.defaultPriceEth !== "" ? Number(form.defaultPriceEth) : null,
         saleMethod: form.saleMethod || null,
-        scheduledStart: form.scheduledStart ? new Date(form.scheduledStart).toISOString() : null,
-        scheduledEnd: form.scheduledEnd ? new Date(form.scheduledEnd).toISOString() : null,
+        ...(schedLocked ? {} : {
+          scheduledStart: form.scheduledStart ? new Date(form.scheduledStart).toISOString() : null,
+          scheduledEnd: form.scheduledEnd ? new Date(form.scheduledEnd).toISOString() : null,
+        }),
         status: form.status || null,
         unsoldStrategy: form.unsoldStrategy,
         revealStrategy: form.revealStrategy,
         whitelistRequired: form.whitelistRequired,
+        waveRevealUri: form.revealUri || null,
       };
       const res = await fetch(`/api/waves/${editWave.id}`, {
         method: "PUT", credentials: "include",
@@ -434,8 +440,8 @@ export default function WavesPage() {
       {waveWatchAlert && (
         <div className="flex items-center justify-between px-4 py-2 rounded-xl text-sm"
           style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.25)", color: "#d97706" }}>
-          <span>âš¡ {waveWatchAlert}</span>
-          <button onClick={() => setWaveWatchAlert(null)} className="ml-4 text-xs opacity-60 hover:opacity-100">âœ•</button>
+          <span>{waveWatchAlert}</span>
+          <button onClick={() => setWaveWatchAlert(null)} className="ml-4 text-xs opacity-60 hover:opacity-100">X</button>
         </div>
       )}
       {watchUpdated && (

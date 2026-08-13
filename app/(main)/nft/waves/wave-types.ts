@@ -77,6 +77,7 @@ export interface WaveSchedule {
   wave_end_triggered: boolean;
   wave_reveal_triggered: boolean;
   is_revealed: boolean;
+  wave_reveal_uri?: string | null;
   wave_revealed_at: string | null;
   sold_count: number;
   quantity: number;
@@ -91,4 +92,5 @@ export interface WaveManageForm {
   unsoldStrategy: "auto_treasury" | "manual";
   revealStrategy: "auto" | "manual";
   whitelistRequired: boolean;
+  revealUri: string;
 }

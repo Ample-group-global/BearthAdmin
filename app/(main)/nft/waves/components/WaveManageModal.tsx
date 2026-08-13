@@ -71,6 +71,7 @@ interface WaveManageForm {
   unsoldStrategy: "auto_treasury" | "manual";
   revealStrategy: "auto" | "manual";
   whitelistRequired: boolean;
+  revealUri: string;
 }
 
 // ─── Props ─────────────────────────────────────────────────────────────────────
@@ -657,6 +658,32 @@ export default function WaveManageModal({
               {editWave.revealScheduledAt
                 ? `Auto-reveal scheduled for ${new Date(editWave.revealScheduledAt).toLocaleString()}`
                 : `Auto mode — set a reveal date via the "Set Date" button in the Waves table`}
+            </div>
+          )}
+
+          {/* ── Reveal Metadata URI (required for Auto Reveal) ── */}
+          {form.revealStrategy === "auto" && !editWave.waveRevealed && !editWave.waveRevealTriggered && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold block" style={{ color: "#374151" }}>
+                Metadata Base URI <span style={{ color: "#dc2626" }}>*</span>
+                <span className="ml-1 text-[10px] font-normal" style={{ color: "#9bafc5" }}>(required for auto-reveal)</span>
+              </label>
+              <input
+                value={form.revealUri}
+                onChange={e => setForm(f => ({ ...f, revealUri: e.target.value }))}
+                placeholder="ipfs://QmXxx.../metadata/"
+                className="w-full px-3 py-2 rounded-xl text-xs outline-none"
+                style={{
+                  border: `1px solid ${form.revealUri && !form.revealUri.startsWith("ipfs://") ? "#fca5a5" : "#e5e7eb"}`,
+                  fontFamily: "monospace", color: "#111827",
+                }}
+              />
+              {form.revealUri && !form.revealUri.startsWith("ipfs://") && (
+                <p className="text-[10px]" style={{ color: "#dc2626" }}>URI must start with ipfs://</p>
+              )}
+              <p className="text-[10px]" style={{ color: "#9bafc5" }}>
+                The IPFS base URI for revealed metadata. Auto-trigger will use this at reveal time.
+              </p>
             </div>
           )}
 

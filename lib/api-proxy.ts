@@ -33,6 +33,7 @@ export async function proxyToApi(
       method: options.method ?? "GET",
       headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      cache: "no-store",
     });
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });

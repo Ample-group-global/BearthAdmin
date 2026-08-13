@@ -15,6 +15,7 @@ interface WaveSchedule {
   wave_end_triggered: boolean;
   wave_reveal_triggered: boolean;
   is_revealed: boolean;
+  wave_reveal_uri?: string | null;
   wave_revealed_at: string | null;
   sold_count: number;
   quantity: number;
@@ -38,7 +39,7 @@ export default function WaveRevealModal({
   onClose: () => void;
   onSuccess: (txHash: string) => void;
 }) {
-  const [uri, setUri] = useState("");
+  const [uri, setUri] = useState(wave.wave_reveal_uri ?? "");
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
