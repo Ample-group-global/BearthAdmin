@@ -59,59 +59,30 @@ export default function TreasuryMoveModal({
   onClose: () => void;
   onSuccess: (txHash: string) => void;
 }) {
-  const [useCustom, setUseCustom] = useState(false);
-  const [recipient, setRecipient] = useState("");
-  const [revealUri, setRevealUri] = useState(wave.waveRevealUri ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Contract now allows treasury-close without reveal for 0-minted waves (waveSoldCount == 0)
-  // so a reveal URI is never required from the modal — the API skips the reveal step entirely.
-  const needsRevealUri = false;
-
   const handleSubmit = async () => {
-    if (useCustom && !/^0x[0-9a-fA-F]{40}$/.test(recipient)) {
-      setError("Enter a valid Ethereum address (0x + 40 hex chars)");
-      return;
-    }
-    if (needsRevealUri && !revealUri.trim().startsWith("ipfs://")) {
-      setError("Enter a valid IPFS reveal URI (must start with ipfs://)");
-      return;
-    }
     setSaving(true);
     setError(null);
-
-    console.group("[TreasuryMoveModal] handleSubmit");
-    console.log("waveNumber:", wave.waveNumber);
-    console.log("useCustom:", useCustom);
-    console.log("recipient:", useCustom ? recipient : "(default treasury)");
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 360_000);
     try {
-      const body: Record<string, string> = {};
-      if (useCustom) body.recipient = recipient;
-      if (needsRevealUri && revealUri.trim()) body.revealUri = revealUri.trim();
       const res = await fetch(`/api/nft-sell/waves/${wave.waveNumber}/treasury-close`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({}),
         signal: controller.signal,
       });
       const d = await res.json();
       if (!res.ok) {
         setError(d.error ?? "Transfer failed");
-        console.log("error response:", d.error);
-        console.groupEnd();
         return;
       }
-      console.log("txHash:", d.txHash);
-      console.groupEnd();
       onSuccess(d.txHash ?? "");
     } catch (err: unknown) {
-      console.log("caught error:", err);
-      console.groupEnd();
       if (err instanceof Error && err.name === "AbortError") {
         setError("Transaction submitted but is taking longer than expected. Refresh the page in a few minutes to confirm the transfer completed.");
       } else {
@@ -124,7 +95,6 @@ export default function TreasuryMoveModal({
   };
 
   const pendingCount = wave.treasuryPendingCount ?? 0;
-  const canSubmit = !saving && (!useCustom || !!recipient.trim()) && (!needsRevealUri || revealUri.trim().startsWith("ipfs://"));
   const actionLabel = saving ? "Transferring…" : "Confirm Transfer";
 
   return (
@@ -133,7 +103,7 @@ export default function TreasuryMoveModal({
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid #e5e7eb" }}>
           <div>
             <h2 className="text-sm font-bold" style={{ color: "#24315f" }}>
-              Move to Wallet — W{wave.waveNumber} {wave.name}
+              Move to Wallet &mdash; W{wave.waveNumber} {wave.name}
             </h2>
             <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
               {pendingCount.toLocaleString()} unsold NFT{pendingCount !== 1 ? "s" : ""} awaiting transfer
@@ -149,67 +119,20 @@ export default function TreasuryMoveModal({
         <div className="px-6 py-5 space-y-3">
           {error && <ErrBanner msg={error} onDismiss={() => setError(null)} />}
 
-          {/* Reveal URI — only for 0-minted unrevealed waves */}
-          {needsRevealUri && (
-            <div className="px-3.5 py-3 rounded-xl space-y-2"
-              style={{ background: "rgba(65,175,235,0.05)", border: "1px solid rgba(65,175,235,0.2)" }}>
-              <div className="flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#41afeb" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-[11px] font-semibold" style={{ color: "#24315f" }}>Reveal URI Required</p>
-              </div>
-              <p className="text-[10px]" style={{ color: "#9bafc5" }}>
-                No customers minted in this wave — reveal will run automatically during the transfer. Enter the IPFS metadata base URI to use for this wave&apos;s artwork.
-              </p>
-              <input
-                type="text"
-                value={revealUri}
-                onChange={e => setRevealUri(e.target.value)}
-                placeholder="ipfs://Qm.../metadata"
-                className="w-full rounded-lg px-3 py-2 text-xs font-mono"
-                style={{ border: "1px solid #d1d5db", outline: "none" }}
-              />
-            </div>
-          )}
-
-          {/* Option A — default treasury wallet */}
-          <label
-            className="flex items-start gap-3 p-3.5 rounded-xl cursor-pointer transition-colors"
-            style={{ border: `1.5px solid ${!useCustom ? "#41afeb" : "#e5e7eb"}`, background: !useCustom ? "rgba(65,175,235,0.04)" : "white" }}>
-            <input type="radio" checked={!useCustom} onChange={() => setUseCustom(false)} className="mt-0.5 flex-shrink-0" />
+          {/* Treasury wallet destination */}
+          <div className="flex items-start gap-3 p-3.5 rounded-xl"
+            style={{ border: "1.5px solid #41afeb", background: "rgba(65,175,235,0.04)" }}>
+            <svg className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "#41afeb" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
             <div>
               <p className="text-xs font-bold" style={{ color: "#24315f" }}>Default Treasury Wallet</p>
               <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
-                Uses the treasury address configured in the smart contract
+                NFTs will be sent to the treasury address configured in the smart contract
               </p>
             </div>
-          </label>
-
-          {/* Option B — custom wallet */}
-          <label
-            className="flex items-start gap-3 p-3.5 rounded-xl cursor-pointer transition-colors"
-            style={{ border: `1.5px solid ${useCustom ? "#41afeb" : "#e5e7eb"}`, background: useCustom ? "rgba(65,175,235,0.04)" : "white" }}>
-            <input type="radio" checked={useCustom} onChange={() => setUseCustom(true)} className="mt-0.5 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold" style={{ color: "#24315f" }}>Custom Wallet Address</p>
-              <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
-                Send NFTs to any Ethereum wallet you specify
-              </p>
-              {useCustom && (
-                <input
-                  type="text"
-                  value={recipient}
-                  onChange={e => setRecipient(e.target.value)}
-                  placeholder="0x..."
-                  className="mt-2 w-full rounded-lg px-3 py-2 text-xs font-mono"
-                  style={{ border: "1px solid #d1d5db", outline: "none" }}
-                  autoFocus
-                />
-              )}
-            </div>
-          </label>
+          </div>
 
           {/* Gas warning */}
           <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs"
@@ -230,9 +153,9 @@ export default function TreasuryMoveModal({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!canSubmit}
+              disabled={saving}
               className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white"
-              style={{ background: !canSubmit ? "#9bafc5" : "#16a34a", cursor: !canSubmit ? "not-allowed" : "pointer" }}>
+              style={{ background: saving ? "#9bafc5" : "#16a34a", cursor: saving ? "not-allowed" : "pointer" }}>
               {actionLabel}
             </button>
           </div>
