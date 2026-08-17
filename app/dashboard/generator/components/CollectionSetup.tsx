@@ -322,8 +322,9 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
               <label>Collection Size <span style={{color:'#ef4444'}}>*</span></label>
               <input
                 type="number" min="1" max="100000"
-                value={collection.supply}
-                onChange={e => set('supply', Math.max(1, +e.target.value))}
+                placeholder="e.g. 9999"
+                value={collection.supply ?? ''}
+                onChange={e => set('supply', e.target.value ? Math.max(1, +e.target.value) : undefined)}
                 style={errors.supply ? { borderColor: '#ef4444' } : undefined}
               />
               {errors.supply && <span className="field-error">{errors.supply}</span>}

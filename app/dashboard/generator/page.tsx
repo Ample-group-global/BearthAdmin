@@ -21,7 +21,7 @@ const DEFAULT_COLLECTION = {
   name: '',
   symbol: '',
   description: '',
-  supply: 100,
+  supply: undefined as number | undefined,
   blockchain: 'ethereum',
   format: 'png',
   nameFormat: '#{{id}}',
@@ -321,8 +321,10 @@ export default function Page() {
     setCollection(DEFAULT_COLLECTION);
     setCollectionId(null);
     setSessionRestored(false);
+    setSyncError('');
     setLayers([]);
     fetch('/api/session/collection', { method: 'DELETE' }).catch(() => {});
+    fetch('/api/nft-gen/layers/clear-bucket', { method: 'POST' }).catch(() => {});
   }
 
   const activeLayer = layers.find(l => l.folder === activeFolder) ?? null;
