@@ -93,17 +93,22 @@ test.describe('NFT Studio — generator page', () => {
     test.setTimeout(60_000);
     await waitForStudio(page);
 
-    // The page already fetches from DB on mount and updates the supply input.
-    // Reading the input directly is sufficient — if the DB fetch ran and the
-    // page settled, this value reflects what is stored in the DB.
+    // collection.supply starts undefined and the input intentionally renders
+    // empty (value={collection.supply ?? ''}) until the DB fetch resolves —
+    // that's correct, not a bug, so the product stays untouched. What was
+    // actually wrong was this test reading on a fixed 3s timer instead of
+    // waiting for the real value; poll until it's a genuine positive integer,
+    // however long that takes, instead of assuming a fixed delay is enough.
     const supplyInput = page.locator('input[type="number"]').first();
     await expect(supplyInput).toBeVisible({ timeout: 5_000 });
-    const supplyVal = await supplyInput.inputValue().catch(() => '');
-    console.log(`S-03: Collection Size input = "${supplyVal}"`);
 
-    // Supply must be a valid positive integer
-    const parsed = parseInt(supplyVal, 10);
-    expect(parsed).toBeGreaterThanOrEqual(1);
+    let parsed = NaN;
+    await expect(async () => {
+      const supplyVal = await supplyInput.inputValue().catch(() => '');
+      parsed = parseInt(supplyVal, 10);
+      expect(parsed).toBeGreaterThanOrEqual(1);
+    }).toPass({ timeout: 15_000, intervals: [500] });
+
     console.log(`S-03: Supply input shows ${parsed} — valid DB-loaded value ✓`);
   });
 
