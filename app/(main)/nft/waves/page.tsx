@@ -423,7 +423,7 @@ export default function WavesPage() {
           {/* Hidden: "packs" (Mystery Packs — no on-chain mint in reveal flow, design gap pending) */}
           {([
             { key: "waves", label: "Waves" },
-            { key: "collaborations", label: "Collaborations" },
+            /* Hidden for now (work in progress): { key: "collaborations", label: "Collaborations" } */
           ] as const).map(tab => (
             <button
               key={tab.key}

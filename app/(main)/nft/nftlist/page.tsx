@@ -774,8 +774,9 @@ export default function NftPage() {
       {/* ── Tab Bar ── */}
       <div className="ba-tabs" style={{ borderBottom: "1px solid #e5e7eb" }}>
         <div className="flex gap-1">
-          {/* Hidden: "auctions" (BearthAuction contract not deployed), "seasons" (mintSeasonPass removed from contract), "burn" (BearthBreeding not deployed) */}
-          {(["nftlist", "otc", "bulk", "gifts", "events"] as const).map(tab => {
+          {/* Hidden: "auctions" (BearthAuction not deployed), "seasons" (mintSeasonPass removed), "burn" (BearthBreeding not deployed) */}
+          {/* Hidden for now (work in progress): "otc", "bulk", "gifts", "events" */}
+          {(["nftlist"] as const).map(tab => {
             const LABELS: Record<string, string> = { nftlist: "Records", otc: "OTC Deals", bulk: "Bulk Ops", gifts: "Gifts", events: "Events" };
             const label = LABELS[tab] ?? tab;
             const isActive = activeTab === tab;
