@@ -1,6 +1,6 @@
 // @ts-nocheck
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useLayerFiles } from '../LayerFilesContext';
 
 // Client-side display name derivation — mirrors server-side getName in lib/studio/layers.ts
@@ -146,45 +146,8 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
   const [uploadMsg,     setUploadMsg]     = useState('');
   const [activeFolder,  setActiveFolder]  = useState('');
   const [errors,        setErrors]        = useState({});
-  const [serverInfo,    setServerInfo]    = useState(null);
-  const [pathInput,     setPathInput]     = useState('');
-  const [pathSaving,    setPathSaving]    = useState(false);
-  const [pathMsg,       setPathMsg]       = useState('');
   const folderRef = useRef(null);
   const { storeFiles } = useLayerFiles();
-
-  function refreshServerInfo() {
-    fetch('/api/nft-gen/layers/server-info')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        setServerInfo(d?.folderCount > 0 ? d : null);
-        if (d?.layersDir) setPathInput(d.layersDir);
-      })
-      .catch(() => {});
-  }
-
-  useEffect(() => { refreshServerInfo(); }, []);
-
-  async function handleSetFolder() {
-    if (!pathInput.trim()) return;
-    setPathSaving(true);
-    setPathMsg('');
-    try {
-      const r = await fetch('/api/nft-gen/layers/set-folder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: pathInput.trim() }),
-      });
-      const d = await r.json();
-      if (!r.ok) { setPathMsg(d.error ?? 'Failed to set path'); return; }
-      setPathMsg(`Saved — ${d.folderCount} layer folder${d.folderCount === 1 ? '' : 's'} found`);
-      refreshServerInfo();
-    } catch {
-      setPathMsg('Error saving path');
-    } finally {
-      setPathSaving(false);
-    }
-  }
 
   const set = (k, v) => {
     onChange({ ...collection, [k]: v });
@@ -427,44 +390,6 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
             <div className="setup-artwork-hint">
               Drag and Drop your assets folder into the box below. We will automatically detect your folder name and import all layers.
             </div>
-            {/* Layers folder path — editable, saved to BearthApi config */}
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <input
-                  value={pathInput}
-                  onChange={e => { setPathInput(e.target.value); setPathMsg(''); }}
-                  placeholder="e.g. D:\MyProject\exported_layers"
-                  style={{ flex: 1, fontSize: 12, padding: '5px 9px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--fg)', fontFamily: 'monospace' }}
-                  onKeyDown={e => { if (e.key === 'Enter') handleSetFolder(); }}
-                />
-                <button
-                  onClick={handleSetFolder}
-                  disabled={pathSaving || !pathInput.trim()}
-                  style={{ padding: '5px 12px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--fg)', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                >
-                  {pathSaving ? 'Setting…' : 'Set Path'}
-                </button>
-              </div>
-              {pathMsg && (
-                <div style={{ marginTop: 4, fontSize: 11, color: pathMsg.startsWith('Saved') ? '#22c55e' : '#ef4444' }}>{pathMsg}</div>
-              )}
-            </div>
-
-            {/* Server layers detected banner */}
-            {serverInfo && !uploadDone && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10,
-                padding: '8px 12px', background: 'rgba(34,197,94,0.07)',
-                border: '1px solid rgba(34,197,94,0.25)', borderRadius: 8, fontSize: 12,
-              }}>
-                <span style={{ color: '#22c55e', fontSize: 15, flexShrink: 0 }}>✓</span>
-                <span>
-                  <strong style={{ color: '#22c55e' }}>{serverInfo.folderCount} layer {serverInfo.folderCount === 1 ? 'folder' : 'folders'} detected</strong>
-                  <span style={{ color: 'var(--dim)', marginLeft: 5 }}>— drag-drop below to replace, or click <strong>Save &amp; Continue</strong> to use them directly.</span>
-                </span>
-              </div>
-            )}
-
             <div
               className={`setup-drop-zone${dragOver ? ' drag-over' : ''}${uploadDone ? ' done' : ''}`}
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -482,12 +407,6 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
                   <div className="setup-drop-icon">✅</div>
                   <div className="setup-drop-label">{uploadMsg || 'Assets imported!'}</div>
                   <div className="setup-drop-sub">Click to add more</div>
-                </>
-              ) : serverInfo ? (
-                <>
-                  <div className="setup-drop-icon">☁</div>
-                  <div className="setup-drop-label">Drop to replace server layers</div>
-                  <div className="setup-drop-sub">Optional — server layers will be used automatically if you skip this</div>
                 </>
               ) : (
                 <>
