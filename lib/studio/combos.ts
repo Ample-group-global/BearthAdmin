@@ -1,4 +1,14 @@
-// Shared client-side combo generation logic used by PreviewPanel and ExportPanel
+// Shared client-side combo generation logic used by PreviewPanel (and the
+// legacy browser-side export path).
+//
+// PREVIEW-ONLY, NOT AUTHORITATIVE: this reimplements the same weighted-pick
+// + conflict-resolution + rarity-scoring algorithm as BearthApi's
+// src/routes/nft-gen/generate.ts, which is the actual server-side path that
+// persists real generation results. The two are not guaranteed to stay in
+// sync — if the rarity formula or conflict logic changes on one side,
+// remember to check the other. Preview's numbers are a fast local
+// approximation for the Preview tab's UI, not a guarantee of what the
+// server will actually generate.
 
 export function pickWeighted(assets: any[], ws: Record<string, number>): any | null {
   const pool = assets.filter(a => (ws[a.stem] ?? a.defaultWeight ?? 1) > 0);

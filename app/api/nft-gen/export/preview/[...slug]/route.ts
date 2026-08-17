@@ -32,7 +32,7 @@ export async function GET(
 
   // GET /preview/:previewId — status poll
   if (slug.length === 1) {
-    return proxyToApi(req, `/api/nft-gen/export/preview/${slug[0]}`, { method: "GET" });
+    return proxyToApi(req, `/api/nft-gen/export/preview/${slug[0]}`);
   }
 
   return NextResponse.json({ error: "Not found" }, { status: 404 });

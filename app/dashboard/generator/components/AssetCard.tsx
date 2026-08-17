@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import { useState } from 'react';
-import { calcRarity } from '../../../../lib/studio/probability';
+import { calcRarity, positionForProb } from '../../../../lib/studio/probability';
 import { TIER_PRESET_WEIGHTS } from '../../../../lib/studio/tiers';
 import { useLayerFiles } from '../LayerFilesContext';
 
@@ -17,22 +17,11 @@ function CardModal({ asset, weight, totalWeight, supply, onChange, onDelete, onC
   const { prob, tier, pct, expected: exp } = calcRarity(weight, totalWeight, supply);
   const { getBlobUrl } = useLayerFiles();
 
-  // Compute where tier boundaries fall on the 0-100 slider scale
+  // Tier boundary positions on the 0-100 slider scale
   const otherWeight = Math.max(0, totalWeight - weight);
-  function probAtWeight(w) {
-    const tot = otherWeight + w;
-    return tot > 0 ? w / tot : 0;
-  }
-  // Find slider position (0-100) where each tier starts
-  // prob = w/(w+otherWeight) → w = prob*otherWeight/(1-prob)
-  function weightForProb(p) {
-    if (p <= 0 || otherWeight === 0) return 0;
-    if (p >= 1) return 100;
-    return Math.min(100, (p * otherWeight) / (1 - p));
-  }
-  const legendaryPos = weightForProb(0.01);  // 1% boundary
-  const epicPos      = weightForProb(0.05);  // 5%
-  const rarePos      = weightForProb(0.15);  // 15%
+  const legendaryPos = positionForProb(otherWeight, 0.01);  // 1% boundary
+  const epicPos      = positionForProb(otherWeight, 0.05);  // 5%
+  const rarePos      = positionForProb(otherWeight, 0.15);  // 15%
 
   const sliderVal = Math.min(weight, 100);
 
@@ -146,13 +135,9 @@ export default function AssetCard({ asset, weight, totalWeight, supply, onChange
 
   // Tier zone positions on 0-100 slider scale (same math as modal)
   const otherW = Math.max(0, totalWeight - weight);
-  function wpAt(p) {
-    if (p <= 0 || otherW === 0) return 0;
-    return Math.min(100, (p * otherW) / (1 - p));
-  }
-  const lPos = wpAt(0.01);
-  const ePos = wpAt(0.05);
-  const rPos = wpAt(0.15);
+  const lPos = positionForProb(otherW, 0.01);
+  const ePos = positionForProb(otherW, 0.05);
+  const rPos = positionForProb(otherW, 0.15);
 
   function handleDelete(e) {
     e.stopPropagation();

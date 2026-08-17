@@ -1,23 +1,7 @@
 // @ts-nocheck
 'use client';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import JSZip from 'jszip';
-import { generateAllCombos, computeRarity, applyNameFormat } from '../../../../lib/studio/combos';
 import NftPopup from './NftPopup';
-
-const BATCH = 64;
-
-function makeCanvas(w: number, h: number): OffscreenCanvas | HTMLCanvasElement {
-  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h);
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  return c;
-}
-
-function canvasToBlob(canvas: any, type: string, quality?: number): Promise<Blob> {
-  if (canvas instanceof OffscreenCanvas) return canvas.convertToBlob({ type, quality });
-  return new Promise(res => canvas.toBlob(res, type, quality));
-}
 
 const TIER_META = [
   { label: 'Legendary', sub: 'top 1%',  color: '#F59E0B', bg: '#FEF3C7' },
@@ -200,33 +184,15 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const tW    = Math.max(1, Math.round(targetW * scale));
   const tH    = Math.max(1, Math.round(targetH * scale));
 
-  const [phase,     setPhase]     = useState<'idle'|'preload'|'combos'|'generating'|'done'>('idle');
-  const [loadMsg,   setLoadMsg]   = useState('');
-  const [progress,  setProgress]  = useState(0);
-  const [cid,       setCid]       = useState('');
-  const [metaOnly,  setMetaOnly]  = useState(false);
+  const [phase,     setPhase]     = useState<'idle'|'done'>('idle');
   const [sortBy,    setSortBy]    = useState<'rarity'|'id'>('rarity');
   const [popup,     setPopup]     = useState(null);
-  const [dlLoading, setDlLoading] = useState(false);
   const [error,     setError]     = useState('');
   const [dbError,   setDbError]   = useState('');
   const [dbSaving,  setDbSaving]  = useState(false);
   const [dbSaved,   setDbSaved]   = useState(false);
 
   const [externalUrlBase, setExternalUrlBase] = useState(defaultExternalUrl);
-
-  const [fbBucket,  setFbBucket]  = useState('bearth-nft-it');
-  const [fbStatus,  setFbStatus]  = useState('idle');
-  const [imgPhase,  setImgPhase]  = useState('idle');
-  const [imgDone,   setImgDone]   = useState(0);
-  const [imgCids,   setImgCids]   = useState({});
-  const [metaPhase, setMetaPhase] = useState('idle');
-  const [metaDone,  setMetaDone]  = useState(0);
-  const [metaCids,  setMetaCids]  = useState({});
-  const [showCids,  setShowCids]  = useState(false);
-  const [fbError,   setFbError]   = useState('');
-  const imgCidsRef      = useRef({});
-  const imgPathsRef     = useRef<Record<number, string>>({});
 
   // ── Server-side export state ──────────────────────────────────────────────
   const [svrBucket,   setSvrBucket]   = useState('bearth-nft-it');
@@ -261,19 +227,20 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const [layerStatus,  setLayerStatus]  = useState<'loading'|'ok'|'empty'|'unknown'>('loading');
 
   const [rarityItems,  setRarityItems]  = useState<any[]>([]);
-  const [allCombos,    setAllCombos]    = useState<any[]>([]);
   const [bitmapsVer,   setBitmapsVer]   = useState(0);
   const [filter,       setFilter]       = useState<{ folder: string; stem: string; layerLabel: string; assetName: string } | null>(null);
   const [gridPage,     setGridPage]     = useState(0);
   const jobBitmaps = useRef<Record<string, ImageBitmap>>({});
   const [layers, setLayers] = useState<any[]>(layersProp);
-  const cancelledRef       = useRef(false);
   const lastFailedJobIdRef = useRef<string | null>(null);
   const dbJobIdRef         = useRef<string | null>(null);
   // editionNumber → itemId UUID (populated during persistToDb, used for IPFS CID writeback)
   const editionItemMapRef  = useRef<Record<number, string>>({});
 
   // ── Check whether this collection has active layers in DB ────────────────
+  // Re-runs whenever layersProp/layers actually gain data (not just on mount) —
+  // otherwise a collectionId that's set before the parent's own layer fetch
+  // resolves gets stuck on the self-fetch's stale first verdict.
   useEffect(() => {
     if (!collectionId) { setLayerStatus('unknown'); return; }
     // If layers are already known from props/state, no extra fetch needed
@@ -289,7 +256,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         setLayerStatus(active.length > 0 ? 'ok' : 'empty');
       })
       .catch(() => setLayerStatus('unknown'));
-  }, [collectionId]);
+  }, [collectionId, (layersProp as any[]).length, layers.length]);
 
   // ── Auto-restore done state from DB on mount ─────────────────────────────
   useEffect(() => {
@@ -443,70 +410,6 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       setPrevStatus('error');
       setPrevError(e.message ?? 'Failed to start preview');
     }
-  }
-
-  async function generate() {
-    cancelledRef.current = false;
-    setError('');
-    setPhase('preload');
-    setProgress(0);
-    setRarityItems([]);
-    setAllCombos([]);
-    jobBitmaps.current = {};
-    setBitmapsVer(0);
-
-    let layerData: any[] = layersProp.length ? layersProp : layers;
-    if (!layerData.length) {
-      if (collectionId) {
-        try { const r = await fetch(`/api/layers?collectionId=${collectionId}`); layerData = await r.json(); } catch {}
-      }
-    }
-    if (!layerData.length) {
-      setError('No layers found. Upload assets in the Settings tab first.');
-      setPhase('idle');
-      return;
-    }
-    setLayers(layerData);
-
-    const rels = [...new Set(
-      layerData.flatMap((l: any) => l.assets.filter((a: any) => a.rel).map((a: any) => a.rel))
-    )] as string[];
-
-    let loaded = 0;
-    const imgTotal1 = rels.length;
-    setLoadMsg('Loading images…');
-
-    await Promise.all(rels.map(async (rel) => {
-      try {
-        const res = await fetch(`/api/layer-raw/${rel}`);
-        if (res.ok) {
-          const blob = await res.blob();
-          jobBitmaps.current[rel] = await createImageBitmap(blob);
-        }
-      } catch {}
-      loaded++;
-      setLoadMsg(`Loading images… ${Math.round(loaded / imgTotal1 * 100)}%`);
-    }));
-
-    if (cancelledRef.current) { setPhase('idle'); return; }
-
-    setPhase('combos');
-    setLoadMsg('Generating trait combinations…');
-    await new Promise(r => setTimeout(r, 0));
-
-    const combos = generateAllCombos(supply, layerData, weights, conflicts);
-    const scored = computeRarity(combos, layerData).map(item => ({
-      ...item,
-      combo: combos[item.index - 1],
-      total: supply,
-    }));
-    setAllCombos(combos);
-    setRarityItems(scored);
-    setPhase('done');
-    setDbError('');
-    setDbSaved(false);
-    lastFailedJobIdRef.current = null;
-    if (collectionId) await persistToDb(scored);
   }
 
   const [syncingLayers, setSyncingLayers] = useState(false);
@@ -802,450 +705,6 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     }
   }
 
-  async function downloadZip() {
-    if (!allCombos.length || !layers.length) return;
-    setDlLoading(true);
-    setError('');
-    cancelledRef.current = false;
-    setPhase('generating');
-    setProgress(0);
-
-    try {
-      const zip        = new JSZip();
-      const imgsFolder = metaOnly ? null : zip.folder('images');
-      const metaFolder = zip.folder('metadata');
-      const resolvedCid = cid.trim() || 'PLACEHOLDER_CID';
-
-      for (let idx = 0; idx < supply; idx++) {
-        const num   = idx + 1;
-        const combo = allCombos[idx];
-        const attrs = layers
-          .filter(l => combo[l.folder] && combo[l.folder].rel !== null)
-          .map(l => ({ trait_type: l.label, value: combo[l.folder].name }));
-        metaFolder!.file(`${num}.json`, JSON.stringify({
-          name:         applyNameFormat(nameFormat || (collName ? `${collName} #{{id}}` : '#{{id}}'), num),
-          description,
-          image:        `ipfs://${resolvedCid}/${num}.${imgExt}`,
-          edition:      num,
-          ...(externalUrlBase.trim() ? { external_url: `${externalUrlBase.trim().replace(/\/$/, '')}/${num}` } : {}),
-          attributes:   attrs,
-        }, null, 2));
-      }
-
-      if (!metaOnly && imgsFolder) {
-        const rels = [...new Set(
-          layers.flatMap((l: any) => l.assets.filter((a: any) => a.rel).map((a: any) => a.rel))
-        )] as string[];
-
-        const imageBuffers: Record<string, ArrayBuffer> = {};
-        let imgLoaded = 0;
-        const imgTotal2 = rels.length;
-        setLoadMsg('Loading images…');
-        await Promise.all(rels.map(async (rel) => {
-          try {
-            const res = await fetch(`/api/layer-raw/${rel}`);
-            if (res.ok) imageBuffers[rel] = await res.arrayBuffer();
-          } catch {}
-          imgLoaded++;
-          setLoadMsg(`Loading images… ${Math.round(imgLoaded / imgTotal2 * 100)}%`);
-        }));
-
-        if (cancelledRef.current) { setPhase('done'); setDlLoading(false); return; }
-
-        const useWorkers = typeof Worker !== 'undefined';
-        const numWorkers = useWorkers ? Math.min(navigator.hardwareConcurrency || 4, 8) : 0;
-
-        if (useWorkers && numWorkers > 0) {
-          setLoadMsg(`Compositing with ${numWorkers} threads…`);
-          const chunkSize = Math.ceil(supply / numWorkers);
-          let done = 0, workersDone = 0;
-          let firstError: string | null = null;
-
-          await new Promise<void>((resolve, reject) => {
-            let activeWorkers = 0;
-            for (let w = 0; w < numWorkers; w++) {
-              const start = w * chunkSize;
-              const end   = Math.min(start + chunkSize, supply);
-              if (start >= supply) continue;
-              activeWorkers++;
-              const worker = new Worker('/nft-export-worker.js');
-              worker.onmessage = (e) => {
-                if (cancelledRef.current) { worker.terminate(); workersDone++; if (workersDone >= activeWorkers) resolve(); return; }
-                if (e.data.type === 'chunk') {
-                  for (const { idx, buffer } of e.data.results) imgsFolder.file(`${idx + 1}.${imgExt}`, buffer, { compression: 'STORE' });
-                } else if (e.data.type === 'progress') {
-                  done += e.data.count; setProgress(done);
-                } else if (e.data.type === 'done') {
-                  worker.terminate(); workersDone++; if (workersDone >= activeWorkers) resolve();
-                } else if (e.data.type === 'error') {
-                  if (!firstError) firstError = e.data.message;
-                  worker.terminate(); workersDone++;
-                  if (workersDone >= activeWorkers) { firstError ? reject(new Error(firstError)) : resolve(); }
-                }
-              };
-              worker.onerror = (ev) => {
-                if (!firstError) firstError = ev.message;
-                worker.terminate(); workersDone++;
-                if (workersDone >= activeWorkers) { firstError ? reject(new Error(firstError)) : resolve(); }
-              };
-              worker.postMessage({ combos: allCombos.slice(start, end), imageBuffers, layers, targetW, targetH, imgMime, startIdx: start });
-            }
-            if (activeWorkers === 0) resolve();
-          });
-        } else {
-          const exportBitmaps: Record<string, ImageBitmap> = {};
-          await Promise.all(Object.keys(imageBuffers).map(async (rel) => {
-            try { exportBitmaps[rel] = await createImageBitmap(new Blob([imageBuffers[rel]])); } catch {}
-          }));
-          let done = 0;
-          for (let i = 0; i < supply; i += BATCH) {
-            if (cancelledRef.current) break;
-            const end = Math.min(i + BATCH, supply);
-            await Promise.all(Array.from({ length: end - i }, async (_, j) => {
-              const idx   = i + j;
-              const combo = allCombos[idx];
-              const canvas = makeCanvas(targetW, targetH);
-              const ctx    = (canvas as any).getContext('2d');
-              ctx.clearRect(0, 0, targetW, targetH);
-              for (const layer of layers) {
-                const pick = combo[layer.folder];
-                if (!pick?.rel) continue;
-                const bm = exportBitmaps[pick.rel];
-                if (bm) ctx.drawImage(bm, 0, 0, targetW, targetH);
-              }
-              const blob = await canvasToBlob(canvas, imgMime, wantWebp ? 0.85 : undefined);
-              imgsFolder!.file(`${idx + 1}.${imgExt}`, blob, { compression: 'STORE' });
-            }));
-            done = Math.min(i + BATCH, supply);
-            setProgress(done);
-            await new Promise(r => setTimeout(r, 0));
-          }
-        }
-      }
-
-      if (cancelledRef.current) { setPhase('done'); setDlLoading(false); return; }
-
-      setLoadMsg('Building ZIP…');
-      const blob = await zip.generateAsync(
-        { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 1 } },
-        ({ percent }) => setLoadMsg(`Compressing… ${Math.round(percent)}%`)
-      );
-      const url = URL.createObjectURL(blob);
-      const a   = document.createElement('a');
-      a.href = url;
-      a.download = `${(collName || 'collection').replace(/\s+/g, '_').toLowerCase()}_nfts.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-    } catch (e: any) {
-      setError(e.message);
-    }
-    setPhase('done');
-    setLoadMsg('');
-    setDlLoading(false);
-  }
-
-  function cancel() { cancelledRef.current = true; }
-
-  // ── Filebase helpers ──────────────────────────────────────────────────────────
-  async function checkBucket() {
-    const name = fbBucket.trim();
-    if (!name) return;
-    setFbStatus('checking');
-    setFbError('');
-    try {
-      const r = await fetch(`/api/filebase/buckets/${encodeURIComponent(name)}`);
-      const d = await r.json();
-      setFbStatus(d.exists ? 'exists' : 'not_found');
-    } catch {
-      setFbStatus('error');
-      setFbError('Failed to reach the API. Is BearthApi running on port 8000?');
-    }
-  }
-
-  async function createBucket() {
-    setFbStatus('creating');
-    setFbError('');
-    try {
-      const r = await fetch('/api/filebase/buckets', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: fbBucket.trim() }),
-      });
-      if (!r.ok) { const t = await r.text(); throw new Error(t); }
-      setFbStatus('created');
-    } catch (e: any) {
-      setFbStatus('error');
-      setFbError(e.message ?? 'Create bucket failed');
-    }
-  }
-
-  async function uploadImages() {
-    const bucket = fbBucket.trim();
-    if (!bucket || !allCombos.length) return;
-    setImgPhase('preloading');
-    setFbError('');
-    setImgDone(0);
-    setImgCids({});
-    imgCidsRef.current  = {};
-    imgPathsRef.current = {};
-
-    // Create DB upload batch record
-    let imgBatchId: string | null = null;
-    if (dbJobIdRef.current) {
-      try {
-        const br = await fetch(`/api/nft-gen/jobs/${dbJobIdRef.current}/upload-batches`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ provider: 'filebase', batchType: 'images', totalItems: supply }),
-        });
-        if (br.ok) {
-          const bd = await br.json();
-          imgBatchId = bd?.batch?.id ?? null;
-          if (imgBatchId) {
-            await fetch(`/api/nft-gen/upload-batches/${imgBatchId}/start`, { method: 'POST' }).catch(() => {});
-          }
-        } else {
-          const errBody = await br.json().catch(() => ({}));
-          console.error('[upload-batch-img] create failed:', br.status, JSON.stringify(errBody));
-        }
-      } catch (e) {
-        console.error('[upload-batch-img] create exception:', String(e));
-      }
-    } else {
-      console.error('[upload-batch-img] dbJobIdRef is null — batch skipped');
-    }
-
-    const rels = [...new Set(layers.flatMap(l => l.assets.filter(a => a.rel).map(a => a.rel)))];
-    const imageBuffers = {};
-    await Promise.all(rels.map(async (rel) => {
-      try { const res = await fetch(`/api/layer-raw/${rel}`); if (res.ok) imageBuffers[rel] = await res.arrayBuffer(); } catch {}
-    }));
-    const bitmaps = {};
-    await Promise.all(Object.keys(imageBuffers).map(async (rel) => {
-      try { bitmaps[rel] = await createImageBitmap(new Blob([imageBuffers[rel]])); } catch {}
-    }));
-
-    setImgPhase('uploading');
-    const CONCURRENCY = 3;
-    let cursor = 0;
-    let uploadedCount = 0;
-    let lastReported = 0;
-
-    async function runOne() {
-      while (cursor < allCombos.length) {
-        const idx   = cursor++;
-        const num   = idx + 1;
-        const combo = allCombos[idx];
-        const canvas = makeCanvas(targetW, targetH);
-        const ctx    = canvas.getContext('2d');
-        ctx.clearRect(0, 0, targetW, targetH);
-        for (const layer of layers) {
-          const pick = combo[layer.folder];
-          if (!pick?.rel) continue;
-          const bm = bitmaps[pick.rel];
-          if (bm) ctx.drawImage(bm, 0, 0, targetW, targetH);
-        }
-        const blob = await canvasToBlob(canvas, imgMime, wantWebp ? 0.85 : undefined);
-        const fd = new FormData();
-        fd.append('file', blob, `${num}.${imgExt}`);
-        fd.append('bucket', bucket);
-        fd.append('key', `images/${num}.${imgExt}`);
-        try {
-          const r = await fetch('/api/filebase/image', { method: 'POST', body: fd });
-          if (r.ok) {
-            const d = await r.json();
-            imgCidsRef.current[num]  = d.cid || '';
-            imgPathsRef.current[num] = `images/${num}.${imgExt}`;
-            setImgCids(prev => ({ ...prev, [num]: d.cid || '' }));
-          }
-        } catch {}
-        uploadedCount++;
-        setImgDone(prev => prev + 1);
-        // Report progress every 10% of supply (min 1, max 100)
-        const imgProgressStep = Math.max(1, Math.min(100, Math.ceil(supply / 10)));
-        if (imgBatchId && uploadedCount - lastReported >= imgProgressStep) {
-          lastReported = uploadedCount;
-          fetch(`/api/nft-gen/upload-batches/${imgBatchId}/progress`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uploadedItems: uploadedCount }),
-          }).catch(() => {});
-        }
-      }
-    }
-
-    try {
-      await Promise.all(Array.from({ length: CONCURRENCY }, runOne));
-      setImgPhase('done');
-      if (imgBatchId) {
-        await fetch(`/api/nft-gen/upload-batches/${imgBatchId}/complete`, { method: 'POST' }).catch(() => {});
-      }
-    } catch (e: any) {
-      setImgPhase('idle');
-      setFbError(e.message ?? 'Image upload failed');
-      if (imgBatchId) {
-        fetch(`/api/nft-gen/upload-batches/${imgBatchId}/fail`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error: e.message ?? 'Image upload failed' }),
-        }).catch(() => {});
-      }
-    }
-  }
-
-  async function clearUploads() {
-    const bucket = fbBucket.trim();
-    if (!bucket) return;
-    if (!confirm(`Delete ALL uploaded files from bucket "${bucket}"? This cannot be undone.`)) return;
-    setFbError('');
-    try {
-      // List everything with images/ and metadata/ prefix
-      const [imgList, metaList] = await Promise.all([
-        fetch(`/api/filebase/objects?bucket=${encodeURIComponent(bucket)}&prefix=images/`).then(r => r.json()),
-        fetch(`/api/filebase/objects?bucket=${encodeURIComponent(bucket)}&prefix=metadata/`).then(r => r.json()),
-      ]);
-      const keys = [
-        ...(imgList.objects ?? []).map((o: any) => o.key),
-        ...(metaList.objects ?? []).map((o: any) => o.key),
-      ].filter(Boolean);
-
-      if (!keys.length) { alert('No files found in bucket to delete.'); return; }
-
-      const r = await fetch('/api/filebase/objects/batch', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bucket, keys }),
-      });
-      const d = await r.json();
-      if (r.ok) {
-        setImgPhase('idle');
-        setImgDone(0);
-        setImgCids({});
-        setMetaPhase('idle');
-        setMetaDone(0);
-        setMetaCids({});
-        imgCidsRef.current = {};
-        alert(`Deleted ${d.deleted} files from bucket "${bucket}".`);
-      } else {
-        setFbError(d.error ?? 'Delete failed');
-      }
-    } catch (e: any) {
-      setFbError(e.message ?? 'Delete failed');
-    }
-  }
-
-  async function uploadMetadata() {
-    const bucket = fbBucket.trim();
-    if (!bucket || !allCombos.length) return;
-    setMetaPhase('uploading');
-    setFbError('');
-    setMetaDone(0);
-    setMetaCids({});
-
-    // Create DB upload batch record
-    let metaBatchId: string | null = null;
-    if (dbJobIdRef.current) {
-      try {
-        const br = await fetch(`/api/nft-gen/jobs/${dbJobIdRef.current}/upload-batches`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ provider: 'filebase', batchType: 'metadata', totalItems: supply }),
-        });
-        if (br.ok) {
-          const bd = await br.json();
-          metaBatchId = bd?.batch?.id ?? null;
-          if (metaBatchId) {
-            await fetch(`/api/nft-gen/upload-batches/${metaBatchId}/start`, { method: 'POST' }).catch(() => {});
-          }
-        }
-      } catch {}
-    }
-
-    const BATCH_SIZE = 50;
-    const resolvedNameFmt = nameFormat || (collName ? `${collName} #{{id}}` : '#{{id}}');
-    let totalUploaded = 0;
-    const localMetaCids: Record<number, string> = {};
-
-    for (let i = 0; i < supply; i += BATCH_SIZE) {
-      const end   = Math.min(i + BATCH_SIZE, supply);
-      const items = [];
-      for (let idx = i; idx < end; idx++) {
-        const num   = idx + 1;
-        const combo = allCombos[idx];
-        const attrs = layers
-          .filter(l => combo[l.folder] && combo[l.folder].rel !== null)
-          .map(l => ({ trait_type: l.label, value: combo[l.folder].name }));
-        const imgCid = imgCidsRef.current[num];
-        items.push({
-          key:     `metadata/${num}.json`,
-          content: JSON.stringify({
-            name:         applyNameFormat(resolvedNameFmt, num),
-            description,
-            image:        imgCid ? `ipfs://${imgCid}` : `ipfs://PLACEHOLDER_CID/${num}.${imgExt}`,
-            edition:      num,
-            ...(externalUrlBase.trim() ? { external_url: `${externalUrlBase.trim().replace(/\/$/, '')}/${num}` } : {}),
-            attributes:   attrs,
-          }, null, 2),
-        });
-      }
-      try {
-        const r = await fetch('/api/filebase/metadata', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bucket, items }),
-        });
-        if (r.ok) {
-          const results = await r.json();
-          const update  = {};
-          results.forEach(({ key, cid }) => {
-            const n = parseInt(key.split('/').pop().replace('.json', ''), 10);
-            if (!isNaN(n)) update[n] = cid || '';
-          });
-          setMetaCids(prev => ({ ...prev, ...update }));
-          Object.assign(localMetaCids, update);
-        }
-      } catch {}
-      totalUploaded += items.length;
-      setMetaDone(prev => prev + items.length);
-      // Report progress to DB every batch
-      if (metaBatchId) {
-        fetch(`/api/nft-gen/upload-batches/${metaBatchId}/progress`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uploadedItems: totalUploaded }),
-        }).catch(() => {});
-      }
-    }
-    setMetaPhase('done');
-    if (metaBatchId) {
-      await fetch(`/api/nft-gen/upload-batches/${metaBatchId}/complete`, { method: 'POST' }).catch(() => {});
-    }
-
-    // Write IPFS CIDs back to nft_generated_items in the DB
-    if (dbJobIdRef.current && Object.keys(imgCidsRef.current).length > 0) {
-      const IPFS_BATCH = 500;
-      const editions = Object.keys(imgCidsRef.current).map(Number);
-      for (let i = 0; i < editions.length; i += IPFS_BATCH) {
-        const chunk = editions.slice(i, i + IPFS_BATCH);
-        const payload = chunk
-          .filter(n => imgCidsRef.current[n] && localMetaCids[n])
-          .map(n => ({
-            editionNumber:   n,
-            ipfsImageCid:    imgCidsRef.current[n],
-            ipfsMetadataCid: localMetaCids[n],
-            imagePath:       imgPathsRef.current[n] ?? null,
-          }));
-        if (payload.length > 0) {
-          fetch(`/api/nft-gen/jobs/${dbJobIdRef.current}/items/batch-ipfs`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ items: payload }),
-          }).catch(() => {});
-        }
-      }
-    }
-  }
-
   const PAGE_SIZE = 200;
 
   const visibleItems = useMemo(() => {
@@ -1278,9 +737,6 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     );
   }
   function clearFilter() { setFilter(null); }
-
-  const pct = supply > 0 ? Math.min((progress / supply) * 100, 100) : 0;
-  const bucketReady = fbStatus === 'exists' || fbStatus === 'created';
 
   // ── Server-side generation in progress (must come before idle check) ─────────
   if (svrGenStatus === 'running') {
@@ -1334,18 +790,8 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
             </div>
           </div>
 
-          {/* CID + Options */}
+          {/* Options */}
           <div className="exp-idle-options">
-            <div className="exp-idle-option-card">
-              <div className="exp-option-label">IPFS CID <span className="exp-option-hint">(optional — paste after uploading images)</span></div>
-              <input
-                className="exp-text-input"
-                placeholder="ipfs://Qm…  or leave blank"
-                value={cid}
-                onChange={e => setCid(e.target.value)}
-              />
-              <div className="exp-option-sub">Image URLs in metadata: <code>ipfs://YOUR_CID/1.{imgExt}</code></div>
-            </div>
             <div className="exp-idle-option-card">
               <div className="exp-option-label">Website URL <span className="exp-option-hint">(optional — OpenSea "View on Website" link)</span></div>
               <input
@@ -1355,13 +801,6 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
                 onChange={e => setExternalUrlBase(e.target.value)}
               />
               <div className="exp-option-sub">Each NFT gets: <code>{externalUrlBase.trim() ? `${externalUrlBase.trim().replace(/\/$/, '')}/1` : 'https://bearth.io/nft/1'}</code></div>
-            </div>
-            <div className="exp-idle-option-card">
-              <div className="exp-option-label">Options</div>
-              <label className="exp-checkbox-row">
-                <input type="checkbox" checked={metaOnly} onChange={e => setMetaOnly(e.target.checked)} />
-                <span>Metadata only <span className="exp-option-hint">(skip image compositing)</span></span>
-              </label>
             </div>
           </div>
 
@@ -1398,36 +837,6 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     );
   }
 
-  // ── Preload / Combos (browser generation) ────────────────────────────────────
-  if (phase === 'preload' || phase === 'combos') {
-    return (
-      <div className="export-page">
-        <div className="exp-loading-card">
-          <Spinner size={32} color="var(--accent)" />
-          <div className="exp-loading-title">{phase === 'combos' ? 'Generating combinations…' : 'Preparing…'}</div>
-          <div className="exp-loading-msg">{loadMsg}</div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Generating ZIP ────────────────────────────────────────────────────────────
-  if (phase === 'generating') {
-    return (
-      <div className="export-page">
-        <div className="exp-loading-card">
-          <div className="exp-gen-title">{metaOnly ? 'Generating metadata…' : 'Compositing NFTs…'}</div>
-          <div className="exp-gen-sub">{loadMsg || `${progress.toLocaleString()} / ${supply.toLocaleString()} NFTs`}</div>
-          <div className="exp-gen-progress-wrap">
-            <ProgressBar value={progress} max={supply} />
-            <div className="exp-gen-pct">{pct.toFixed(1)}%</div>
-          </div>
-          <button className="btn btn-ghost" onClick={cancel} style={{ marginTop: 8 }}>Cancel</button>
-        </div>
-      </div>
-    );
-  }
-
   // ── Done ──────────────────────────────────────────────────────────────────────
   return (
     <div className="export-page">
@@ -1450,35 +859,11 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           </div>
 
           <div className="exp-top-right">
-            <label className="exp-checkbox-row exp-checkbox-sm">
-              <input type="checkbox" checked={metaOnly} onChange={e => setMetaOnly(e.target.checked)} />
-              <span>Metadata only</span>
-            </label>
-            <input
-              className="exp-cid-input"
-              placeholder="IPFS CID (optional)"
-              value={cid}
-              onChange={e => setCid(e.target.value)}
-            />
-            <button className="btn btn-primary" onClick={downloadZip} disabled={dlLoading}>
-              {dlLoading ? loadMsg || 'Generating…' : '⬇ Download ZIP'}
-            </button>
-            {dlLoading && (
-              <button className="btn btn-ghost" onClick={cancel}>Cancel</button>
-            )}
-            <button className="btn btn-ghost" onClick={() => { setPhase('idle'); setRarityItems([]); setAllCombos([]); }}>
+            <button className="btn btn-ghost" onClick={() => { setPhase('idle'); setRarityItems([]); }}>
               ↺ Regenerate
             </button>
           </div>
         </div>
-
-        {/* ZIP progress (while downloading) */}
-        {dlLoading && (
-          <div className="exp-dl-progress">
-            <ProgressBar value={progress} max={supply} />
-            <div className="exp-dl-pct">{pct.toFixed(0)}%&ensp;{loadMsg}</div>
-          </div>
-        )}
 
         {error && <div className="exp-error-banner" style={{ marginBottom: 10 }}>{error}</div>}
 
@@ -1500,9 +885,8 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
             <div className="exp-banner-error-body">
               <div className="exp-banner-error-msg">Failed to save to database: {dbError}</div>
               <div className="exp-banner-error-sub">
-                Your {rarityItems.length.toLocaleString()} generated NFTs are still in memory. You can{' '}
-                <button className="exp-inline-btn" onClick={downloadZip}>Download ZIP</button>{' '}
-                at any time. When the server recovers, click Retry to persist.
+                Your {rarityItems.length.toLocaleString()} generated NFTs are still in memory.
+                When the server recovers, click Retry to persist.
               </div>
             </div>
             <button className="exp-retry-btn" onClick={() => persistToDb(rarityItems)}>↺ Retry</button>
@@ -1574,155 +958,6 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           </div>
         ) : (
           <div className="exp-empty-filter">No NFTs match this filter.</div>
-        )}
-      </div>
-
-      {/* ── Push to Filebase IPFS ── */}
-      <div className="exp-fb-card">
-        <div className="exp-fb-header">
-          <div className="exp-fb-title">Push to Filebase IPFS</div>
-          <div className="exp-fb-sub">Upload all images and metadata to IPFS via Filebase for on-chain use</div>
-        </div>
-
-        {/* Bucket row */}
-        <div className="exp-fb-bucket-row">
-          <input
-            className="exp-fb-input"
-            placeholder="Filebase bucket name"
-            value={fbBucket}
-            onChange={e => { setFbBucket(e.target.value); setFbStatus('idle'); }}
-          />
-          <button
-            className="btn btn-ghost"
-            onClick={checkBucket}
-            disabled={!fbBucket.trim() || fbStatus === 'checking'}
-          >
-            {fbStatus === 'checking' ? <><Spinner size={13} />&ensp;Checking…</> : 'Check Bucket'}
-          </button>
-          {fbStatus === 'not_found' && (
-            <button className="btn btn-primary" onClick={createBucket} disabled={fbStatus === 'creating'}>
-              + Create Bucket
-            </button>
-          )}
-          {fbStatus === 'creating' && <span className="exp-fb-status-info"><Spinner size={13} />&ensp;Creating…</span>}
-          {bucketReady && (
-            <span className="exp-fb-status-ok"><CheckIcon size={14} /> Bucket ready</span>
-          )}
-          {fbStatus === 'not_found' && (
-            <span className="exp-fb-status-warn">Bucket not found — create it first</span>
-          )}
-        </div>
-
-        {fbError && <div className="exp-error-banner" style={{ marginBottom: 14 }}>{fbError}</div>}
-
-        {/* Step cards */}
-        <div className="exp-step-grid">
-          {/* Step 1 — Images */}
-          <StepCard num={1} title="Upload Images" status={imgPhase}>
-            <button
-              className="btn btn-primary"
-              onClick={uploadImages}
-              disabled={!bucketReady || imgPhase === 'preloading' || imgPhase === 'uploading'}
-              style={{ width: '100%', marginBottom: 10, justifyContent: 'center' }}
-            >
-              {imgPhase === 'preloading' ? <><Spinner size={13} color="#fff" />&ensp;Preloading images…</>
-               : imgPhase === 'uploading' ? <><Spinner size={13} color="#fff" />&ensp;Uploading {imgDone.toLocaleString()} / {supply.toLocaleString()}</>
-               : imgPhase === 'done'      ? <><CheckIcon size={13} />&ensp;{imgDone.toLocaleString()} Images Uploaded</>
-               : '⬆ Upload Images'}
-            </button>
-            {imgPhase !== 'idle' && (
-              <>
-                <ProgressBar value={imgDone} max={supply} color={imgPhase === 'done' ? '#16a34a' : undefined} />
-                <div className="exp-step-count">{imgDone.toLocaleString()} / {supply.toLocaleString()}</div>
-              </>
-            )}
-            {!bucketReady && imgPhase === 'idle' && (
-              <div className="exp-step-hint">Configure a bucket above first</div>
-            )}
-          </StepCard>
-
-          {/* Step 2 — Metadata */}
-          <StepCard num={2} title="Upload Metadata" status={metaPhase}>
-            <button
-              className="btn btn-primary"
-              onClick={uploadMetadata}
-              disabled={imgPhase !== 'done' || metaPhase === 'uploading'}
-              style={{ width: '100%', marginBottom: 10, justifyContent: 'center' }}
-            >
-              {metaPhase === 'uploading' ? <><Spinner size={13} color="#fff" />&ensp;Uploading {metaDone.toLocaleString()} / {supply.toLocaleString()}</>
-               : metaPhase === 'done'    ? <><CheckIcon size={13} />&ensp;{metaDone.toLocaleString()} Metadata Uploaded</>
-               : '⬆ Upload Metadata'}
-            </button>
-            {metaPhase !== 'idle' && (
-              <>
-                <ProgressBar value={metaDone} max={supply} color={metaPhase === 'done' ? '#16a34a' : undefined} />
-                <div className="exp-step-count">{metaDone.toLocaleString()} / {supply.toLocaleString()}</div>
-              </>
-            )}
-            {imgPhase !== 'done' && metaPhase === 'idle' && (
-              <div className="exp-step-hint">Complete Step 1 first</div>
-            )}
-          </StepCard>
-        </div>
-
-        {/* CID summary (after metadata done) */}
-        {metaPhase === 'done' && (
-          <div className="exp-cid-section">
-            <div className="exp-cid-header">
-              <div className="exp-cid-title">CID Summary</div>
-              <div className="exp-cid-actions">
-                <button className="btn btn-ghost" onClick={() => setShowCids(v => !v)}>
-                  {showCids ? '▲ Hide table' : '▼ Show table'}
-                </button>
-                <button className="btn btn-ghost" onClick={() => {
-                  const keys = Object.keys(imgCids).sort((a, b) => Number(a) - Number(b));
-                  const lines = keys.map(n => `${n}\t${imgCids[n]}\t${metaCids[n] || ''}`).join('\n');
-                  navigator.clipboard?.writeText(`#\tImage CID\tMetadata CID\n${lines}`);
-                }}>📋 Copy All</button>
-                <button
-                  className="btn btn-ghost"
-                  style={{ color: '#dc2626', borderColor: '#fca5a5' }}
-                  onClick={clearUploads}
-                >🗑 Clear uploads</button>
-              </div>
-            </div>
-
-            <div className="exp-cid-stats">
-              {[
-                { label: 'Images Uploaded',   val: Object.keys(imgCids).length },
-                { label: 'Metadata Uploaded', val: Object.keys(metaCids).length },
-                { label: 'Bucket',            val: fbBucket, mono: true },
-              ].map(s => (
-                <div key={s.label} className="exp-cid-stat">
-                  <div className="exp-cid-stat-label">{s.label}</div>
-                  <div className={`exp-cid-stat-val${s.mono ? ' exp-cid-mono' : ''}`}>{typeof s.val === 'number' ? s.val.toLocaleString() : s.val}</div>
-                </div>
-              ))}
-            </div>
-
-            {showCids && (
-              <div className="exp-cid-table-wrap">
-                <table className="exp-cid-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Image CID</th>
-                      <th>Metadata CID</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.keys(imgCids).sort((a, b) => Number(a) - Number(b)).map(n => (
-                      <tr key={n}>
-                        <td className="exp-cid-num">{n}</td>
-                        <td className="exp-cid-mono">{imgCids[n] || '—'}</td>
-                        <td className="exp-cid-mono">{metaCids[n] || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
         )}
       </div>
 

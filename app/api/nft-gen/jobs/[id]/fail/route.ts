@@ -3,8 +3,10 @@ import { proxyToApi } from "../../../../../../lib/api-proxy";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  let body: unknown;
+  try { body = await req.json(); } catch { body = undefined; }
   return proxyToApi(req, `/api/nft-gen/jobs/${id}/fail`, {
     method: "POST",
-    body: await req.json(),
+    body,
   });
 }

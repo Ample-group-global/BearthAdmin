@@ -419,6 +419,9 @@ export default function Page() {
         )}
 
         {/* ── Step 3: Rarity ── */}
+        {/* Unreachable while StepNav's SHOW_RARITY_TAB flag is false — the nav never
+            offers 'rarity' as a step, so setStep(...) can't land here. Kept (not
+            deleted) so the tab can be restored by flipping that one flag. */}
         {step === 'rarity' && (
           <RarityTab
             layers={layers}

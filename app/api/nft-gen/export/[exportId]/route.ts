@@ -3,5 +3,5 @@ import { proxyToApi }  from "../../../../../lib/api-proxy";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ exportId: string }> }) {
   const { exportId } = await params;
-  return proxyToApi(req, `/api/nft-gen/export/${exportId}`, { method: "GET" });
+  return proxyToApi(req, `/api/nft-gen/export/${exportId}`);
 }

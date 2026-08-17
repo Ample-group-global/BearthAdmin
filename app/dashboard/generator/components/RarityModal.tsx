@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import { useState, useMemo, useCallback } from 'react';
-import { TIER_PRESET_WEIGHTS } from '../../../../lib/studio/tiers';
+import { TIER_PRESET_WEIGHTS, TIERS } from '../../../../lib/studio/tiers';
 import { calcRarity } from '../../../../lib/studio/probability';
 import { useLayerFiles } from '../LayerFilesContext';
 
@@ -36,16 +36,18 @@ export default function RarityModal({ layer, weights, supply, onSave, onDelete, 
   }
 
   function distributeByTier() {
-    // Sort assets by current weight ascending — rarest first
+    // Sort assets by current weight ascending — rarest first. Boundaries
+    // match the same TIERS thresholds used for the tier badges shown right
+    // below (was previously 10/25/50%, badges use 1/5/15% — mismatched).
     const sorted = [...layer.assets].sort((a, b) => (localWs[a.stem] ?? 1) - (localWs[b.stem] ?? 1));
     const n = sorted.length;
     const eq = { ...localWs };
     sorted.forEach((a, i) => {
       const pct = i / Math.max(n - 1, 1);
-      if (pct < 0.10)      eq[a.stem] = TIER_PRESET_WEIGHTS.Legendary;
-      else if (pct < 0.25) eq[a.stem] = TIER_PRESET_WEIGHTS.Epic;
-      else if (pct < 0.50) eq[a.stem] = TIER_PRESET_WEIGHTS.Rare;
-      else                 eq[a.stem] = TIER_PRESET_WEIGHTS.Common;
+      if (pct < TIERS[0].max)      eq[a.stem] = TIER_PRESET_WEIGHTS.Legendary;
+      else if (pct < TIERS[1].max) eq[a.stem] = TIER_PRESET_WEIGHTS.Epic;
+      else if (pct < TIERS[2].max) eq[a.stem] = TIER_PRESET_WEIGHTS.Rare;
+      else                         eq[a.stem] = TIER_PRESET_WEIGHTS.Common;
     });
     setLocalWs(eq);
   }
@@ -71,7 +73,7 @@ export default function RarityModal({ layer, weights, supply, onSave, onDelete, 
         <div className="rm-toolbar">
           <span className="rm-trait-count">{layer.count} traits</span>
           <span className="rm-totalw">Total weight: {totalW.toFixed(1)}</span>
-          <button className="rm-tbtn" onClick={distributeByTier} title="Auto-assign weights: top 10% = Legendary (1), next 15% = Epic (3), next 25% = Rare (10), rest = Common (30)">✦ Distribute</button>
+          <button className="rm-tbtn" onClick={distributeByTier} title="Auto-assign weights: rarest 1% = Legendary, next 4% = Epic, next 10% = Rare, rest = Common">✦ Distribute</button>
           <button className="rm-tbtn" onClick={equalizeAll}>Equalize</button>
           <button className="rm-tbtn" onClick={resetAll}>Reset</button>
         </div>
