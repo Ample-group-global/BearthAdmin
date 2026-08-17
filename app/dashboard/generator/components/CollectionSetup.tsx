@@ -147,15 +147,44 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
   const [activeFolder,  setActiveFolder]  = useState('');
   const [errors,        setErrors]        = useState({});
   const [serverInfo,    setServerInfo]    = useState(null);
+  const [pathInput,     setPathInput]     = useState('');
+  const [pathSaving,    setPathSaving]    = useState(false);
+  const [pathMsg,       setPathMsg]       = useState('');
   const folderRef = useRef(null);
   const { storeFiles } = useLayerFiles();
 
-  useEffect(() => {
+  function refreshServerInfo() {
     fetch('/api/nft-gen/layers/server-info')
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d && d.folderCount > 0) setServerInfo(d); })
+      .then(d => {
+        setServerInfo(d?.folderCount > 0 ? d : null);
+        if (d?.layersDir) setPathInput(d.layersDir);
+      })
       .catch(() => {});
-  }, []);
+  }
+
+  useEffect(() => { refreshServerInfo(); }, []);
+
+  async function handleSetFolder() {
+    if (!pathInput.trim()) return;
+    setPathSaving(true);
+    setPathMsg('');
+    try {
+      const r = await fetch('/api/nft-gen/layers/set-folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: pathInput.trim() }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setPathMsg(d.error ?? 'Failed to set path'); return; }
+      setPathMsg(`Saved — ${d.folderCount} layer folder${d.folderCount === 1 ? '' : 's'} found`);
+      refreshServerInfo();
+    } catch {
+      setPathMsg('Error saving path');
+    } finally {
+      setPathSaving(false);
+    }
+  }
 
   const set = (k, v) => {
     onChange({ ...collection, [k]: v });
@@ -398,14 +427,27 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
             <div className="setup-artwork-hint">
               Drag and Drop your assets folder into the box below. We will automatically detect your folder name and import all layers.
             </div>
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, padding:'6px 10px', background:'var(--bg2)', borderRadius:7, border:'1px solid var(--border)', fontSize:12 }}>
-              <span style={{ color:'var(--dim)' }}>Active layers folder:</span>
-              {activeFolder
-                ? <span style={{ color:'var(--accent)', fontWeight:600, fontFamily:'monospace' }}>{activeFolder}</span>
-                : collectionId
-                  ? <span style={{ color:'#2e9fd8', fontWeight:600 }}>Saved in database — drop a new folder to replace</span>
-                  : <span style={{ color:'var(--dim)', fontStyle:'italic' }}>None — drop a folder below to import</span>
-              }
+            {/* Layers folder path — editable, saved to BearthApi config */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input
+                  value={pathInput}
+                  onChange={e => { setPathInput(e.target.value); setPathMsg(''); }}
+                  placeholder="e.g. D:\MyProject\exported_layers"
+                  style={{ flex: 1, fontSize: 12, padding: '5px 9px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--fg)', fontFamily: 'monospace' }}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSetFolder(); }}
+                />
+                <button
+                  onClick={handleSetFolder}
+                  disabled={pathSaving || !pathInput.trim()}
+                  style={{ padding: '5px 12px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--fg)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  {pathSaving ? 'Setting…' : 'Set Path'}
+                </button>
+              </div>
+              {pathMsg && (
+                <div style={{ marginTop: 4, fontSize: 11, color: pathMsg.startsWith('Saved') ? '#22c55e' : '#ef4444' }}>{pathMsg}</div>
+              )}
             </div>
 
             {/* Server layers detected banner */}
