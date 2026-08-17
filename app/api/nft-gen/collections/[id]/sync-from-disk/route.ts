@@ -49,7 +49,13 @@ async function syncLayerManifest(
 
     const activeFilePaths = realAssets.map((a) => a.rel as string);
     let traitsUpserted = 0;
-    const BATCH = 50;
+    // BearthApi's DB pool caps at 10 connections total (src/pool.ts). Each of
+    // these trait-create calls is a full round-trip that briefly holds one —
+    // batching at 50 could open up to 50 at once, starving the pool and
+    // causing "timeout exceeded when trying to connect" cascades (confirmed
+    // live 2026-08-17: a 213-trait upload crashed BearthApi this way). 6
+    // leaves headroom for the wave-auto-trigger job and other traffic.
+    const BATCH = 6;
     for (let i = 0; i < realAssets.length; i += BATCH) {
       await Promise.all(realAssets.slice(i, i + BATCH).map(async (asset) => {
         const r = await apiPost(token, `/api/nft-gen/layers/${layerId}/traits`, {
