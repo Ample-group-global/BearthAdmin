@@ -4,6 +4,19 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import NftPopup from './NftPopup';
 import { TIER_META, Spinner, CheckIcon, RarityCard, ProgressBar, HLayerFilter } from './ExportGridParts';
 
+// A single hung request in a bitmap batch used to freeze that whole batch
+// forever — fetch() has no default timeout, and Promise.all never resolves
+// until every request in it settles. Same fix as PreviewPanel.tsx.
+async function fetchWithTimeout(url: string, ms = 10_000): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function ExportPanel({ weights, layers: layersProp = [], collection, conflicts, collectionId = null }) {
   const supply      = collection?.supply      ?? 100;
@@ -424,7 +437,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           await Promise.all(batch.map(async (rel) => {
             if (jobBitmaps.current[rel]) return;
             try {
-              const res = await fetch(`/api/layer-raw/${rel}`);
+              const res = await fetchWithTimeout(`/api/layer-raw/${rel}`);
               if (res.ok) {
                 const blob = await res.blob();
                 jobBitmaps.current[rel] = await createImageBitmap(blob);

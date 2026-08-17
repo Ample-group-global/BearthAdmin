@@ -8,6 +8,21 @@ import NftPopup from './NftPopup';
 const THUMB      = 160;
 const CARD_MIN_W = 155; // matches CSS minmax(155px, 1fr)
 const GAP        = 12;  // matches CSS gap: 12px
+
+// A single hung request in the batch loop below used to freeze "Loading
+// images…" forever — fetch() has no default timeout, and Promise.all never
+// resolves the batch until every request in it settles (confirmed live
+// 2026-08-17: Preview stuck at 0% with no error, no recovery). One bad
+// connection now fails just that one thumbnail instead of the whole load.
+async function fetchWithTimeout(url: string, ms = 10_000): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
 const CARD_BODY  = 36;  // thumb body height below image (padding + name)
 const OVERSCAN   = 3;   // extra rows rendered above/below viewport
 
@@ -195,10 +210,10 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
           const blobUrl = getBlobUrl(rel);
           let res: Response;
           if (blobUrl) {
-            res = await fetch(blobUrl);
-            if (!res.ok) res = await fetch(`/api/thumb/${rel}`);
+            res = await fetchWithTimeout(blobUrl);
+            if (!res.ok) res = await fetchWithTimeout(`/api/thumb/${rel}`);
           } else {
-            res = await fetch(`/api/thumb/${rel}`);
+            res = await fetchWithTimeout(`/api/thumb/${rel}`);
           }
           if (res.ok) {
             const blob = await res.blob();
