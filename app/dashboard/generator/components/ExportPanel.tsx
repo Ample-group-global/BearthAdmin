@@ -395,18 +395,33 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       });
       setRarityItems(displayed);
 
-      // Load bitmaps in background — increment bitmapsVer when done to trigger re-draw
-      Promise.all(rels.map(async (rel) => {
-        if (!jobBitmaps.current[rel]) {
-          try {
-            const res = await fetch(`/api/layer-raw/${rel}`);
-            if (res.ok) {
-              const blob = await res.blob();
-              jobBitmaps.current[rel] = await createImageBitmap(blob);
-            }
-          } catch {}
+      // Load bitmaps in background, in small batches — bump bitmapsVer after
+      // EACH batch instead of once at the very end. Previously this was one
+      // giant Promise.all over every unique trait image in the whole
+      // generated set, so the entire grid stayed blank until all of them
+      // arrived (confirmed live: a 1000-NFT set with ~213 distinct trait
+      // images left every visible card blank for several seconds after
+      // "NFTs Ready" appeared). Cards already lazy-draw via
+      // IntersectionObserver as soon as their own bitmaps exist, so
+      // progressively unlocking bitmaps in batches lets visible cards start
+      // filling in almost immediately instead of waiting for the whole set.
+      const BITMAP_BATCH = 24;
+      (async () => {
+        for (let i = 0; i < rels.length; i += BITMAP_BATCH) {
+          const batch = rels.slice(i, i + BITMAP_BATCH);
+          await Promise.all(batch.map(async (rel) => {
+            if (jobBitmaps.current[rel]) return;
+            try {
+              const res = await fetch(`/api/layer-raw/${rel}`);
+              if (res.ok) {
+                const blob = await res.blob();
+                jobBitmaps.current[rel] = await createImageBitmap(blob);
+              }
+            } catch {}
+          }));
+          setBitmapsVer(v => v + 1);
         }
-      })).then(() => setBitmapsVer(v => v + 1)).catch(() => {});
+      })().catch(() => {});
     } catch (e) {
       console.error('[loadAndDisplayFromDb]', e);
     }
