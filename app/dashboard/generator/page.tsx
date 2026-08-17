@@ -213,6 +213,17 @@ export default function Page() {
     loadLayers();
   }
 
+  async function handleSaveLayerMeta(folder: string, meta: { displayName?: string; isActive?: boolean; layerRarityPct?: number }) {
+    const layerId = layers.find(l => l.folder === folder)?.id;
+    if (!layerId) return;
+    await fetch(`/api/nft-gen/layers/${layerId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(meta),
+    }).catch(() => { });
+    loadLayers();
+  }
+
   // Create/update collection in DB, then sync layers from disk
   async function handleCollectionContinue() {
     setSyncing(true);
@@ -483,6 +494,10 @@ export default function Page() {
               layer={gearLayer}
               weights={weights[gearFolder] ?? {}}
               supply={collection.supply}
+              allLayers={layers}
+              conflicts={conflicts}
+              onSaveConflicts={saveConflicts}
+              onSaveLayerMeta={(meta: { displayName?: string; layerRarityPct?: number }) => handleSaveLayerMeta(gearFolder, meta)}
               onSave={(newWs: Record<string, number>) => {
                 Object.entries(newWs).forEach(([stem, val]) => handleWeightChange(gearFolder, stem, val));
               }}

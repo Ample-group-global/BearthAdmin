@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { TIER_PRESET_WEIGHTS, TIERS } from '../../../../lib/studio/tiers';
 import { calcRarity } from '../../../../lib/studio/probability';
 import { useLayerFiles } from '../LayerFilesContext';
+import RulesTabContent from './RulesTabContent';
 
 const TIER_LABELS = [
   { label: 'Legendary', color: '#F59E0B' },
@@ -12,10 +13,17 @@ const TIER_LABELS = [
   { label: 'Common',    color: '#6B7280' },
 ];
 
-export default function RarityModal({ layer, weights, supply, onSave, onDelete, onClose }) {
+export default function RarityModal({
+  layer, weights, supply, onSave, onDelete, onClose,
+  allLayers, conflicts, onSaveConflicts, onSaveLayerMeta,
+}) {
   // Local state for weights - starts from parent weights
   const [localWs, setLocalWs] = useState<Record<string, number>>(() => ({ ...weights }));
   const { getBlobUrl } = useLayerFiles();
+
+  const [tab, setTab] = useState<'assets' | 'rules'>('assets');
+  const [name, setName] = useState(layer.label ?? layer.folder);
+  const [rarityPct, setRarityPct] = useState(layer.rarityPct ?? 100);
 
   const totalW = useMemo(() => Object.values(localWs).reduce((a, b) => a + b, 0), [localWs]);
 
@@ -54,8 +62,19 @@ export default function RarityModal({ layer, weights, supply, onSave, onDelete, 
 
   function handleSave() {
     onSave(localWs);
+    // isActive intentionally not sent here — it's the same flag the
+    // sync-from-disk reconcile step uses to remove/restore layers based on
+    // what's actually on disk. Wiring this toggle to it risks a layer either
+    // becoming unreachable (no gear icon left to undo it) or silently
+    // reappearing on the next sync. Name/rarity are safe: they're pure
+    // display fields with no reconcile interaction.
+    onSaveLayerMeta?.({ displayName: name, layerRarityPct: rarityPct });
     onClose();
   }
+
+  const layerRuleCount = allLayers
+    ? (conflicts ?? []).filter(r => r.ifLayer === layer.folder || r.thenLayer === layer.folder).length
+    : (conflicts ?? []).length;
 
   return (
     <div className="rm-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -63,12 +82,76 @@ export default function RarityModal({ layer, weights, supply, onSave, onDelete, 
         {/* Header */}
         <div className="rm-header">
           <div>
-            <div className="rm-title">{layer.folder} — {layer.label}</div>
+            <div className="rm-title">{layer.folder} <span style={{ opacity: .5, margin: '0 4px' }}>›</span> {layer.count} traits</div>
             <div className="rm-sub">Layer Rarity Settings</div>
           </div>
           <button className="rm-close" onClick={onClose}>✕</button>
         </div>
 
+        {/* Layer Metadata */}
+        {onSaveLayerMeta && (
+          <div style={{ padding: '14px 20px 4px' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>Layer Metadata</div>
+            <div style={{ fontSize: 11.5, color: 'var(--dim)', marginBottom: 10 }}>Layer details appearing in the token metadata.</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', minWidth: 40 }}>Name</span>
+              <input
+                className="rm-w-input"
+                style={{ flex: 1, width: 'auto', textAlign: 'left', padding: '7px 10px' }}
+                value={name}
+                onChange={e => setName(e.target.value)}
+              />
+            </div>
+
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginTop: 14, marginBottom: 2 }}>Layer Rarity</div>
+            <div style={{ fontSize: 11.5, color: 'var(--dim)', marginBottom: 8 }}>Chance for this layer to appear in your tokens. 100% means every token has it.</div>
+            <div className="rm-slider-row">
+              <input
+                className="rm-w-input"
+                type="number" min="0" max="100" step="1"
+                style={{ width: 64 }}
+                value={rarityPct}
+                onChange={e => setRarityPct(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+              />
+              <input
+                className="rm-slider"
+                type="range" min="0" max="100" step="1"
+                value={rarityPct}
+                onChange={e => setRarityPct(parseFloat(e.target.value))}
+              />
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent2)', width: 40, textAlign: 'right' }}>{rarityPct}%</span>
+            </div>
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 20, padding: '14px 20px 0', borderBottom: '1px solid var(--border)' }}>
+          <button
+            onClick={() => setTab('assets')}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 10px',
+              fontSize: 13, fontWeight: 700, color: tab === 'assets' ? 'var(--text)' : 'var(--dim)',
+              borderBottom: tab === 'assets' ? '2px solid var(--accent)' : '2px solid transparent',
+            }}
+          >Assets <span style={{ opacity: .6, fontWeight: 500 }}>{layer.count}</span></button>
+          {onSaveConflicts && (
+            <button
+              onClick={() => setTab('rules')}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 10px',
+                fontSize: 13, fontWeight: 700, color: tab === 'rules' ? 'var(--text)' : 'var(--dim)',
+                borderBottom: tab === 'rules' ? '2px solid var(--accent)' : '2px solid transparent',
+              }}
+            >Rules <span style={{ opacity: .6, fontWeight: 500 }}>{layerRuleCount}</span></button>
+          )}
+        </div>
+
+        {tab === 'rules' && onSaveConflicts ? (
+          <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1 }}>
+            <RulesTabContent layers={allLayers ?? [layer]} rules={conflicts} onChange={onSaveConflicts} />
+          </div>
+        ) : (
+        <>
         {/* Toolbar */}
         <div className="rm-toolbar">
           <span className="rm-trait-count">{layer.count} traits</span>
@@ -178,6 +261,8 @@ export default function RarityModal({ layer, weights, supply, onSave, onDelete, 
             );
           })}
         </div>
+        </>
+        )}
 
         {/* Footer */}
         <div className="rm-footer">
