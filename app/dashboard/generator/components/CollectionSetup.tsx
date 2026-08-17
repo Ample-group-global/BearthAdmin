@@ -411,18 +411,15 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
             {/* Server layers detected banner */}
             {serverInfo && !uploadDone && (
               <div style={{
-                display: 'flex', alignItems: 'flex-start', gap: 9, marginBottom: 10,
-                padding: '9px 12px', background: 'rgba(34,197,94,0.08)',
-                border: '1px solid rgba(34,197,94,0.28)', borderRadius: 8, fontSize: 12,
+                display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10,
+                padding: '8px 12px', background: 'rgba(34,197,94,0.07)',
+                border: '1px solid rgba(34,197,94,0.25)', borderRadius: 8, fontSize: 12,
               }}>
-                <span style={{ color: '#22c55e', fontSize: 16, lineHeight: 1, flexShrink: 0 }}>✓</span>
-                <div style={{ flex: 1 }}>
-                  <span style={{ color: '#22c55e', fontWeight: 600 }}>
-                    {serverInfo.folderCount} layer {serverInfo.folderCount === 1 ? 'folder' : 'folders'} found on server
-                  </span>
-                  <span style={{ color: 'var(--dim)', marginLeft: 6 }}>— drag-drop below to replace, or click <strong>Save &amp; Continue</strong> to use them directly.</span>
-                  <div style={{ marginTop: 4, color: 'var(--dim)', fontSize: 11, fontFamily: 'monospace', wordBreak: 'break-all' }}>{serverInfo.layersDir}</div>
-                </div>
+                <span style={{ color: '#22c55e', fontSize: 15, flexShrink: 0 }}>✓</span>
+                <span>
+                  <strong style={{ color: '#22c55e' }}>{serverInfo.folderCount} layer {serverInfo.folderCount === 1 ? 'folder' : 'folders'} detected</strong>
+                  <span style={{ color: 'var(--dim)', marginLeft: 5 }}>— drag-drop below to replace, or click <strong>Save &amp; Continue</strong> to use them directly.</span>
+                </span>
               </div>
             )}
 
