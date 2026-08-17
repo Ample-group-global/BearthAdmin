@@ -1,6 +1,6 @@
 // @ts-nocheck
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLayerFiles } from '../LayerFilesContext';
 
 // Client-side display name derivation — mirrors server-side getName in lib/studio/layers.ts
@@ -146,8 +146,16 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
   const [uploadMsg,     setUploadMsg]     = useState('');
   const [activeFolder,  setActiveFolder]  = useState('');
   const [errors,        setErrors]        = useState({});
+  const [serverInfo,    setServerInfo]    = useState(null);
   const folderRef = useRef(null);
   const { storeFiles } = useLayerFiles();
+
+  useEffect(() => {
+    fetch('/api/nft-gen/layers/server-info')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && d.folderCount > 0) setServerInfo(d); })
+      .catch(() => {});
+  }, []);
 
   const set = (k, v) => {
     onChange({ ...collection, [k]: v });
@@ -399,6 +407,25 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
                   : <span style={{ color:'var(--dim)', fontStyle:'italic' }}>None — drop a folder below to import</span>
               }
             </div>
+
+            {/* Server layers detected banner */}
+            {serverInfo && !uploadDone && (
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: 9, marginBottom: 10,
+                padding: '9px 12px', background: 'rgba(34,197,94,0.08)',
+                border: '1px solid rgba(34,197,94,0.28)', borderRadius: 8, fontSize: 12,
+              }}>
+                <span style={{ color: '#22c55e', fontSize: 16, lineHeight: 1, flexShrink: 0 }}>✓</span>
+                <div style={{ flex: 1 }}>
+                  <span style={{ color: '#22c55e', fontWeight: 600 }}>
+                    {serverInfo.folderCount} layer {serverInfo.folderCount === 1 ? 'folder' : 'folders'} found on server
+                  </span>
+                  <span style={{ color: 'var(--dim)', marginLeft: 6 }}>— drag-drop below to replace, or click <strong>Save &amp; Continue</strong> to use them directly.</span>
+                  <div style={{ marginTop: 4, color: 'var(--dim)', fontSize: 11, fontFamily: 'monospace', wordBreak: 'break-all' }}>{serverInfo.layersDir}</div>
+                </div>
+              </div>
+            )}
+
             <div
               className={`setup-drop-zone${dragOver ? ' drag-over' : ''}${uploadDone ? ' done' : ''}`}
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -416,6 +443,12 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
                   <div className="setup-drop-icon">✅</div>
                   <div className="setup-drop-label">{uploadMsg || 'Assets imported!'}</div>
                   <div className="setup-drop-sub">Click to add more</div>
+                </>
+              ) : serverInfo ? (
+                <>
+                  <div className="setup-drop-icon">☁</div>
+                  <div className="setup-drop-label">Drop to replace server layers</div>
+                  <div className="setup-drop-sub">Optional — server layers will be used automatically if you skip this</div>
                 </>
               ) : (
                 <>

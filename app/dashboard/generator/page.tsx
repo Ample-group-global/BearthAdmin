@@ -263,17 +263,27 @@ export default function Page() {
         }).catch(() => {});
       }
 
-      // Sync layers into DB. On Vercel, local disk is empty so we pass the
-      // parsed layer manifest from React state as a fallback.
+      // Sync layers into DB.
+      // - layers.length > 0 means the user drag-dropped files this session → send the manifest.
+      // - layers.length === 0 means session restore or re-save without re-upload → ask
+      //   BearthApi to scan its own LAYERS_DIR (best-effort; layers may already be in DB).
       if (cid) {
-        const syncResp = await fetch(`/api/nft-gen/collections/${cid}/sync-from-disk`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ layers }),
-        });
-        if (!syncResp.ok) {
-          const d = await syncResp.json().catch(() => ({}));
-          throw new Error(d.error ?? 'Layer sync failed — please check your connection and try again.');
+        if (layers.length > 0) {
+          const syncResp = await fetch(`/api/nft-gen/collections/${cid}/sync-from-disk`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ layers }),
+          });
+          if (!syncResp.ok) {
+            const d = await syncResp.json().catch(() => ({}));
+            throw new Error(d.error ?? 'Layer sync failed — please check your connection and try again.');
+          }
+        } else {
+          // No browser upload — try server-side layer scan silently
+          await fetch(`/api/nft-gen/collections/${cid}/sync-from-api-layers`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          }).catch(() => {});
         }
         loadLayers(undefined, cid);
 
