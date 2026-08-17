@@ -12,8 +12,8 @@ import RarityTab from './components/RarityTab';
 import ConflictsPanel from './components/ConflictsPanel';
 import { LayerFilesProvider } from './LayerFilesContext';
 
-interface LayerAsset { stem: string; defaultWeight?: number; rel?: string; }
-interface Layer { folder: string; count: number; assets: LayerAsset[]; optional?: boolean; }
+interface LayerAsset { id?: string; stem: string; defaultWeight?: number; rel?: string; }
+interface Layer { id?: string; folder: string; count: number; assets: LayerAsset[]; optional?: boolean; }
 type Weights = Record<string, Record<string, number>>;
 type ConflictRule = Record<string, unknown>;
 
@@ -93,17 +93,10 @@ export default function Page() {
   }, [activeFolder, collectionId]);
 
   useEffect(() => {
-    // Load conflicts, weights, and server-side session (collectionId) in parallel
-    Promise.all([
-      fetch('/api/conflicts').then(r => r.json()).catch(() => []),
-      fetch('/api/weights').then(r => r.json()).catch(() => ({})),
-      fetch('/api/session/collection').then(r => r.json()).catch(() => ({})),
-    ]).then(([conflictData, weightData, sessionData]) => {
-      if (Array.isArray(conflictData)) setConflicts(conflictData);
-      if (weightData && typeof weightData === 'object' && !Array.isArray(weightData)) {
-        setWeights(prev => ({ ...prev, ...weightData }));
-      }
-
+    // Conflicts and weights now live on the collection/trait rows in the DB —
+    // both get picked up below from the same collection-detail fetches that
+    // already run to restore name/symbol/supply/etc.
+    fetch('/api/session/collection').then(r => r.json()).catch(() => ({})).then((sessionData) => {
       const savedId: string | null = sessionData?.collectionId ?? null;
       loadLayers(undefined, savedId || undefined);
 
@@ -129,6 +122,7 @@ export default function Page() {
               nameFormat:  c.nameFormat   ?? prev.nameFormat,
               format:      c.formatType   ?? prev.format,
             }));
+            if (Array.isArray(c.conflictRules)) setConflicts(c.conflictRules);
           })
           .catch(() => {});
       } else {
@@ -171,32 +165,37 @@ export default function Page() {
   }, []);
 
   const handleWeightChange = useCallback((folder: string, stem: string, value: number) => {
-    setWeights(prev => {
-      const updated = { ...prev, [folder]: { ...prev[folder], [stem]: value } };
-      // Persist weights to disk (fire-and-forget)
-      fetch('/api/weights', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated),
-      }).catch(() => { });
-      return updated;
-    });
-  }, []);
+    setWeights(prev => ({ ...prev, [folder]: { ...prev[folder], [stem]: value } }));
+
+    // Weight lives on the trait row itself now — find its id and persist there.
+    const traitId = layers.find(l => l.folder === folder)?.assets.find((a: LayerAsset) => a.stem === stem)?.id;
+    if (!traitId) return;
+    fetch(`/api/nft-gen/traits/${traitId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(
+        value > 0 ? { rarityWeight: Math.max(1, Math.round(value)), isActive: true } : { isActive: false }
+      ),
+    }).catch(() => { });
+  }, [layers]);
 
   async function saveConflicts(rules: ConflictRule[]) {
-    await fetch('/api/conflicts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(rules),
-    });
     setConflicts(rules);
+    if (!collectionId) return;
+    await fetch(`/api/nft-gen/collections/${collectionId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conflictRules: rules }),
+    }).catch(() => { });
   }
 
   async function handleToggleOptional(folder: string, optional: boolean) {
-    await fetch('/api/layers/optional', {
-      method: 'POST',
+    const layerId = layers.find(l => l.folder === folder)?.id;
+    if (!layerId) return;
+    await fetch(`/api/nft-gen/layers/${layerId}`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ folder, optional }),
+      body: JSON.stringify({ layerRarityPct: optional ? 80 : 100 }),
     });
     loadLayers();
   }
@@ -263,10 +262,9 @@ export default function Page() {
         }).catch(() => {});
       }
 
-      // Sync layers into DB.
-      // - layers.length > 0 means the user drag-dropped files this session → send the manifest.
-      // - layers.length === 0 means session restore or re-save without re-upload → ask
-      //   BearthApi to scan its own LAYERS_DIR (best-effort; layers may already be in DB).
+      // Sync layers into DB — only when the user drag-dropped files this session.
+      // With no fresh manifest, the DB already holds whatever was last synced;
+      // there's no local-disk fallback to fall back to anymore.
       if (cid) {
         if (layers.length > 0) {
           const syncResp = await fetch(`/api/nft-gen/collections/${cid}/sync-from-disk`, {
@@ -278,12 +276,6 @@ export default function Page() {
             const d = await syncResp.json().catch(() => ({}));
             throw new Error(d.error ?? 'Layer sync failed — please check your connection and try again.');
           }
-        } else {
-          // No browser upload — try server-side layer scan silently
-          await fetch(`/api/nft-gen/collections/${cid}/sync-from-api-layers`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-          }).catch(() => {});
         }
         loadLayers(undefined, cid);
 
@@ -372,6 +364,7 @@ export default function Page() {
           <div className="org-layout">
             <Sidebar
               layers={layers}
+              collectionId={collectionId}
               activeFolder={activeFolder}
               onSelect={setActiveFolder}
               onLayersChange={loadLayers}
@@ -380,15 +373,18 @@ export default function Page() {
               onReorder={(newFolderOrder: string[]) => {
                 // Apply the user's drag order immediately in state — no refetch.
                 // Refetching would re-sort numerically and undo the drag.
-                setLayers(prev => {
-                  const map = new Map(prev.map(l => [l.folder, l]));
-                  return newFolderOrder.map(f => map.get(f)).filter(Boolean) as Layer[];
-                });
-                // Persist to server (no-op on Vercel but works on local dev).
-                fetch('/api/layers/order', {
-                  method: 'POST',
+                const map = new Map(layers.map(l => [l.folder, l]));
+                const reordered = newFolderOrder.map(f => map.get(f)).filter(Boolean) as Layer[];
+                setLayers(reordered);
+
+                const items = reordered
+                  .map((l, i) => ({ id: l.id, sortOrder: i }))
+                  .filter((i): i is { id: string; sortOrder: number } => !!i.id);
+                if (!items.length || !collectionId) return;
+                fetch(`/api/nft-gen/collections/${collectionId}/layers/reorder`, {
+                  method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ order: newFolderOrder }),
+                  body: JSON.stringify({ items }),
                 }).catch(() => {});
               }}
             />
@@ -474,13 +470,9 @@ export default function Page() {
               onSave={(newWs: Record<string, number>) => {
                 Object.entries(newWs).forEach(([stem, val]) => handleWeightChange(gearFolder, stem, val));
               }}
-              onDelete={async (asset: { rel?: string }) => {
-                if (!asset.rel) return;
-                await fetch('/api/asset/delete', {
-                  method: 'DELETE',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ rel: asset.rel }),
-                });
+              onDelete={async (asset: { id?: string; rel?: string }) => {
+                if (!asset.rel || !asset.id) return;
+                await fetch(`/api/nft-gen/traits/${asset.id}`, { method: 'DELETE' });
                 loadLayers();
               }}
               onClose={() => setGearFolder(null)}

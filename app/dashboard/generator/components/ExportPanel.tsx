@@ -457,7 +457,9 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
 
     let layerData: any[] = layersProp.length ? layersProp : layers;
     if (!layerData.length) {
-      try { const r = await fetch('/api/layers'); layerData = await r.json(); } catch {}
+      if (collectionId) {
+        try { const r = await fetch(`/api/layers?collectionId=${collectionId}`); layerData = await r.json(); } catch {}
+      }
     }
     if (!layerData.length) {
       setError('No layers found. Upload assets in the Settings tab first.');
@@ -595,7 +597,9 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     try {
       let layerData: any[] = layersProp.length ? layersProp : layers;
       if (!layerData.length) {
-        try { const r = await fetch('/api/layers'); layerData = await r.json(); } catch {}
+        if (collectionId) {
+        try { const r = await fetch(`/api/layers?collectionId=${collectionId}`); layerData = await r.json(); } catch {}
+      }
       }
       if (!layerData.length) return;
       setLayers(layerData);

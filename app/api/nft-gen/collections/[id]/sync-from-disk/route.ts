@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionToken } from "../../../../../../lib/api-proxy";
-import { scanLayers } from "../../../../../../lib/studio/layers";
 
 export const dynamic = "force-dynamic";
 
@@ -88,36 +87,17 @@ export async function POST(
     const token = getSessionToken(req);
     if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    // Wrap in try-catch: on Vercel there is no local layers dir, so scanLayers() may
-    // throw EACCES when the path resolves to a system directory. Treat any error as
-    // "no local layers" and fall through to the body.layers / API fallback.
-    let diskLayers: ReturnType<typeof scanLayers> = [];
-    try { diskLayers = scanLayers(); } catch { diskLayers = []; }
-
-    if (diskLayers.length) {
-      const data = await syncLayerManifest(token, collectionId, diskLayers);
-      return NextResponse.json(data);
-    }
-
     let body: { layers?: ManifestLayer[] } = {};
     try { body = await req.json(); } catch { /* body may be empty */ }
 
-    if (body.layers?.length) {
-      const data = await syncLayerManifest(token, collectionId, body.layers);
-      return NextResponse.json(data);
+    if (!body.layers?.length) {
+      return NextResponse.json({
+        error: "No layer manifest provided — drag and drop your assets folder in the Settings tab before syncing.",
+      }, { status: 422 });
     }
 
-    // Last resort: ask BearthApi to scan its own LAYERS_DIR
-    try {
-      const r = await fetch(`${API_BASE}/api/nft-gen/collections/${collectionId}/sync-from-api-layers`, {
-        method:  "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      const data = await r.json();
-      return NextResponse.json(data, { status: r.status });
-    } catch {
-      return NextResponse.json({ error: "API unreachable" }, { status: 503 });
-    }
+    const data = await syncLayerManifest(token, collectionId, body.layers);
+    return NextResponse.json(data);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[sync-from-disk] unhandled:", msg);

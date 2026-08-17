@@ -2,7 +2,7 @@
 'use client';
 import { useState, useRef, Fragment } from 'react';
 
-export default function Sidebar({ layers, activeFolder, onSelect, onLayersChange, onReorder, onGearClick, onToggleOptional }) {
+export default function Sidebar({ layers, collectionId, activeFolder, onSelect, onLayersChange, onReorder, onGearClick, onToggleOptional }) {
   const [newName, setNewName]   = useState('');
   const [adding,  setAdding]    = useState(false);
   const [dragSrc, setDragSrc]   = useState(null);
@@ -10,12 +10,12 @@ export default function Sidebar({ layers, activeFolder, onSelect, onLayersChange
 
   async function createLayer() {
     const name = newName.trim();
-    if (!name) return;
+    if (!name || !collectionId) return;
     setAdding(true);
-    await fetch('/api/layers/new', {
+    await fetch(`/api/nft-gen/collections/${collectionId}/layers`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, sortOrder: layers.length }),
     });
     setNewName('');
     setAdding(false);

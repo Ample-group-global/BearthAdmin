@@ -19,11 +19,11 @@ function TraitNameEditor({ asset, folder, onRenamed }) {
   async function commit() {
     setEditing(false);
     const trimmed = val.trim();
-    if (!trimmed || trimmed === asset.name) { setVal(asset.name); return; }
-    await fetch('/api/layers/rename', {
-      method:  'POST',
+    if (!trimmed || trimmed === asset.name || !asset.id) { setVal(asset.name); return; }
+    await fetch(`/api/nft-gen/traits/${asset.id}`, {
+      method:  'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ folder, stem: asset.stem, name: trimmed }),
+      body:    JSON.stringify({ name: trimmed }),
     });
     onRenamed?.();
   }
@@ -72,13 +72,9 @@ export default function LayerContent({ layer, layerWeights, allWeights, supply, 
   }
 
   async function deleteAsset(asset) {
-    if (!asset.rel) return;
+    if (!asset.rel || !asset.id) return;
     if (!confirm(`Delete "${asset.name}"? This cannot be undone.`)) return;
-    await fetch('/api/asset/delete', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rel: asset.rel }),
-    });
+    await fetch(`/api/nft-gen/traits/${asset.id}`, { method: 'DELETE' });
     onLayersChange?.();
   }
 

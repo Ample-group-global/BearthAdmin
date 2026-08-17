@@ -3,7 +3,6 @@
 import { useState, useRef } from 'react';
 import { useLayerFiles } from '../LayerFilesContext';
 
-// Client-side display name derivation — mirrors server-side getName in lib/studio/layers.ts
 function deriveLabelFromFolder(fname) {
   return fname.replace(/^\d+[-_]/, '').replace(/[_-]+/g, ' ')
     .replace(/\b\w/g, c => c.toUpperCase()).trim() || fname;
@@ -144,7 +143,6 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
   const [uploading,     setUploading]     = useState(false);
   const [uploadDone,    setUploadDone]    = useState(false);
   const [uploadMsg,     setUploadMsg]     = useState('');
-  const [activeFolder,  setActiveFolder]  = useState('');
   const [errors,        setErrors]        = useState({});
   const folderRef = useRef(null);
   const { storeFiles } = useLayerFiles();
@@ -186,26 +184,9 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
     setUploadDone(true);
     setUploadMsg(`${parsedLayers.length} layers imported!`);
 
-    // ── 2. Fire server uploads in background (local dev persistence only) ────
+    // ── 2. Fire server uploads in background ──────────────────────────────────
     // These are intentionally NOT awaited — the UI is already updated above.
     const doServerUpload = async () => {
-      let detectedRoot = null;
-      for (const file of files) {
-        const parts = (file.webkitRelativePath || file.name).split('/').filter(Boolean);
-        const layerIdx = parts.findIndex(p => /^\d+[-_]/.test(p));
-        if (layerIdx > 0) { detectedRoot = parts[0]; break; }
-      }
-      if (detectedRoot) {
-        const safe = detectedRoot.replace(/[^a-zA-Z0-9\-_]/g, '');
-        if (safe) {
-          setActiveFolder(safe);
-          await fetch('/api/layers/root', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folder: safe }),
-          }).catch(() => {});
-        }
-      }
       const groups = {};
       for (const file of files) {
         if (!file.type.startsWith('image/') && !file.name.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) continue;

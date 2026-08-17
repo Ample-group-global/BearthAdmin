@@ -1,7 +1,4 @@
-import path  from 'path';
-import fs    from 'fs';
 import sharp from 'sharp';
-import { getLayersDir } from '../../../../lib/studio/layers';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,30 +13,12 @@ async function toThumbnail(input: string | Buffer, w: number, h: number): Promis
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ rel: string[] }> }) {
-  const rel       = (await params).rel.join('/');
-  const layersDir = getLayersDir();
+  const rel = (await params).rel.join('/');
 
   const url = new URL(req.url);
   const w   = parseInt(url.searchParams.get('w') ?? '512') || 512;
   const h   = parseInt(url.searchParams.get('h') ?? '512') || 512;
 
-  // Try local disk first (works in local dev), trim transparent borders then resize
-  if (layersDir) {
-    const file     = path.join(layersDir, rel);
-    const relCheck = path.relative(layersDir, file);
-    if (!relCheck.startsWith('..') && !path.isAbsolute(relCheck) && fs.existsSync(file)) {
-      try {
-        const buf = await toThumbnail(file, w, h);
-        return new Response(new Uint8Array(buf), {
-          headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' },
-        });
-      } catch {
-        return new Response(null, { status: 500 });
-      }
-    }
-  }
-
-  // Fall back to BearthApi (has Filebase S3 fallback) — used on Vercel
   try {
     const upstream = await fetch(`${API_BASE}/api/nft-gen/layers/image?rel=${encodeURIComponent(rel)}`);
     if (!upstream.ok) return new Response(null, { status: 404 });

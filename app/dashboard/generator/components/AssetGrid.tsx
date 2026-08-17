@@ -30,11 +30,8 @@ export default function AssetGrid({ layer, layerWeights, supply, onWeightChange,
       });
 
   async function handleDelete(asset) {
-    await fetch('/api/asset/delete', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rel: asset.rel }),
-    });
+    if (!asset.id) return;
+    await fetch(`/api/nft-gen/traits/${asset.id}`, { method: 'DELETE' });
     onLayersChange?.();
   }
 
