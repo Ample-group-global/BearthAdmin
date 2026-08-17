@@ -9,7 +9,6 @@ import PreviewPanel from './components/PreviewPanel';
 import ExportPanel from './components/ExportPanel';
 import RarityModal from './components/RarityModal';
 import RarityTab from './components/RarityTab';
-import ConflictsPanel from './components/ConflictsPanel';
 import { LayerFilesProvider } from './LayerFilesContext';
 
 interface LayerAsset { id?: string; stem: string; defaultWeight?: number; rel?: string; }
@@ -41,7 +40,6 @@ export default function Page() {
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
   const [gearFolder, setGearFolder] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<ConflictRule[]>([]);
-  const [showConflicts, setShowConflicts] = useState(false);
 
   function goToStep(newStep: string) {
     if (step !== 'organize' && newStep === 'organize') {
@@ -362,17 +360,7 @@ export default function Page() {
         <header className="header">
           <div className="logo">🐻 Bearth <span>NFT Studio</span></div>
           <StepNav step={step} onStep={goToStep} />
-          <div style={{ minWidth: 120, display: 'flex', justifyContent: 'flex-end' }}>
-            {step === 'organize' && (
-              <button
-                className="btn btn-ghost"
-                style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}
-                onClick={() => setShowConflicts(true)}
-              >
-                ⚡ {conflicts.length > 0 ? `Rules (${conflicts.length})` : 'Conflict Rules'}
-              </button>
-            )}
-          </div>
+          <div style={{ minWidth: 120 }} />
         </header>
 
         {/* ── Step 1: Settings ── */}
@@ -482,16 +470,6 @@ export default function Page() {
             collection={collection}
             conflicts={conflicts}
             collectionId={collectionId as never}
-          />
-        )}
-
-        {/* ── Conflict Rules modal ── */}
-        {showConflicts && (
-          <ConflictsPanel
-            layers={layers}
-            rules={conflicts}
-            onSave={saveConflicts}
-            onClose={() => setShowConflicts(false)}
           />
         )}
 
