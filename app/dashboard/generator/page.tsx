@@ -169,14 +169,27 @@ export default function Page() {
 
     // Weight lives on the trait row itself now — find its id and persist there.
     const traitId = layers.find(l => l.folder === folder)?.assets.find((a: LayerAsset) => a.stem === stem)?.id;
-    if (!traitId) return;
+    if (!traitId) {
+      // Layers state hasn't caught up with what's on screen yet — don't pretend the
+      // edit was saved. Revert the optimistic update so the UI never shows a value
+      // that was never persisted.
+      setWeights(prev => {
+        const original = layers.find(l => l.folder === folder)?.assets.find((a: LayerAsset) => a.stem === stem)?.defaultWeight;
+        if (original == null) return prev;
+        return { ...prev, [folder]: { ...prev[folder], [stem]: original } };
+      });
+      console.error(`Rarity weight edit for "${stem}" in "${folder}" could not be saved — trait not found yet. Please try again.`);
+      return;
+    }
     fetch(`/api/nft-gen/traits/${traitId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(
         value > 0 ? { rarityWeight: Math.max(1, Math.round(value)), isActive: true } : { isActive: false }
       ),
-    }).catch(() => { });
+    }).then(res => {
+      if (!res.ok) throw new Error(`PUT /api/nft-gen/traits/${traitId} failed (${res.status})`);
+    }).catch(err => console.error('Rarity weight save failed:', err));
   }, [layers]);
 
   async function saveConflicts(rules: ConflictRule[]) {
