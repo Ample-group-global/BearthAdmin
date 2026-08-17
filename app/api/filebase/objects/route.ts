@@ -10,8 +10,3 @@ export async function GET(req: NextRequest) {
   if (prefix) sp.set("prefix", prefix);
   return proxyToApi(req, "/api/filebase/objects", { searchParams: sp });
 }
-
-export async function DELETE(req: NextRequest) {
-  const body = await req.json();
-  return proxyToApi(req, "/api/filebase/objects", { method: "DELETE", body });
-}

@@ -32,11 +32,11 @@ async function syncLayerManifest(
 ) {
   // Process layers sequentially to preserve folder order (0-bg, 1-back, 2-body, …)
   // Promise.all would insert in random order because requests resolve at different times.
-  const results: Array<{ layerName: string; layerId: string | null; traitsUpserted: number; traitsDeactivated: number }> = [];
+  const results: Array<{ layerName: string; layerId: string | null; traitsUpserted: number; traitsDeleted: number }> = [];
   for (let layerIdx = 0; layerIdx < manifest.length; layerIdx++) {
     const ml = manifest[layerIdx];
     const realAssets = ml.assets.filter((a) => !!a.rel);
-    if (!realAssets.length) { results.push({ layerName: ml.folder, layerId: null, traitsUpserted: 0, traitsDeactivated: 0 }); continue; }
+    if (!realAssets.length) { results.push({ layerName: ml.folder, layerId: null, traitsUpserted: 0, traitsDeleted: 0 }); continue; }
 
     const layerData = await apiPost(token, `/api/nft-gen/collections/${collectionId}/layers`, {
       name:           ml.folder,
@@ -45,7 +45,7 @@ async function syncLayerManifest(
       sortOrder:      layerIdx,
     });
     const layerId: string | null = layerData?.layer?.id ?? layerData?.id ?? null;
-    if (!layerId) { results.push({ layerName: ml.folder, layerId: null, traitsUpserted: 0, traitsDeactivated: 0 }); continue; }
+    if (!layerId) { results.push({ layerName: ml.folder, layerId: null, traitsUpserted: 0, traitsDeleted: 0 }); continue; }
 
     const activeFilePaths = realAssets.map((a) => a.rel as string);
     let traitsUpserted = 0;
@@ -63,7 +63,7 @@ async function syncLayerManifest(
     }
 
     const reconcileTraits = await apiPost(token, `/api/nft-gen/layers/${layerId}/traits/reconcile`, { activeFilePaths });
-    results.push({ layerName: ml.folder, layerId, traitsUpserted, traitsDeactivated: reconcileTraits?.deactivated ?? 0 });
+    results.push({ layerName: ml.folder, layerId, traitsUpserted, traitsDeleted: reconcileTraits?.deactivated ?? 0 });
   }
 
   const reconcileLayers = await apiPost(token, `/api/nft-gen/collections/${collectionId}/layers/reconcile`, {
@@ -72,8 +72,8 @@ async function syncLayerManifest(
 
   return {
     collectionId,
-    layersSynced:      results.filter((r) => r.layerId).length,
-    layersDeactivated: reconcileLayers?.deactivated ?? 0,
+    layersSynced:  results.filter((r) => r.layerId).length,
+    layersDeleted: reconcileLayers?.deactivated ?? 0,
     results,
   };
 }
