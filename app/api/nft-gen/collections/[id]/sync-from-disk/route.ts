@@ -48,25 +48,21 @@ async function syncLayerManifest(
     if (!layerId) { results.push({ layerName: ml.folder, layerId: null, traitsUpserted: 0, traitsDeleted: 0 }); continue; }
 
     const activeFilePaths = realAssets.map((a) => a.rel as string);
-    let traitsUpserted = 0;
-    // BearthApi's DB pool caps at 10 connections total (src/pool.ts). Each of
-    // these trait-create calls is a full round-trip that briefly holds one —
-    // batching at 50 could open up to 50 at once, starving the pool and
-    // causing "timeout exceeded when trying to connect" cascades (confirmed
-    // live 2026-08-17: a 213-trait upload crashed BearthApi this way). 6
-    // leaves headroom for the wave-auto-trigger job and other traffic.
-    const BATCH = 6;
-    for (let i = 0; i < realAssets.length; i += BATCH) {
-      await Promise.all(realAssets.slice(i, i + BATCH).map(async (asset) => {
-        const r = await apiPost(token, `/api/nft-gen/layers/${layerId}/traits`, {
-          name:            asset.name ?? asset.stem,
-          filePath:        asset.rel,
-          rarityTier:      inferTier(asset.stem),
-          storageProvider: "filebase",
-        });
-        if (r?.trait?.id ?? r?.id) traitsUpserted++;
-      }));
-    }
+    // One bulk call per layer instead of one HTTP round-trip per trait — BearthApi
+    // holds a single DB connection for the whole layer and inserts sequentially on
+    // it, instead of this route opening up to 50 concurrent HTTP+DB round-trips
+    // that used to starve the 10-connection pool (confirmed live 2026-08-17: a
+    // 213-trait upload crashed BearthApi that way). This is both faster (no
+    // per-trait network overhead) and safer (never holds more than 1 connection).
+    const bulkResp = await apiPost(token, `/api/nft-gen/layers/${layerId}/traits/bulk`, {
+      traits: realAssets.map((asset) => ({
+        name:            asset.name ?? asset.stem,
+        filePath:        asset.rel,
+        rarityTier:      inferTier(asset.stem),
+        storageProvider: "filebase",
+      })),
+    });
+    const traitsUpserted = bulkResp?.count ?? 0;
 
     const reconcileTraits = await apiPost(token, `/api/nft-gen/layers/${layerId}/traits/reconcile`, { activeFilePaths });
     results.push({ layerName: ml.folder, layerId, traitsUpserted, traitsDeleted: reconcileTraits?.deactivated ?? 0 });

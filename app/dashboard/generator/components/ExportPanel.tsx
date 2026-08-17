@@ -72,6 +72,10 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const [layers, setLayers] = useState<any[]>(layersProp);
   const lastFailedJobIdRef = useRef<string | null>(null);
   const dbJobIdRef         = useRef<string | null>(null);
+  // Set the instant a real generation starts (before the DB even has a job row for
+  // it yet) so the auto-restore-on-mount effect below can bail for the whole
+  // generation window, not just after dbJobIdRef is finally populated.
+  const generationStartedRef = useRef(false);
   // editionNumber → itemId UUID (populated during persistToDb, used for IPFS CID writeback)
   const editionItemMapRef  = useRef<Record<number, string>>({});
 
@@ -103,18 +107,25 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     (async () => {
       // Retry up to 3× with 5s backoff — BearthApi pool may be briefly stressed
       // after a heavy generation run, causing the first restore attempt to fail.
+      // The backoff means this can still be in flight when the user starts a
+      // real generation from this same mount; if it resolves after that, it
+      // must not clobber the job the user actually just generated — confirmed
+      // live 2026-08-17: this restore landed after a fresh generate and
+      // silently swapped the UI back to an older, unrelated completed job.
       for (let attempt = 0; attempt < 3; attempt++) {
-        if (cancelled) return;
+        if (cancelled || generationStartedRef.current) return;
         if (attempt > 0) await new Promise(r => setTimeout(r, 5_000));
         try {
+          if (cancelled || generationStartedRef.current) return;
           const r = await fetch(`/api/nft-gen/jobs?collectionId=${collectionId}&status=complete`);
-          if (!r.ok || cancelled) continue;
+          if (!r.ok || cancelled || generationStartedRef.current) continue;
           const data = await r.json();
-          if (cancelled || !data.jobs?.length) return;
+          if (cancelled || generationStartedRef.current || !data.jobs?.length) return;
           const latestJob = data.jobs[0];
+          if (generationStartedRef.current) return; // real generation won the race — don't set dbJobIdRef to a stale job
           dbJobIdRef.current = latestJob.id;
           await loadAndDisplayFromDb(latestJob.id);
-          if (cancelled) return;
+          if (cancelled || generationStartedRef.current) return;
           setSvrGenStatus('done');
           setDbSaved(true);
           setPhase('done');
@@ -274,6 +285,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
 
   async function generateOnServer() {
     if (!collectionId) { setError('Save collection settings before generating.'); return; }
+    generationStartedRef.current = true;
     setSvrGenStatus('running');
     setSvrGenProgress(0);
     setSvrGenTotal(supply);
