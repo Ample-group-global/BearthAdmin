@@ -56,6 +56,10 @@ export default function LayerContent({ layer, layerWeights, allWeights, supply, 
   const [view,      setView]      = useState(layer.assets.length > 0 ? 'advanced' : 'manage');  // 'manage' | 'advanced'
   const [dragOver,  setDragOver]  = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [customSaving, setCustomSaving] = useState(false);
+  const [customError, setCustomError] = useState('');
   const fileRef = useRef(null);
   const { getBlobUrl } = useLayerFiles();
 
@@ -69,6 +73,32 @@ export default function LayerContent({ layer, layerWeights, allWeights, supply, 
     await fetch('/api/upload', { method: 'POST', body: form });
     setUploading(false);
     onLayersChange?.();
+  }
+
+  async function addCustomAsset() {
+    const name = customName.trim();
+    if (!name || !layer.id) return;
+    setCustomSaving(true);
+    setCustomError('');
+    try {
+      const res = await fetch(`/api/nft-gen/layers/${layer.id}/traits`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, filePath: null }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setCustomError(d.error ?? 'Failed to add custom asset.');
+        return;
+      }
+      setCustomName('');
+      setCustomOpen(false);
+      onLayersChange?.();
+    } catch {
+      setCustomError('Failed to add custom asset. Check your connection.');
+    } finally {
+      setCustomSaving(false);
+    }
   }
 
   async function deleteAsset(asset) {
@@ -130,10 +160,33 @@ export default function LayerContent({ layer, layerWeights, allWeights, supply, 
             </div>
 
             {/* Add Custom Asset card */}
-            <div className="lc-custom-asset">
-              <div className="lc-custom-icon">🎨</div>
-              <div className="lc-custom-label">Add Custom Asset</div>
-              <div className="lc-custom-sub">An asset with no file that will only be used for metadata.</div>
+            <div className={`lc-custom-asset${customOpen ? ' lc-custom-asset-open' : ''}`}>
+              {customOpen ? (
+                <div className="lc-custom-form" onClick={e => e.stopPropagation()}>
+                  <div className="lc-custom-form-label">Trait name</div>
+                  <input
+                    className="lc-custom-form-input"
+                    autoFocus
+                    placeholder="e.g. None"
+                    value={customName}
+                    onChange={e => setCustomName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') addCustomAsset(); if (e.key === 'Escape') setCustomOpen(false); }}
+                  />
+                  {customError && <div className="lc-custom-form-error">{customError}</div>}
+                  <div className="lc-custom-form-actions">
+                    <button className="btn btn-ghost" onClick={() => { setCustomOpen(false); setCustomError(''); }}>Cancel</button>
+                    <button className="btn btn-primary" disabled={!customName.trim() || customSaving} onClick={addCustomAsset}>
+                      {customSaving ? 'Adding…' : 'Add'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div onClick={() => setCustomOpen(true)} style={{ cursor: 'pointer' }}>
+                  <div className="lc-custom-icon">🎨</div>
+                  <div className="lc-custom-label">Add Custom Asset</div>
+                  <div className="lc-custom-sub">An asset with no file that will only be used for metadata.</div>
+                </div>
+              )}
             </div>
           </div>
 

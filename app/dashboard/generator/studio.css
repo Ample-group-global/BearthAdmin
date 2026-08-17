@@ -541,6 +541,17 @@
 .studio-wrap .lc-custom-icon { font-size: 28px; }
 .studio-wrap .lc-custom-label { font-size: 13px; font-weight: 700; color: var(--accent2); }
 .studio-wrap .lc-custom-sub { font-size: 11px; color: var(--dim); line-height: 1.5; }
+.studio-wrap .lc-custom-asset-open { cursor: default; border-style: solid; border-color: var(--accent); }
+.studio-wrap .lc-custom-asset-open:hover { background: transparent; }
+.studio-wrap .lc-custom-form { width: 100%; text-align: left; }
+.studio-wrap .lc-custom-form-label { font-size: 10.5px; font-weight: 700; color: var(--dim); margin-bottom: 4px; }
+.studio-wrap .lc-custom-form-input {
+  width: 100%; box-sizing: border-box; background: var(--bg0); border: 1px solid var(--border2);
+  color: var(--text); border-radius: 6px; padding: 6px 9px; font-size: 12px; margin-bottom: 8px;
+}
+.studio-wrap .lc-custom-form-input:focus { border-color: var(--accent); outline: none; }
+.studio-wrap .lc-custom-form-error { font-size: 10.5px; color: #ef4444; margin-bottom: 8px; }
+.studio-wrap .lc-custom-form-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .studio-wrap .lc-file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px,1fr)); gap: 10px; margin-top: 6px; }
 .studio-wrap .lc-file-card {
   background: var(--bg1); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
