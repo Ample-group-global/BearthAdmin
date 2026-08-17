@@ -39,7 +39,19 @@ export default function Page() {
   const [weights, setWeights] = useState<Weights>({});
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
   const [gearFolder, setGearFolder] = useState<string | null>(null);
+  const [gearFocusStem, setGearFocusStem] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<ConflictRule[]>([]);
+
+  // Single entry point for the layer modal — used by the sidebar gear icon,
+  // the Advanced view's own "Layer Rarity" button, and clicking an individual
+  // trait card. Previously each of those opened a different popup (or, for
+  // the Advanced-view button, an under-propped copy of this same one missing
+  // Layer Metadata/Rules); now there's exactly one modal, optionally scrolled
+  // to a specific trait when opened from a card click.
+  function openLayerModal(folder: string, focusStem?: string) {
+    setGearFolder(folder);
+    setGearFocusStem(focusStem ?? null);
+  }
 
   function goToStep(newStep: string) {
     if (step !== 'organize' && newStep === 'organize') {
@@ -390,7 +402,7 @@ export default function Page() {
               activeFolder={activeFolder}
               onSelect={setActiveFolder}
               onLayersChange={loadLayers}
-              onGearClick={setGearFolder}
+              onGearClick={openLayerModal}
               onToggleOptional={handleToggleOptional}
               onReorder={(newFolderOrder: string[]) => {
                 // Apply the user's drag order immediately in state — no refetch.
@@ -432,6 +444,7 @@ export default function Page() {
                   onWeightChange={handleWeightChange}
                   onLayersChange={loadLayers}
                   onGenerate={() => goToStep('preview')}
+                  onOpenLayerModal={openLayerModal}
                 />
               ) : (
                 <div className="loading"><div className="spinner" /></div>
@@ -484,6 +497,7 @@ export default function Page() {
               supply={collection.supply}
               allLayers={layers}
               conflicts={conflicts}
+              focusStem={gearFocusStem}
               onSaveConflicts={saveConflicts}
               onSaveLayerMeta={(meta: { displayName?: string; layerRarityPct?: number }) => handleSaveLayerMeta(gearFolder, meta)}
               onRenameTrait={handleRenameTrait}
@@ -495,7 +509,7 @@ export default function Page() {
                 await fetch(`/api/nft-gen/traits/${asset.id}`, { method: 'DELETE' });
                 loadLayers();
               }}
-              onClose={() => setGearFolder(null)}
+              onClose={() => { setGearFolder(null); setGearFocusStem(null); }}
             />
           );
         })()}

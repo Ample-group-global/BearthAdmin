@@ -3,11 +3,9 @@
 import { useState, useMemo } from 'react';
 import { TIERS, getTier }    from '../../../../lib/studio/tiers';
 import AssetCard              from './AssetCard';
-import RarityModal            from './RarityModal';
 
-export default function AssetGrid({ layer, layerWeights, supply, onWeightChange, onLayersChange }) {
+export default function AssetGrid({ layer, layerWeights, supply, onWeightChange, onLayersChange, onOpenLayerModal }) {
   const [filterTier, setFilterTier] = useState('all');
-  const [showModal, setShowModal]   = useState(false);
 
   const ws: Record<string,number> = layerWeights ?? {};
   const totalW  = useMemo(() => Object.values(ws).reduce((a, b) => a + b, 0), [ws]);
@@ -61,7 +59,7 @@ export default function AssetGrid({ layer, layerWeights, supply, onWeightChange,
             {t.label} ({tierCounts[t.label]})
           </button>
         ))}
-        <button className="filter-btn" style={{ marginLeft: 'auto' }} onClick={() => setShowModal(true)}>
+        <button className="filter-btn" style={{ marginLeft: 'auto' }} onClick={() => onOpenLayerModal?.(layer.folder)}>
           ⚙ Layer Rarity
         </button>
       </div>
@@ -76,24 +74,12 @@ export default function AssetGrid({ layer, layerWeights, supply, onWeightChange,
             supply={supply}
             onChange={(stem, val) => onWeightChange(layer.folder, stem, val)}
             onDelete={handleDelete}
+            onOpen={() => onOpenLayerModal?.(layer.folder, asset.stem)}
           />
         ))}
       </div>
 
       {visible.length === 0 && <div className="empty">No traits match this filter.</div>}
-
-      {showModal && (
-        <RarityModal
-          layer={layer}
-          weights={ws}
-          supply={supply}
-          onSave={newWs => {
-            Object.entries(newWs).forEach(([stem, val]) => onWeightChange(layer.folder, stem, val));
-          }}
-          onDelete={handleDelete}
-          onClose={() => setShowModal(false)}
-        />
-      )}
     </main>
   );
 }

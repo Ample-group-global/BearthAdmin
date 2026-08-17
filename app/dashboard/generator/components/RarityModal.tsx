@@ -1,6 +1,6 @@
 // @ts-nocheck
 'use client';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { TIER_PRESET_WEIGHTS, TIERS } from '../../../../lib/studio/tiers';
 import { calcRarity, positionForProb } from '../../../../lib/studio/probability';
 import { useLayerFiles } from '../LayerFilesContext';
@@ -15,11 +15,25 @@ const TIER_LABELS = [
 
 export default function RarityModal({
   layer, weights, supply, onSave, onDelete, onClose,
-  allLayers, conflicts, onSaveConflicts, onSaveLayerMeta, onRenameTrait,
+  allLayers, conflicts, onSaveConflicts, onSaveLayerMeta, onRenameTrait, focusStem,
 }) {
   // Local state for weights - starts from parent weights
   const [localWs, setLocalWs] = useState<Record<string, number>>(() => ({ ...weights }));
   const { getBlobUrl } = useLayerFiles();
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Opened from a card click (not the gear icon) — scroll straight to that
+  // trait's row and briefly highlight it, since this is now the same modal
+  // both entry points share instead of a separate single-trait popup.
+  useEffect(() => {
+    if (!focusStem || !listRef.current) return;
+    const row = listRef.current.querySelector(`[data-stem="${CSS.escape(focusStem)}"]`);
+    if (!row) return;
+    row.scrollIntoView({ block: 'center' });
+    row.classList.add('rm-row-focused');
+    const t = setTimeout(() => row.classList.remove('rm-row-focused'), 1800);
+    return () => clearTimeout(t);
+  }, [focusStem]);
 
   const [tab, setTab] = useState<'assets' | 'rules'>('assets');
   const [name, setName] = useState(layer.label ?? layer.folder);
@@ -162,7 +176,7 @@ export default function RarityModal({
         ) : (
         <>
         {/* Asset List */}
-        <div className="rm-list rm-list-v2">
+        <div className="rm-list rm-list-v2" ref={listRef}>
           {layer.assets.map(asset => {
             const w = localWs[asset.stem] ?? 1;
             const { pct, tier } = calcRarity(w, totalW, supply);
@@ -176,7 +190,7 @@ export default function RarityModal({
             const rPos = positionForProb(otherW, 0.15);
 
             return (
-              <div key={asset.stem} className={`rm-row-v2${enabled ? '' : ' rm-row-disabled'}`}>
+              <div key={asset.stem} data-stem={asset.stem} className={`rm-row-v2${enabled ? '' : ' rm-row-disabled'}`}>
                 <button
                   className={`rm-radio${enabled ? ' rm-radio-on' : ''}`}
                   onClick={() => setW(asset.stem, enabled ? 0 : 1)}

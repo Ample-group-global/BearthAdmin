@@ -52,7 +52,7 @@ function TraitNameEditor({ asset, folder, onRenamed }) {
   );
 }
 
-export default function LayerContent({ layer, layerWeights, allWeights, supply, onWeightChange, onLayersChange, onGenerate }) {
+export default function LayerContent({ layer, layerWeights, allWeights, supply, onWeightChange, onLayersChange, onGenerate, onOpenLayerModal }) {
   const [view,      setView]      = useState(layer.assets.length > 0 ? 'advanced' : 'manage');  // 'manage' | 'advanced'
   const [dragOver,  setDragOver]  = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -237,6 +237,7 @@ export default function LayerContent({ layer, layerWeights, allWeights, supply, 
             supply={supply}
             onWeightChange={onWeightChange}
             onLayersChange={onLayersChange}
+            onOpenLayerModal={onOpenLayerModal}
           />
           <SummaryPanel
             layer={layer}

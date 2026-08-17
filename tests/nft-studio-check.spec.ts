@@ -29,7 +29,7 @@ test.describe('NFT Studio — generator page', () => {
     await waitForStudio(page);
 
     await page.screenshot({
-      path: 'tests/phase-results/screenshots/nft-studio-settings.png',
+      path: 'tests/phase-results/screenshots/settings/nft-studio-settings.png',
       fullPage: true,
     }).catch(() => {});
 
@@ -71,7 +71,7 @@ test.describe('NFT Studio — generator page', () => {
     await page.waitForTimeout(1500);
 
     await page.screenshot({
-      path: 'tests/phase-results/screenshots/nft-studio-organize.png',
+      path: 'tests/phase-results/screenshots/organize/nft-studio-organize.png',
       fullPage: true,
     }).catch(() => {});
 
@@ -126,10 +126,64 @@ test.describe('NFT Studio — generator page', () => {
     await expect(saveBtn).toBeEnabled();
 
     await page.screenshot({
-      path: 'tests/phase-results/screenshots/nft-studio-inputs-enabled.png',
+      path: 'tests/phase-results/screenshots/settings/nft-studio-inputs-enabled.png',
       fullPage: true,
     }).catch(() => {});
 
     console.log('S-04: All Settings inputs enabled ✓');
+  });
+
+  test('S-05: Adjust rarity weight for a trait — persists after reload', async ({ page }) => {
+    test.setTimeout(60_000);
+    await waitForStudio(page);
+
+    const organizeTab = page.locator('button.step-btn').filter({ hasText: /Organize/i }).first();
+    await organizeTab.click();
+    await page.waitForTimeout(2000);
+
+    // Clicking a card now opens the same unified layer modal used by the
+    // gear icon (CardModal/.cm-weight-input were removed) — scrolled to the
+    // clicked trait. Operate on the first row inside it; data-stem lets us
+    // re-find that exact same trait after reload regardless of row order.
+    const firstCard = page.locator('.asset-card').first();
+    await expect(firstCard).toBeVisible({ timeout: 10_000 });
+    await firstCard.click();
+
+    const firstRow = page.locator('.rm-row-v2').first();
+    await expect(firstRow).toBeVisible({ timeout: 5_000 });
+    const stem = await firstRow.getAttribute('data-stem');
+    await firstRow.locator('.rm-pct-toggle').click();
+    const weightInput = firstRow.locator('.rm-w-input');
+    await expect(weightInput).toBeVisible({ timeout: 5_000 });
+    const original = await weightInput.inputValue();
+    const newWeight = parseFloat(original) === 42 ? '17' : '42';
+    console.log(`S-05: trait weight ${original} -> ${newWeight}`);
+
+    await weightInput.fill(newWeight);
+    await weightInput.blur();
+    const saveBtn = page.locator('.rm-footer button').filter({ hasText: /Save Rarity/i }).first();
+    await saveBtn.click();
+    await page.waitForTimeout(1000);
+
+    await page.screenshot({
+      path: 'tests/phase-results/screenshots/organize/nft-studio-rarity-adjust.png',
+      fullPage: true,
+    }).catch(() => {});
+
+    // Reload the whole page and re-open the SAME trait (by stem) to confirm the DB write stuck
+    await waitForStudio(page);
+    await organizeTab.click();
+    await page.waitForTimeout(2000);
+    await page.locator('.asset-card').first().click();
+
+    const reloadedRow = page.locator(`.rm-row-v2[data-stem="${stem}"]`).first();
+    await expect(reloadedRow).toBeVisible({ timeout: 5_000 });
+    await reloadedRow.locator('.rm-pct-toggle').click();
+    const reloadedInput = reloadedRow.locator('.rm-w-input');
+    await expect(reloadedInput).toBeVisible({ timeout: 5_000 });
+    const persisted = await reloadedInput.inputValue();
+    console.log(`S-05: weight after reload = ${persisted}`);
+    expect(persisted).toBe(newWeight);
+    console.log('S-05: Rarity weight adjustment persisted through PUT + reload ✓');
   });
 });
