@@ -2,7 +2,7 @@
 'use client';
 import { useState, useMemo, useCallback } from 'react';
 import { TIER_PRESET_WEIGHTS, TIERS } from '../../../../lib/studio/tiers';
-import { calcRarity } from '../../../../lib/studio/probability';
+import { calcRarity, positionForProb } from '../../../../lib/studio/probability';
 import { useLayerFiles } from '../LayerFilesContext';
 import RulesTabContent from './RulesTabContent';
 
@@ -15,7 +15,7 @@ const TIER_LABELS = [
 
 export default function RarityModal({
   layer, weights, supply, onSave, onDelete, onClose,
-  allLayers, conflicts, onSaveConflicts, onSaveLayerMeta,
+  allLayers, conflicts, onSaveConflicts, onSaveLayerMeta, onRenameTrait,
 }) {
   // Local state for weights - starts from parent weights
   const [localWs, setLocalWs] = useState<Record<string, number>>(() => ({ ...weights }));
@@ -24,6 +24,9 @@ export default function RarityModal({
   const [tab, setTab] = useState<'assets' | 'rules'>('assets');
   const [name, setName] = useState(layer.label ?? layer.folder);
   const [rarityPct, setRarityPct] = useState(layer.rarityPct ?? 100);
+  const [traitNames, setTraitNames] = useState<Record<string, string>>(() =>
+    Object.fromEntries(layer.assets.map(a => [a.stem, a.name])));
+  const [weightInputOpen, setWeightInputOpen] = useState<Record<string, boolean>>({});
 
   const totalW = useMemo(() => Object.values(localWs).reduce((a, b) => a + b, 0), [localWs]);
 
@@ -58,6 +61,12 @@ export default function RarityModal({
       else                         eq[a.stem] = TIER_PRESET_WEIGHTS.Common;
     });
     setLocalWs(eq);
+  }
+
+  function commitTraitName(asset) {
+    const next = traitNames[asset.stem]?.trim();
+    if (!next || next === asset.name) return;
+    onRenameTrait?.(asset, next);
   }
 
   function handleSave() {
@@ -152,26 +161,31 @@ export default function RarityModal({
           </div>
         ) : (
         <>
-        {/* Toolbar */}
-        <div className="rm-toolbar">
-          <span className="rm-trait-count">{layer.count} traits</span>
-          <span className="rm-totalw">Total weight: {totalW.toFixed(1)}</span>
-          <button className="rm-tbtn" onClick={distributeByTier} title="Auto-assign weights: rarest 1% = Legendary, next 4% = Epic, next 10% = Rare, rest = Common">✦ Distribute</button>
-          <button className="rm-tbtn" onClick={equalizeAll}>Equalize</button>
-          <button className="rm-tbtn" onClick={resetAll}>Reset</button>
-        </div>
-
         {/* Asset List */}
-        <div className="rm-list">
+        <div className="rm-list rm-list-v2">
           {layer.assets.map(asset => {
             const w = localWs[asset.stem] ?? 1;
-            const { pct, expected, tier } = calcRarity(w, totalW, supply);
+            const { pct, tier } = calcRarity(w, totalW, supply);
             const enabled = w > 0;
 
+            // Same tier-zone gradient math as the per-card modal (AssetCard.tsx) —
+            // reused here so the slider reads identically in both places.
+            const otherW = Math.max(0, totalW - w);
+            const lPos = positionForProb(otherW, 0.01);
+            const ePos = positionForProb(otherW, 0.05);
+            const rPos = positionForProb(otherW, 0.15);
+
             return (
-              <div key={asset.stem} className={`rm-row${enabled ? '' : ' rm-row-disabled'}`}>
-                {/* Thumbnail */}
-                <div className="rm-thumb">
+              <div key={asset.stem} className={`rm-row-v2${enabled ? '' : ' rm-row-disabled'}`}>
+                <button
+                  className={`rm-radio${enabled ? ' rm-radio-on' : ''}`}
+                  onClick={() => setW(asset.stem, enabled ? 0 : 1)}
+                  title={enabled ? 'Disable trait' : 'Enable trait'}
+                >
+                  {enabled && <span className="rm-radio-dot" />}
+                </button>
+
+                <div className="rm-thumb rm-thumb-v2">
                   {asset.rel ? (
                     <img
                       src={getBlobUrl(asset.rel) ?? `/api/thumb/${asset.rel}`}
@@ -184,74 +198,61 @@ export default function RarityModal({
                   )}
                 </div>
 
-                {/* Info */}
-                <div className="rm-info">
-                  <div className="rm-asset-name" title={asset.name}>{asset.name}</div>
-                  <div className="rm-tier-pill" style={{ background: tier.bg, color: tier.color }}>{tier.label}</div>
+                <input
+                  className="rm-name-input"
+                  value={traitNames[asset.stem] ?? asset.name}
+                  onChange={e => setTraitNames(prev => ({ ...prev, [asset.stem]: e.target.value }))}
+                  onBlur={() => commitTraitName(asset)}
+                  onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                />
+
+                <div className="rm-pct-chip" title="Chance this trait is picked when its layer appears">
+                  <span className="rm-pct-icon">◈</span>{pct}%
                 </div>
 
-                {/* Controls */}
-                <div className="rm-controls">
-                  <div className="rm-pct-row">
-                    <span className="rm-pct">{pct}%</span>
-                    <span className="rm-exp">{expected.toLocaleString()} NFTs</span>
+                <div className="rm-tierzone-col">
+                  <div className="rm-tier-bar">
+                    <div className="rm-tier-zone" style={{ width: `${lPos}%`, background: '#F59E0B' }} title="Legendary" />
+                    <div className="rm-tier-zone" style={{ width: `${Math.max(0, ePos - lPos)}%`, background: '#A855F7' }} title="Epic" />
+                    <div className="rm-tier-zone" style={{ width: `${Math.max(0, rPos - ePos)}%`, background: '#3B82F6' }} title="Rare" />
+                    <div className="rm-tier-zone" style={{ width: `${Math.max(0, 100 - rPos)}%`, background: '#6B7280' }} title="Common" />
                   </div>
-                  <div className="rm-slider-row">
-                    <input
-                      className="rm-slider"
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="0.5"
-                      value={Math.min(w, 100)}
-                      onChange={e => setW(asset.stem, parseFloat(e.target.value))}
-                    />
-                    <input
-                      className="rm-w-input"
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      value={w}
-                      onChange={e => setW(asset.stem, Math.max(0, parseFloat(e.target.value) || 0))}
-                    />
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'0 2px', marginTop:4, gap:2 }}>
-                    {TIER_LABELS.map(t => (
-                      <button
-                        key={t.label}
-                        title={`Set to ${t.label} (weight ${TIER_PRESET_WEIGHTS[t.label]})`}
-                        onClick={() => setW(asset.stem, TIER_PRESET_WEIGHTS[t.label])}
-                        style={{
-                          fontSize:9, color: t.color, fontWeight:700, letterSpacing:'0.02em',
-                          background:'transparent', border:`1px solid ${t.color}44`,
-                          borderRadius:3, padding:'1px 4px', cursor:'pointer',
-                          opacity: tier.label === t.label ? 1 : 0.45,
-                        }}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
+                  <input
+                    className="rm-slider rm-slider-v2"
+                    type="range"
+                    min="0" max="100" step="0.5"
+                    value={Math.min(w, 100)}
+                    onChange={e => setW(asset.stem, parseFloat(e.target.value))}
+                  />
+                  <div className="rm-tier-labels-row">
+                    <span style={{ color: '#F59E0B' }}>Legendary</span>
+                    <span style={{ color: '#A855F7' }}>Epic</span>
+                    <span style={{ color: '#3B82F6' }}>Rare</span>
+                    <span style={{ color: '#6B7280' }}>Common</span>
                   </div>
                 </div>
 
-                {/* Toggle */}
                 <button
-                  className={`rm-toggle${enabled ? ' rm-toggle-on' : ''}`}
-                  onClick={() => setW(asset.stem, enabled ? 0 : 1)}
-                  title={enabled ? 'Disable' : 'Enable'}
-                >
-                  {enabled ? '●' : '○'}
-                </button>
+                  className={`rm-pct-toggle${weightInputOpen[asset.stem] ? ' rm-pct-toggle-on' : ''}`}
+                  title="Show exact weight number"
+                  onClick={() => setWeightInputOpen(prev => ({ ...prev, [asset.stem]: !prev[asset.stem] }))}
+                >%</button>
+                {weightInputOpen[asset.stem] && (
+                  <input
+                    className="rm-w-input"
+                    type="number" min="0" step="0.1"
+                    value={w}
+                    onChange={e => setW(asset.stem, Math.max(0, parseFloat(e.target.value) || 0))}
+                  />
+                )}
 
-                {/* Delete */}
                 {asset.rel && (
                   <button
-                    className="rm-delete-btn"
+                    className="rm-delete-btn rm-delete-btn-v2"
                     title="Delete trait"
                     onClick={() => {
                       if (!confirm(`Delete "${asset.name}"? This cannot be undone.`)) return;
                       onDelete?.(asset);
-                      onClose();
                     }}
                   >
                     🗑

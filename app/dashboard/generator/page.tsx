@@ -224,6 +224,16 @@ export default function Page() {
     loadLayers();
   }
 
+  async function handleRenameTrait(asset: { id?: string }, name: string) {
+    if (!asset.id) return;
+    await fetch(`/api/nft-gen/traits/${asset.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }).catch(() => { });
+    loadLayers();
+  }
+
   // Create/update collection in DB, then sync layers from disk
   async function handleCollectionContinue() {
     setSyncing(true);
@@ -498,6 +508,7 @@ export default function Page() {
               conflicts={conflicts}
               onSaveConflicts={saveConflicts}
               onSaveLayerMeta={(meta: { displayName?: string; layerRarityPct?: number }) => handleSaveLayerMeta(gearFolder, meta)}
+              onRenameTrait={handleRenameTrait}
               onSave={(newWs: Record<string, number>) => {
                 Object.entries(newWs).forEach(([stem, val]) => handleWeightChange(gearFolder, stem, val));
               }}

@@ -770,6 +770,49 @@
 }
 .studio-wrap .rm-delete-btn:hover { background: #dc2626; color: #fff; }
 
+/* ── Rarity modal — Assets tab, redesigned row (matches reference tool) ── */
+.studio-wrap .rm-list-v2 { overflow-y: auto; flex: 1; padding: 8px 0; }
+.studio-wrap .rm-row-v2 {
+  display: flex; align-items: center; gap: 10px; padding: 10px 20px;
+  border-bottom: 1px solid var(--border); transition: background .1s;
+}
+.studio-wrap .rm-row-v2:hover { background: var(--bg2); }
+.studio-wrap .rm-row-v2.rm-row-disabled { opacity: .5; }
+.studio-wrap .rm-radio {
+  width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--border2);
+  background: transparent; cursor: pointer; flex-shrink: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.studio-wrap .rm-radio-on { border-color: var(--accent); }
+.studio-wrap .rm-radio-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.studio-wrap .rm-thumb-v2 { width: 48px; height: 48px; }
+.studio-wrap .rm-name-input {
+  width: 150px; flex-shrink: 0; background: var(--bg0); border: 1px solid var(--border2);
+  color: var(--text); border-radius: 6px; padding: 6px 9px; font-size: 12px; font-weight: 600;
+}
+.studio-wrap .rm-name-input:focus { border-color: var(--accent); outline: none; }
+.studio-wrap .rm-pct-chip {
+  display: flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700;
+  color: var(--accent2); width: 58px; flex-shrink: 0;
+}
+.studio-wrap .rm-pct-icon { font-size: 11px; opacity: .7; }
+.studio-wrap .rm-tierzone-col { flex: 1; min-width: 160px; }
+.studio-wrap .rm-tier-bar {
+  display: flex; height: 4px; border-radius: 2px; overflow: hidden; margin-bottom: 3px;
+}
+.studio-wrap .rm-tier-zone { height: 100%; }
+.studio-wrap .rm-slider-v2 { width: 100%; margin: 2px 0; }
+.studio-wrap .rm-tier-labels-row {
+  display: flex; justify-content: space-between; font-size: 8.5px; font-weight: 700;
+  letter-spacing: .3px; text-transform: uppercase; opacity: .75;
+}
+.studio-wrap .rm-pct-toggle {
+  width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0; cursor: pointer;
+  background: var(--bg2); border: 1px solid var(--border2); color: var(--dim); font-size: 11px; font-weight: 700;
+}
+.studio-wrap .rm-pct-toggle-on { background: var(--accent-bg); border-color: var(--accent); color: var(--accent2); }
+.studio-wrap .rm-delete-btn-v2 { width: 26px; height: 26px; }
+
 /* ── Dimensions field ── */
 .studio-wrap .setup-hint { font-size: 11px; color: var(--dim); margin-bottom: 6px; }
 .studio-wrap .setup-dim-row { display: flex; align-items: center; gap: 10px; }
