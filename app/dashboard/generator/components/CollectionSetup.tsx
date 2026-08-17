@@ -143,6 +143,7 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
   const [uploading,     setUploading]     = useState(false);
   const [uploadDone,    setUploadDone]    = useState(false);
   const [uploadMsg,     setUploadMsg]     = useState('');
+  const [uploadFailedLayers, setUploadFailedLayers] = useState<string[]>([]);
   const [errors,        setErrors]        = useState({});
   const folderRef = useRef(null);
   const { storeFiles } = useLayerFiles();
@@ -179,15 +180,22 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
     storeFiles(fileMap);
     onLayersChange?.(parsedLayers);
 
-    // Show success immediately — no need to wait for server
+    // Show success immediately — no need to block the UI on the network
     setUploading(false);
     setUploadDone(true);
+    setUploadFailedLayers([]);
     setUploadMsg(`${parsedLayers.length} layers imported!`);
 
-    // ── 2. Fire server uploads in background ──────────────────────────────────
-    // These are intentionally NOT awaited — the UI is already updated above.
+    // ── 2. Upload to S3 in the background, but await + verify each layer ───────
+    // Previously these were fire-and-forget with .catch(() => {}), so if any
+    // single layer's request failed (network blip, timeout, whatever) its
+    // images silently never reached Filebase while the DB still recorded
+    // the trait rows as if nothing was wrong — confirmed live 2026-08-17,
+    // two full layers came back with zero uploaded objects and no error
+    // anywhere. Now every layer's result is checked and failures surface in
+    // the UI instead of vanishing.
     const doServerUpload = async () => {
-      const groups = {};
+      const groups: Record<string, { file: File; subpath: string }[]> = {};
       for (const file of files) {
         if (!file.type.startsWith('image/') && !file.name.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) continue;
         const parts = (file.webkitRelativePath || file.name).split('/').filter(Boolean);
@@ -198,21 +206,36 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
         if (!groups[layerName]) groups[layerName] = [];
         groups[layerName].push({ file, subpath });
       }
-      if (Object.keys(groups).length > 0) {
-        // Clear bearth-layers bucket before uploading new collection layers
-        await fetch('/api/nft-gen/layers/clear-bucket', { method: 'POST' }).catch(() => {});
-      }
-      for (const [layer, entries] of Object.entries(groups)) {
-        const form = new FormData();
-        form.append('layer', layer);
-        for (const { file, subpath } of entries) {
-          form.append('files', file);
-          form.append('subpaths', subpath);
-        }
-        fetch('/api/upload', { method: 'POST', body: form }).catch(() => {});
+      if (Object.keys(groups).length === 0) return;
+
+      // Clear bearth-layers bucket before uploading new collection layers
+      await fetch('/api/nft-gen/layers/clear-bucket', { method: 'POST' }).catch(() => {});
+
+      const results = await Promise.allSettled(
+        Object.entries(groups).map(async ([layer, entries]) => {
+          const form = new FormData();
+          form.append('layer', layer);
+          for (const { file, subpath } of entries) {
+            form.append('files', file);
+            form.append('subpaths', subpath);
+          }
+          const res = await fetch('/api/upload', { method: 'POST', body: form });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json().catch(() => ({}));
+          if (data.s3Uploaded?.length !== entries.length) {
+            throw new Error(`only ${data.s3Uploaded?.length ?? 0}/${entries.length} files uploaded`);
+          }
+          return layer;
+        }),
+      );
+
+      const failed = Object.keys(groups).filter((_, i) => results[i].status === 'rejected');
+      if (failed.length) {
+        console.error('[upload] layer(s) failed to upload to S3:', failed);
+        setUploadFailedLayers(failed);
       }
     };
-    doServerUpload(); // fire and forget — no await
+    doServerUpload();
   }
 
   async function handleDrop(e) {
@@ -398,6 +421,12 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
                 </>
               )}
             </div>
+            {uploadFailedLayers.length > 0 && (
+              <div style={{ color: '#dc2626', fontSize: 13, marginTop: 8 }}>
+                ⚠ {uploadFailedLayers.length} layer(s) failed to upload to storage: {uploadFailedLayers.join(', ')}.
+                Drop the folder again to retry — do not continue until this clears.
+              </div>
+            )}
             <input
               ref={folderRef}
               type="file"
