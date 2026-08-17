@@ -3,19 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import NftPopup from './NftPopup';
 import { TIER_META, Spinner, CheckIcon, RarityCard, ProgressBar, HLayerFilter } from './ExportGridParts';
-
-// A single hung request in a bitmap batch used to freeze that whole batch
-// forever — fetch() has no default timeout, and Promise.all never resolves
-// until every request in it settles. Same fix as PreviewPanel.tsx.
-async function fetchWithTimeout(url: string, ms = 10_000): Promise<Response> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), ms);
-  try {
-    return await fetch(url, { signal: ctrl.signal });
-  } finally {
-    clearTimeout(t);
-  }
-}
+import { fetchWithTimeout } from '../../../../lib/fetchWithTimeout';
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function ExportPanel({ weights, layers: layersProp = [], collection, conflicts, collectionId = null }) {
@@ -186,7 +174,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         let resp: Response;
         let pr: any = null;
         try {
-          resp = await fetch(`/api/nft-gen/export/${svrExportIdRef.current}`);
+          resp = await fetchWithTimeout(`/api/nft-gen/export/${svrExportIdRef.current}`);
           pr = await resp.json();
         } catch { exportPollFailures++; if (exportPollFailures >= 3) { clearInterval(svrPollRef.current!); svrPollRef.current = null; setSvrStatus('error'); setSvrError('Lost connection to server. Please try again.'); } return; }
         if (!resp.ok) {
@@ -245,7 +233,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         let resp: Response;
         let pr: any = null;
         try {
-          resp = await fetch(`/api/nft-gen/export/preview/${prevIdRef.current}`);
+          resp = await fetchWithTimeout(`/api/nft-gen/export/preview/${prevIdRef.current}`);
           pr = await resp.json();
         } catch { prevPollFailures++; if (prevPollFailures >= 3) { clearInterval(prevPollRef.current!); prevPollRef.current = null; setPrevStatus('error'); setPrevError('Lost connection to server. Please try again.'); } return; }
         if (!resp.ok) {
@@ -280,11 +268,14 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     setSyncingLayers(true);
     setError('');
     try {
-      const r = await fetch(`/api/nft-gen/collections/${collectionId}/sync-from-disk`, {
+      // A real layer set legitimately takes several seconds even with the
+      // bulk sync fix — give this a longer budget than the default so a
+      // large collection doesn't get cut off mid-sync.
+      const r = await fetchWithTimeout(`/api/nft-gen/collections/${collectionId}/sync-from-disk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ layers: layersProp }),
-      });
+      }, 60_000);
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setError(d.error ?? 'Layer sync failed. Try again.'); return; }
       setLayerStatus(d.layersSynced > 0 ? 'ok' : 'empty');
@@ -321,7 +312,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         let resp: Response;
         let pr: any = null;
         try {
-          resp = await fetch(`/api/nft-gen/generate/${genId}`);
+          resp = await fetchWithTimeout(`/api/nft-gen/generate/${genId}`);
           pr = await resp.json();
         } catch { pollFailures++; if (pollFailures >= 3) { clearInterval(svrGenPollRef.current!); svrGenPollRef.current = null; setSvrGenStatus('error'); setSvrGenError('Lost connection to server. Please try again.'); } return; }
 
@@ -375,7 +366,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       )] as string[];
 
       // Fetch items only — don't block on bitmap loading
-      const itemsResp = await fetch(`/api/nft-gen/jobs/${jobId}/display-items?limit=${supply}`);
+      const itemsResp = await fetchWithTimeout(`/api/nft-gen/jobs/${jobId}/display-items?limit=${supply}`, {}, 30_000);
 
       if (!itemsResp.ok) {
         console.warn(`[loadAndDisplayFromDb] display-items HTTP ${itemsResp.status} — retrying (${attempt}/3)`);

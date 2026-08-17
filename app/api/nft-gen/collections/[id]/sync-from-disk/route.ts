@@ -25,47 +25,57 @@ function inferTier(stem: string): string {
 interface ManifestAsset { stem: string; name?: string; rel?: string | null; defaultWeight?: number; }
 interface ManifestLayer { folder: string; label?: string; count?: number; optional?: boolean; assets: ManifestAsset[]; }
 
+async function syncOneLayer(token: string, collectionId: string, ml: ManifestLayer, layerIdx: number) {
+  const realAssets = ml.assets.filter((a) => !!a.rel);
+  if (!realAssets.length) return { layerName: ml.folder, layerId: null, traitsUpserted: 0, traitsDeleted: 0 };
+
+  // sortOrder is explicit per layer, so layers no longer need to be created in
+  // request order — each layer's row lands at the right position in the list
+  // regardless of which request happens to resolve first.
+  const layerData = await apiPost(token, `/api/nft-gen/collections/${collectionId}/layers`, {
+    name:           ml.folder,
+    displayName:    ml.label ?? ml.folder,
+    layerRarityPct: ml.optional ? 80 : 100,
+    sortOrder:      layerIdx,
+  });
+  const layerId: string | null = layerData?.layer?.id ?? layerData?.id ?? null;
+  if (!layerId) return { layerName: ml.folder, layerId: null, traitsUpserted: 0, traitsDeleted: 0 };
+
+  const activeFilePaths = realAssets.map((a) => a.rel as string);
+  // One bulk call per layer instead of one HTTP round-trip per trait — BearthApi
+  // holds a single DB connection for the whole layer and inserts in one set-based
+  // query, instead of this route opening up to 50 concurrent HTTP+DB round-trips
+  // that used to starve the 10-connection pool (confirmed live 2026-08-17: a
+  // 213-trait upload crashed BearthApi that way).
+  const bulkResp = await apiPost(token, `/api/nft-gen/layers/${layerId}/traits/bulk`, {
+    traits: realAssets.map((asset) => ({
+      name:            asset.name ?? asset.stem,
+      filePath:        asset.rel,
+      rarityTier:      inferTier(asset.stem),
+      storageProvider: "filebase",
+    })),
+  });
+  const traitsUpserted = bulkResp?.count ?? 0;
+
+  const reconcileTraits = await apiPost(token, `/api/nft-gen/layers/${layerId}/traits/reconcile`, { activeFilePaths });
+  return { layerName: ml.folder, layerId, traitsUpserted, traitsDeleted: reconcileTraits?.deactivated ?? 0 };
+}
+
 async function syncLayerManifest(
   token: string,
   collectionId: string,
   manifest: ManifestLayer[]
 ) {
-  // Process layers sequentially to preserve folder order (0-bg, 1-back, 2-body, …)
-  // Promise.all would insert in random order because requests resolve at different times.
-  const results: Array<{ layerName: string; layerId: string | null; traitsUpserted: number; traitsDeleted: number }> = [];
-  for (let layerIdx = 0; layerIdx < manifest.length; layerIdx++) {
-    const ml = manifest[layerIdx];
-    const realAssets = ml.assets.filter((a) => !!a.rel);
-    if (!realAssets.length) { results.push({ layerName: ml.folder, layerId: null, traitsUpserted: 0, traitsDeleted: 0 }); continue; }
-
-    const layerData = await apiPost(token, `/api/nft-gen/collections/${collectionId}/layers`, {
-      name:           ml.folder,
-      displayName:    ml.label ?? ml.folder,
-      layerRarityPct: ml.optional ? 80 : 100,
-      sortOrder:      layerIdx,
-    });
-    const layerId: string | null = layerData?.layer?.id ?? layerData?.id ?? null;
-    if (!layerId) { results.push({ layerName: ml.folder, layerId: null, traitsUpserted: 0, traitsDeleted: 0 }); continue; }
-
-    const activeFilePaths = realAssets.map((a) => a.rel as string);
-    // One bulk call per layer instead of one HTTP round-trip per trait — BearthApi
-    // holds a single DB connection for the whole layer and inserts sequentially on
-    // it, instead of this route opening up to 50 concurrent HTTP+DB round-trips
-    // that used to starve the 10-connection pool (confirmed live 2026-08-17: a
-    // 213-trait upload crashed BearthApi that way). This is both faster (no
-    // per-trait network overhead) and safer (never holds more than 1 connection).
-    const bulkResp = await apiPost(token, `/api/nft-gen/layers/${layerId}/traits/bulk`, {
-      traits: realAssets.map((asset) => ({
-        name:            asset.name ?? asset.stem,
-        filePath:        asset.rel,
-        rarityTier:      inferTier(asset.stem),
-        storageProvider: "filebase",
-      })),
-    });
-    const traitsUpserted = bulkResp?.count ?? 0;
-
-    const reconcileTraits = await apiPost(token, `/api/nft-gen/layers/${layerId}/traits/reconcile`, { activeFilePaths });
-    results.push({ layerName: ml.folder, layerId, traitsUpserted, traitsDeleted: reconcileTraits?.deactivated ?? 0 });
+  // Layers run with bounded concurrency instead of one-at-a-time — each layer
+  // is now just 3 quick calls (create, bulk-upsert traits, reconcile), so a
+  // handful running together stays well under the DB pool's 10-connection cap
+  // while cutting total sync time roughly by the concurrency factor.
+  const CONCURRENCY = 4;
+  const results: Array<{ layerName: string; layerId: string | null; traitsUpserted: number; traitsDeleted: number }> = new Array(manifest.length);
+  for (let i = 0; i < manifest.length; i += CONCURRENCY) {
+    const batch = manifest.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(batch.map((ml, j) => syncOneLayer(token, collectionId, ml, i + j)));
+    batchResults.forEach((r, j) => { results[i + j] = r; });
   }
 
   const reconcileLayers = await apiPost(token, `/api/nft-gen/collections/${collectionId}/layers/reconcile`, {
