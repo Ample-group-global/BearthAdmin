@@ -148,7 +148,7 @@ export default function RarityModal({
 
         {tab === 'rules' && onSaveConflicts ? (
           <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1 }}>
-            <RulesTabContent layers={allLayers ?? [layer]} rules={conflicts} onChange={onSaveConflicts} />
+            <RulesTabContent layer={layer} layers={allLayers ?? [layer]} rules={conflicts} onChange={onSaveConflicts} />
           </div>
         ) : (
         <>
