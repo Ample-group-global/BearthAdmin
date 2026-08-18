@@ -391,10 +391,12 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       )] as string[];
 
       // Fetch items only — don't block on bitmap loading.
-      // Fixed high limit (matches server's own hard cap), NOT the client `supply`
-      // guess — `supply` can still be the ??100 fallback while collection is
-      // loading, which would silently truncate the grid below the real count.
-      const itemsResp = await fetchWithTimeout(`/api/nft-gen/jobs/${jobId}/display-items?limit=10000`, {}, 30_000);
+      // Fixed high limit (matches server's own safety ceiling), NOT the client
+      // `supply` guess — `supply` can still be the ??100 fallback while
+      // collection is loading, which would silently truncate the grid below
+      // the real count. 50000 is a safety bound, not a business cap —
+      // collections are expected to grow well past 10K.
+      const itemsResp = await fetchWithTimeout(`/api/nft-gen/jobs/${jobId}/display-items?limit=50000`, {}, 30_000);
 
       if (!itemsResp.ok) {
         console.warn(`[loadAndDisplayFromDb] display-items HTTP ${itemsResp.status} — retrying (${attempt}/3)`);
