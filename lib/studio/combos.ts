@@ -105,12 +105,15 @@ export function generateAllCombos(
     for (let attempt = 0; attempt < 200; attempt++) {
       picks = {};
       for (const layer of layers) {
+        // Match server generate.ts: optional layers (rarityPct < 100) are skipped by chance
+        const pct = (layer.rarityPct ?? 100) as number;
+        if (pct < 100 && Math.random() * 100 >= pct) continue;
         const ws = weights[layer.folder] ?? {};
         const pick = pickWeighted(layer.assets, ws);
         if (pick) picks[layer.folder] = pick;
       }
       resolveConflicts(picks, conflicts, weights, layers);
-      const key = layers.map(l => picks[l.folder]?.stem ?? '').join('|');
+      const key = layers.filter(l => !l.bypassDna).map(l => picks[l.folder]?.stem ?? '').join('|');
       if (!seen.has(key)) { seen.add(key); unique = true; break; }
     }
     if (!unique) duplicateCount++;
@@ -141,7 +144,7 @@ export function computeRarity(
   for (const combo of allCombos) {
     for (const layer of layers) {
       const pick = combo[layer.folder];
-      if (!pick || pick.rel === null) continue;
+      if (!pick) continue;
       const key = `${layer.label}\x00${pick.name}`;
       traitCounts[key] = (traitCounts[key] ?? 0) + 1;
     }
@@ -152,9 +155,9 @@ export function computeRarity(
     const attrs: { trait_type: string; value: string }[] = [];
     for (const layer of layers) {
       const pick = combo[layer.folder];
-      if (!pick || pick.rel === null) continue;
+      if (!pick) continue;
       const key = `${layer.label}\x00${pick.name}`;
-      // OpenSea statistical rarity: sum of (1 / trait_frequency) per trait
+      // OpenSea statistical rarity: sum of (supply / trait_frequency) per trait
       score += supply / (traitCounts[key] ?? 1);
       attrs.push({ trait_type: layer.label, value: pick.name });
     }

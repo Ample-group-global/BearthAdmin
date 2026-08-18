@@ -106,12 +106,12 @@ const SORT_LABELS = {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function PreviewPanel({ weights, layers, collection, conflicts }) {
   const { getBlobUrl } = useLayerFiles();
-  const supply  = collection?.supply ?? 100;
-  const srcW    = collection?.width  ?? 512;
-  const srcH    = collection?.height ?? 512;
-  const scale   = Math.min(THUMB / srcW, THUMB / srcH, 1);
-  const canvasW = Math.max(1, Math.round(srcW * scale));
-  const canvasH = Math.max(1, Math.round(srcH * scale));
+  const supply  = Number(collection?.supply ?? 0);
+  const srcW    = Number(collection?.width  ?? 0);
+  const srcH    = Number(collection?.height ?? 0);
+  const scale   = (srcW > 0 && srcH > 0) ? Math.min(THUMB / srcW, THUMB / srcH, 1) : 1;
+  const canvasW = srcW > 0 ? Math.max(1, Math.round(srcW * scale)) : THUMB;
+  const canvasH = srcH > 0 ? Math.max(1, Math.round(srcH * scale)) : THUMB;
 
   const [phase,         setPhase]         = useState('idle');
   const [loadMsg,       setLoadMsg]       = useState('');
@@ -176,8 +176,12 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
   }, []);
 
   async function run() {
-    if (!collection?.supply) {
+    if (!supply) {
       setLoadMsg('Collection size is still loading — wait a moment and try again.');
+      return;
+    }
+    if (!srcW || !srcH) {
+      setLoadMsg('Dimensions not configured — set Width and Height in Settings first.');
       return;
     }
     setPhase('loading');
@@ -234,12 +238,15 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
         for (let attempt = 0; attempt < 200; attempt++) {
           picks = {};
           for (const layer of layers) {
+            // Match server: optional layers (rarityPct < 100) are skipped by chance
+            const pct = layer.rarityPct ?? 100;
+            if (pct < 100 && Math.random() * 100 >= pct) continue;
             const ws = weights[layer.folder] ?? {};
             const pick = pickWeighted(layer.assets, ws);
             if (pick) picks[layer.folder] = pick;
           }
           resolveConflicts(picks, conflicts, weights, layers);
-          const key = layers.map((l: any) => picks[l.folder]?.stem ?? '').join('|');
+          const key = layers.filter((l: any) => !l.bypassDna).map((l: any) => picks[l.folder]?.stem ?? '').join('|');
           if (!seen.has(key)) { seen.add(key); unique = true; break; }
         }
         if (!unique) console.warn('[NFT Generator] Could not generate unique combo after 200 attempts.');
@@ -311,7 +318,7 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
     <div className="preview-layout">
       {/* ── Left panel ── */}
       <div className="preview-left-panel">
-        <button className="randomize-btn" onClick={run} disabled={phase === 'loading' || !collection?.supply}>
+        <button className="randomize-btn" onClick={run} disabled={phase === 'loading' || !supply || !srcW || !srcH}>
           {phase === 'loading' ? loadMsg : 'Randomize'}
         </button>
 
