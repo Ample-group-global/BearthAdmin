@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import './studio.css';
 import { useState, useEffect, useCallback } from 'react';
 import StepNav from './components/StepNav';
@@ -249,12 +249,12 @@ export default function Page() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: collection.name || 'Bearth NFT Collection',
+            name: collection.name,
             description: collection.description,
-            symbol: collection.symbol || 'BRT',
+            symbol: collection.symbol,
             network: collection.blockchain,
-            formatWidth: collection.width ?? 2000,
-            formatHeight: collection.height ?? 2000,
+            formatWidth: collection.width ?? null,
+            formatHeight: collection.height ?? null,
             shuffleOutput: true,
             supply:     collection.supply,
             nameFormat: collection.nameFormat,
@@ -270,8 +270,8 @@ export default function Page() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               collectionId: cid,
-              name:   collection.name || 'Bearth NFT Collection',
-              supply: collection.supply ?? 100,
+              name:   collection.name,
+              supply: collection.supply,
             }),
           }).catch(() => {});
         }
@@ -285,8 +285,8 @@ export default function Page() {
             description:  collection.description,
             symbol:       collection.symbol,
             network:      collection.blockchain,
-            formatWidth:  collection.width  ?? 2000,
-            formatHeight: collection.height ?? 2000,
+            formatWidth:  collection.width  ?? null,
+            formatHeight: collection.height ?? null,
             supply:       collection.supply,
             nameFormat:   collection.nameFormat,
             formatType:   collection.format,
@@ -295,7 +295,7 @@ export default function Page() {
         await fetch('/api/session/collection', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ collectionId: cid, supply: collection.supply ?? 100 }),
+          body: JSON.stringify({ collectionId: cid, supply: collection.supply }),
         }).catch(() => {});
       }
 

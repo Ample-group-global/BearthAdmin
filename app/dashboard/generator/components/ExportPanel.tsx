@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 'use client';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import NftPopup from './NftPopup';
@@ -605,10 +605,10 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
             <div className="exp-summary-grid">
               {[
                 { label: 'Name',       value: collName        || '—' },
-                { label: 'Supply',     value: supply.toLocaleString() },
-                { label: 'Blockchain', value: collection?.blockchain || '—' },
-                { label: 'Format',     value: imgExt.toUpperCase() },
-                { label: 'Resolution', value: `${targetW}×${targetH}` },
+                { label: 'Supply',     value: collection?.supply ? Number(collection.supply).toLocaleString() : '—' },
+                { label: 'Blockchain', value: collection?.network || collection?.blockchain || '—' },
+                { label: 'Format',     value: collection?.format ? collection.format.toUpperCase() : '—' },
+                { label: 'Resolution', value: (collection?.width && collection?.height) ? collection.width + '×' + collection.height : '—' },
               ].map(item => (
                 <div key={item.label} className="exp-summary-stat">
                   <div className="exp-summary-stat-label">{item.label}</div>
