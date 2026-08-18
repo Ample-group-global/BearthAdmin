@@ -34,7 +34,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const [externalUrlBase, setExternalUrlBase] = useState(defaultExternalUrl);
 
   // ── Server-side export state ──────────────────────────────────────────────
-  const [svrBucket,   setSvrBucket]   = useState('bearth-nft-it');
+  const [svrBucket,   setSvrBucket]   = useState('bearth-nft-test');
   const [svrStatus,   setSvrStatus]   = useState<'idle'|'running'|'done'|'error'>('idle');
   const [svrProgress, setSvrProgress] = useState(0);
   const [svrTotal,    setSvrTotal]    = useState(0);
@@ -573,7 +573,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       <div className="export-page">
         <div className="exp-loading-card">
           <Spinner size={32} color="var(--accent)" />
-          <div className="exp-loading-title">Generating {supply.toLocaleString()} NFTs on server…</div>
+          <div className="exp-loading-title">Generating {svrGenTotal > 0 ? svrGenTotal.toLocaleString() : supply.toLocaleString()} NFTs on server…</div>
           <div className="exp-loading-msg">{svrGenPhase || 'Starting…'}</div>
           {svrGenTotal > 0 && (
             <>
@@ -634,6 +634,11 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
 
           {layerStatus === 'empty' && (
             <div className="exp-error-banner" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {(!collection?.width || !collection?.height) && (
+            <div className="exp-error-banner">
+              Dimensions not configured — go to <strong>Settings</strong> and set Width and Height before generating.
+            </div>
+          )}
               <span>No active layers found for this collection.</span>
               {layersProp.length > 0 ? (
                 <button
@@ -655,7 +660,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
             <button
               className="btn btn-primary btn-lg"
               onClick={generateOnServer}
-              disabled={!collectionId || svrGenStatus === 'running' || layerStatus === 'loading' || layerStatus === 'empty'}
+              disabled={!collection?.width || !collection?.height || !collectionId || svrGenStatus === 'running' || layerStatus === 'loading' || layerStatus === 'empty'}
             >
               {layerStatus === 'loading' ? '⌛ Checking layers…' : supply > 0 ? `⚡ Generate ${supply.toLocaleString()} NFTs` : `⚡ Generate NFTs`}
             </button>
@@ -673,7 +678,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         {/* ── Top bar ── */}
         <div className="exp-top-bar">
           <div className="exp-top-left">
-            <div className="exp-ready-badge">{supply.toLocaleString()} NFTs Ready</div>
+            <div className="exp-ready-badge">{rarityItems.length > 0 ? rarityItems.length.toLocaleString() : supply.toLocaleString()} NFTs Ready</div>
             <div className="exp-sort-group">
               <button
                 className={`exp-sort-btn${sortBy === 'rarity' ? ' exp-sort-active' : ''}`}
@@ -705,7 +710,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         {dbSaved && !dbSaving && (
           <div className="exp-banner exp-banner-saved" data-job-id={dbJobIdRef.current ?? ''}>
             <CheckIcon size={15} />
-            <span>{supply.toLocaleString()} items saved to database</span>
+            <span>{rarityItems.length > 0 ? rarityItems.length.toLocaleString() : supply.toLocaleString()} items saved to database</span>
           </div>
         )}
         {dbError && !dbSaving && (
