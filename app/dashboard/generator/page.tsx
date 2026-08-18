@@ -61,13 +61,6 @@ export default function Page() {
     setStep(newStep);
   }
 
-  function sortLayersByFolder(data: Layer[]): Layer[] {
-    return [...data].sort((a, b) => {
-      const na = parseInt(a.folder ?? ''), nb = parseInt(b.folder ?? '');
-      return (isNaN(na) ? 999 : na) - (isNaN(nb) ? 999 : nb);
-    });
-  }
-
   const loadLayers = useCallback((localLayers?: Layer[], cid?: string | null) => {
     const applyLayers = (data: Layer[]) => {
       setLayers(data);
@@ -98,7 +91,7 @@ export default function Page() {
 
     fetch(`/api/layers?collectionId=${effectiveCid}`)
       .then(r => r.json())
-      .then((data: Layer[]) => { if (data.length) applyLayers(sortLayersByFolder(data)); })
+      .then((data: Layer[]) => { if (data.length) applyLayers(data); })
       .catch(() => { /* layers load silently — page shows empty state */ });
   }, [activeFolder, collectionId]);
 
