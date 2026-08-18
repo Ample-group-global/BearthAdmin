@@ -68,6 +68,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const [rarityItems,  setRarityItems]  = useState<any[]>([]);
   const [bitmapsVer,   setBitmapsVer]   = useState(0);
   const [filter,       setFilter]       = useState<{ folder: string; stem: string; layerLabel: string; assetName: string } | null>(null);
+  const [tierFilter,   setTierFilter]   = useState<string | null>(null);
   const [gridPage,     setGridPage]     = useState(0);
   const jobBitmaps = useRef<Record<string, ImageBitmap>>({});
   const [layers, setLayers] = useState<any[]>(layersProp);
@@ -206,8 +207,27 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     setSvrStatus('idle');
   }
 
-  async function startPreview() {
+  const DOWNLOAD_ITEM_CAP = 4000; // matches BearthApi's download-zip cap (safe ZIP32 bounds)
+  function downloadOfflineZip() {
     if (!dbJobIdRef.current) return;
+    const params = new URLSearchParams({
+      format: imgExt,
+      width: String(targetW),
+      height: String(targetH),
+      collectionName: collName,
+      description,
+      nameFormat,
+      externalUrl: externalUrlBase,
+    });
+    window.location.href = `/api/nft-gen/export/download-zip/${dbJobIdRef.current}?${params.toString()}`;
+  }
+
+  async function startPreview() {
+    if (!dbJobIdRef.current) {
+      setPrevStatus('error');
+      setPrevError('No saved generation job found yet — wait for generation to finish saving, then try again.');
+      return;
+    }
     setPrevStatus('running');
     setPrevProgress(0);
     setPrevPhase('Starting…');
@@ -223,7 +243,10 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         body: JSON.stringify({ jobId: dbJobIdRef.current, width: targetW, height: targetH }),
       });
       const d = await r.json();
-      if (!r.ok) { setPrevStatus('error'); setPrevError(d.error ?? 'Server error'); return; }
+      if (!r.ok) {
+        console.error(`[startPreview] POST /export/preview failed: HTTP ${r.status}`, d);
+        setPrevStatus('error'); setPrevError(d.error ?? `Server error (HTTP ${r.status})`); return;
+      }
       prevIdRef.current = d.previewId;
       setPrevTotal(d.total ?? supply);
 
@@ -257,6 +280,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         }
       }, 3000);
     } catch (e: any) {
+      console.error('[startPreview] threw:', e);
       setPrevStatus('error');
       setPrevError(e.message ?? 'Failed to start preview');
     }
@@ -289,6 +313,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
 
   async function generateOnServer() {
     if (!collectionId) { setError('Save collection settings before generating.'); return; }
+    if (!collection?.supply) { setError('Collection size is still loading — wait a moment and try again.'); return; }
     generationStartedRef.current = true;
     setSvrGenStatus('running');
     setSvrGenProgress(0);
@@ -365,8 +390,11 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         layerData.flatMap((l: any) => l.assets.filter((a: any) => a.rel).map((a: any) => a.rel))
       )] as string[];
 
-      // Fetch items only — don't block on bitmap loading
-      const itemsResp = await fetchWithTimeout(`/api/nft-gen/jobs/${jobId}/display-items?limit=${supply}`, {}, 30_000);
+      // Fetch items only — don't block on bitmap loading.
+      // Fixed high limit (matches server's own hard cap), NOT the client `supply`
+      // guess — `supply` can still be the ??100 fallback while collection is
+      // loading, which would silently truncate the grid below the real count.
+      const itemsResp = await fetchWithTimeout(`/api/nft-gen/jobs/${jobId}/display-items?limit=10000`, {}, 30_000);
 
       if (!itemsResp.ok) {
         console.warn(`[loadAndDisplayFromDb] display-items HTTP ${itemsResp.status} — retrying (${attempt}/3)`);
@@ -577,12 +605,13 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const PAGE_SIZE = 200;
 
   const visibleItems = useMemo(() => {
-    const base = filter
+    let base = filter
       ? rarityItems.filter(({ combo }) => combo[filter.folder]?.stem === filter.stem)
       : rarityItems;
+    if (tierFilter) base = base.filter(item => item.tier === tierFilter);
     if (sortBy === 'rarity') return [...base].sort((a, b) => a.rank - b.rank);
     return [...base].sort((a, b) => a.index - b.index);
-  }, [rarityItems, filter, sortBy]);
+  }, [rarityItems, filter, tierFilter, sortBy]);
 
   // Only render one page at a time — full sort/filter on all items, display is paginated
   const pageItems = useMemo(() =>
@@ -592,7 +621,11 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const totalPages = Math.max(1, Math.ceil(visibleItems.length / PAGE_SIZE));
 
   // Reset to first page whenever filter or sort changes
-  useEffect(() => { setGridPage(0); }, [filter, sortBy]);
+  useEffect(() => { setGridPage(0); }, [filter, tierFilter, sortBy]);
+
+  function handleTierClick(label: string) {
+    setTierFilter(prev => prev === label ? null : label);
+  }
 
   const layerBreakdown = useMemo(() =>
     layers.map(layer => ({ ...layer, count: layer.assets.length })),
@@ -803,12 +836,24 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
         )}
         <div className="exp-tier-legend">
           {TIER_META.map(t => (
-            <div key={t.label} className="exp-tier-pill" style={{ borderColor: `${t.color}33` }}>
+            <button
+              key={t.label}
+              className={`exp-tier-pill exp-tier-pill-clickable${tierFilter === t.label ? ' exp-tier-pill-active' : ''}`}
+              style={{
+                borderColor: tierFilter === t.label ? t.color : `${t.color}33`,
+                background: tierFilter === t.label ? `${t.color}18` : undefined,
+              }}
+              onClick={() => handleTierClick(t.label)}
+              title={tierFilter === t.label ? `Showing only ${t.label} — click to clear` : `Show only ${t.label} NFTs`}
+            >
               <span className="exp-tier-dot" style={{ background: t.color }} />
               <span style={{ color: t.color, fontWeight: 700 }}>{t.label}</span>
               <span className="exp-tier-pill-sub">{t.sub}</span>
-            </div>
+            </button>
           ))}
+          {tierFilter && (
+            <button className="exp-tier-clear" onClick={() => setTierFilter(null)}>✕ Clear tier filter</button>
+          )}
         </div>
         {pageItems.length > 0 ? (
           <div className="exp-nft-grid">
@@ -950,6 +995,30 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Offline Download (images + metadata, no IPFS/Filebase) ── */}
+      {dbSaved && dbJobIdRef.current && (
+        <div className="exp-fb-card exp-svr-card" data-testid="offline-download-section">
+          <div className="exp-fb-header">
+            <div className="exp-fb-title">Download All (Offline)</div>
+            <div className="exp-fb-sub">
+              {supply > DOWNLOAD_ITEM_CAP
+                ? `Direct ZIP download supports up to ${DOWNLOAD_ITEM_CAP.toLocaleString()} NFTs — use Server-Side Export below for this collection`
+                : `Get a ZIP with all ${supply.toLocaleString()} composited images + metadata JSON for offline use — no Filebase/IPFS upload required`}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 10 }}>
+            <button
+              className="btn btn-primary"
+              onClick={downloadOfflineZip}
+              disabled={supply > DOWNLOAD_ITEM_CAP}
+              data-testid="download-offline-zip-btn"
+            >
+              ⬇ Download All {supply.toLocaleString()} NFTs + Metadata (.zip)
+            </button>
+          </div>
         </div>
       )}
 

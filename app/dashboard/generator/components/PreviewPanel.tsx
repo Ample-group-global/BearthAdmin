@@ -176,6 +176,10 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
   }, []);
 
   async function run() {
+    if (!collection?.supply) {
+      setLoadMsg('Collection size is still loading — wait a moment and try again.');
+      return;
+    }
     setPhase('loading');
 
     // 1. Pre-load all unique layer bitmaps
@@ -307,7 +311,7 @@ export default function PreviewPanel({ weights, layers, collection, conflicts })
     <div className="preview-layout">
       {/* ── Left panel ── */}
       <div className="preview-left-panel">
-        <button className="randomize-btn" onClick={run} disabled={phase === 'loading'}>
+        <button className="randomize-btn" onClick={run} disabled={phase === 'loading' || !collection?.supply}>
           {phase === 'loading' ? loadMsg : 'Randomize'}
         </button>
 
