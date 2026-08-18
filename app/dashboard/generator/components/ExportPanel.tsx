@@ -34,7 +34,11 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const [externalUrlBase, setExternalUrlBase] = useState(defaultExternalUrl);
 
   // ── Server-side export state ──────────────────────────────────────────────
-  const [svrBucket,   setSvrBucket]   = useState('bearth-nft-test');
+  const [svrBucket,      setSvrBucket]      = useState('');
+  const [svrNewBucket,   setSvrNewBucket]   = useState('');
+  const [svrSyncRecords, setSvrSyncRecords] = useState(false);
+  const [bucketList,     setBucketList]     = useState<string[]>([]);
+  const [bucketsLoading, setBucketsLoading] = useState(false);
   const [svrStatus,   setSvrStatus]   = useState<'idle'|'running'|'done'|'error'>('idle');
   const [svrProgress, setSvrProgress] = useState(0);
   const [svrTotal,    setSvrTotal]    = useState(0);
@@ -90,6 +94,24 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       .catch(() => setLayerStatus('unknown'));
   }, [collectionId, (layersProp as any[]).length, layers.length]);
 
+  // ── Load Filebase bucket list for export dropdown ────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    setBucketsLoading(true);
+    fetch('/api/filebase/buckets')
+      .then(r => r.ok ? r.json() : { buckets: [] })
+      .then(data => {
+        if (cancelled) return;
+        const names: string[] = (data.buckets ?? []).map((b: any) => b.name).filter(Boolean);
+        setBucketList(names);
+        if (names.length > 0 && !svrBucket) setSvrBucket(names[0]);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setBucketsLoading(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Auto-restore done state from DB on mount ─────────────────────────────
   useEffect(() => {
     if (!collectionId || phase !== 'idle') return;
@@ -130,7 +152,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   // ── Server export helpers ─────────────────────────────────────────────────
 
   async function startServerExport() {
-    const bucket = svrBucket.trim();
+    const bucket = svrBucket === '__new__' ? svrNewBucket.trim() : svrBucket.trim();
     if (!bucket || !dbJobIdRef.current) return;
     setSvrStatus('running');
     setSvrProgress(0);
@@ -151,6 +173,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           description,
           nameFormat,
           externalUrl:    externalUrlBase,
+          syncToRecords:  svrSyncRecords,
         }),
       });
       const d = await r.json();
@@ -842,20 +865,52 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
 
           {svrStatus === 'idle' && (
             <>
-              <div className="exp-fb-bucket-row">
-                <input
-                  className="exp-fb-input"
-                  placeholder="Filebase bucket name"
-                  value={svrBucket}
-                  onChange={e => setSvrBucket(e.target.value)}
-                />
+              <div className="exp-fb-bucket-row" style={{ flexWrap: 'wrap', gap: 8 }}>
+                {bucketsLoading ? (
+                  <span style={{ fontSize: 13, color: 'var(--muted)' }}>Loading buckets…</span>
+                ) : (
+                  <select
+                    className="exp-fb-input"
+                    style={{ minWidth: 200 }}
+                    value={svrBucket}
+                    onChange={e => { setSvrBucket(e.target.value); if (e.target.value !== '__new__') setSvrNewBucket(''); }}
+                  >
+                    {bucketList.length === 0 && <option value="">— no buckets found —</option>}
+                    {bucketList.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                    <option value="__new__">+ Create new bucket…</option>
+                  </select>
+                )}
+                {svrBucket === '__new__' && (
+                  <input
+                    className="exp-fb-input"
+                    style={{ minWidth: 180 }}
+                    placeholder="New bucket name"
+                    value={svrNewBucket}
+                    onChange={e => setSvrNewBucket(e.target.value)}
+                    autoFocus
+                  />
+                )}
                 <button
                   className="btn btn-primary"
                   onClick={startServerExport}
-                  disabled={!svrBucket.trim()}
+                  disabled={svrBucket === '__new__' ? !svrNewBucket.trim() : !svrBucket.trim()}
                 >
-                  ⚡ Start Server Export
+                  ⚡ Start Export
                 </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <input
+                  type="checkbox"
+                  id="syncToRecords"
+                  checked={svrSyncRecords}
+                  onChange={e => setSvrSyncRecords(e.target.checked)}
+                  style={{ cursor: 'pointer' }}
+                />
+                <label htmlFor="syncToRecords" style={{ fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                  Sync to NFT Records (production only — leave unchecked for test runs)
+                </label>
               </div>
               {svrError && <div className="exp-error-banner" style={{ marginTop: 10 }}>{svrError}</div>}
             </>
