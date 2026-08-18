@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 'use client';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import NftPopup from './NftPopup';
@@ -7,7 +7,7 @@ import { fetchWithTimeout } from '../../../../lib/fetchWithTimeout';
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function ExportPanel({ weights, layers: layersProp = [], collection, conflicts, collectionId = null }) {
-  const supply      = collection?.supply      ?? 100;
+  const supply      = Number(collection?.supply ?? 0);
   const targetW     = collection?.width       ?? 512;
   const targetH     = collection?.height      ?? 512;
   const wantWebp    = collection?.format      === 'webp';
@@ -595,7 +595,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           <div className="exp-idle-header">
             <div>
               <div className="exp-idle-title">Export Collection</div>
-              <div className="exp-idle-sub">Generate all {supply.toLocaleString()} NFTs — composite images, rarity scores, and metadata</div>
+              <div className="exp-idle-sub">{supply > 0 ? `Generate all ${supply.toLocaleString()} NFTs \u2014 composite images, rarity scores, and metadata` : 'Configure your collection in Settings, then generate NFTs here'}</div>
             </div>
           </div>
 
@@ -657,7 +657,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
               onClick={generateOnServer}
               disabled={!collectionId || svrGenStatus === 'running' || layerStatus === 'loading' || layerStatus === 'empty'}
             >
-              {layerStatus === 'loading' ? '⌛ Checking layers…' : `⚡ Generate ${supply.toLocaleString()} NFTs`}
+              {layerStatus === 'loading' ? '⌛ Checking layers…' : supply > 0 ? `⚡ Generate ${supply.toLocaleString()} NFTs` : `⚡ Generate NFTs`}
             </button>
           </div>
         </div>

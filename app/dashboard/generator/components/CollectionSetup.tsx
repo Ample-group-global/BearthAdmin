@@ -160,6 +160,8 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
     if (!collection.symbol?.trim()) e.symbol  = 'Token Symbol is required.';
     const s = Number(collection.supply);
     if (!collection.supply || isNaN(s) || s < 1) e.supply = 'Collection Size must be at least 1.';
+    if (!collection.width  || Number(collection.width)  < 1) e.width  = 'Width is required.';
+    if (!collection.height || Number(collection.height) < 1) e.height = 'Height is required.';
     return e;
   }
 
@@ -368,8 +370,8 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
           </div>
 
           <div className="setup-field">
-            <label>Dimensions</label>
-            <div className="setup-hint">Optional. Dimensions of your assets (px). Calculated automatically from imported assets.</div>
+            <label>Dimensions <span style={{color:'#ef4444'}}>*</span></label>
+            <div className="setup-hint">Required. Output dimensions of each NFT image in pixels (e.g. 2000x2000).</div>
             <div className="setup-dim-row">
               <input
                 type="number"
@@ -377,6 +379,7 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
                 placeholder="Width"
                 value={collection.width ?? ''}
                 onChange={e => set('width', e.target.value ? Math.max(1, +e.target.value) : undefined)}
+                style={errors.width ? { borderColor: '#ef4444' } : undefined}
               />
               <span className="setup-dim-x">×</span>
               <input
@@ -385,8 +388,10 @@ export default function CollectionSetup({ collection, onChange, onNext, onReset,
                 placeholder="Height"
                 value={collection.height ?? ''}
                 onChange={e => set('height', e.target.value ? Math.max(1, +e.target.value) : undefined)}
+                style={errors.height ? { borderColor: '#ef4444' } : undefined}
               />
             </div>
+            {(errors.width || errors.height) && <span className="field-error">{errors.width || errors.height}</span>}
           </div>
 
           {/* Artwork Optional */}
