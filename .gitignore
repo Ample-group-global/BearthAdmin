@@ -58,6 +58,18 @@ yarn-error.log*
 /playwright-report/
 /blob-report/
 /opensea-screenshots/
+/tests/phase-results/
+
+# Test spec files — keep on disk, never commit
+tests/*.spec.ts
+
+# Test screenshots / debug images — keep on disk, never commit
+tests/**/*.png
+tests/**/*.jpg
+tests/**/*.jpeg
+
+# Backup files
+*.bak
 
 # Test scripts with credentials / throwaway utilities
 panel-test.js
