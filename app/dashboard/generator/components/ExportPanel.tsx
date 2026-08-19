@@ -1,6 +1,7 @@
 // @ts-nocheck
 'use client';
 import { useState, useRef, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import NftPopup from './NftPopup';
 import { TIER_META, Spinner, CheckIcon, RarityCard, ProgressBar, HLayerFilter } from './ExportGridParts';
 import { fetchWithTimeout } from '../../../../lib/fetchWithTimeout';
@@ -620,6 +621,12 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
               <div className="exp-idle-title">Export Collection</div>
               <div className="exp-idle-sub">{supply > 0 ? `Generate all ${supply.toLocaleString()} NFTs \u2014 composite images, rarity scores, and metadata` : 'Configure your collection in Settings, then generate NFTs here'}</div>
             </div>
+            <Link
+              href="/dashboard/generator/sync-status"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', textDecoration: 'none', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}
+            >
+              \ud83d\udccb Collection Sync Status
+            </Link>
           </div>
 
           {/* Collection summary */}
@@ -856,11 +863,19 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
       {/* ── Server-Side Export ── */}
       {dbSaved && dbJobIdRef.current && (
         <div className="exp-fb-card exp-svr-card" data-testid="server-export-section">
-          <div className="exp-fb-header">
-            <div className="exp-fb-title">Server-Side Export</div>
-            <div className="exp-fb-sub">
-              Recommended for large collections — compositing and IPFS upload run on the server (no browser limits)
+          <div className="exp-fb-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <div className="exp-fb-title">Server-Side Export</div>
+              <div className="exp-fb-sub">
+                Recommended for large collections — compositing and IPFS upload run on the server (no browser limits)
+              </div>
             </div>
+            <Link
+              href="/dashboard/generator/sync-status"
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-muted)', textDecoration: 'none', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0, marginTop: 2 }}
+            >
+              📋 All Collections
+            </Link>
           </div>
 
           {svrStatus === 'idle' && (
