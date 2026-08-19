@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { TIER_PRESET_WEIGHTS, TIERS } from '../../../../lib/studio/tiers';
+import { TIER_PRESET_WEIGHTS, TIERS, getTier } from '../../../../lib/studio/tiers';
 import { calcRarity, positionForProb } from '../../../../lib/studio/probability';
 import { useLayerFiles } from '../LayerFilesContext';
 import RulesTabContent from './RulesTabContent';
@@ -19,8 +19,26 @@ export default function RarityModal({
 }) {
   // Local state for weights - starts from parent weights
   const [localWs, setLocalWs] = useState<Record<string, number>>(() => ({ ...weights }));
+  // Tracks explicit tier selections — capitalised label (Legendary/Epic/Rare/Common)
+  const [localTiers, setLocalTiers] = useState<Record<string, string>>(() =>
+    Object.fromEntries(layer.assets.map(a => [a.stem, capitalise(a.rarityTier ?? 'common')]))
+  );
   const { getBlobUrl } = useLayerFiles();
   const listRef = useRef<HTMLDivElement>(null);
+
+  function capitalise(s: string) { return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase(); }
+
+  async function applyTier(asset, tierName: string) {
+    const weight = TIER_PRESET_WEIGHTS[tierName] ?? 10;
+    setW(asset.stem, weight);
+    setLocalTiers(prev => ({ ...prev, [asset.stem]: tierName }));
+    if (!asset.id) return;
+    await fetch(`/api/nft-gen/traits/${asset.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rarityWeight: weight, rarityTier: tierName.toLowerCase(), isActive: true }),
+    }).catch(() => {});
+  }
 
   // Opened from a card click (not the gear icon) — scroll straight to that
   // trait's row and briefly highlight it, since this is now the same modal
@@ -219,6 +237,24 @@ export default function RarityModal({
                   onBlur={() => commitTraitName(asset)}
                   onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                 />
+
+                {/* Rarity tier quick-picker — immediately saves tier + preset weight */}
+                <select
+                  className="rm-tier-select"
+                  data-stem={asset.stem}
+                  value={localTiers[asset.stem] ?? capitalise(asset.rarityTier ?? 'common')}
+                  onChange={e => applyTier(asset, e.target.value)}
+                  style={{
+                    background: 'var(--bg0)', border: '1px solid var(--border2)', borderRadius: 6,
+                    color: tier.color, fontSize: 11.5, fontWeight: 700, padding: '4px 8px',
+                    cursor: 'pointer', flexShrink: 0,
+                  }}
+                >
+                  <option value="Legendary">Legendary</option>
+                  <option value="Epic">Epic</option>
+                  <option value="Rare">Rare</option>
+                  <option value="Common">Common</option>
+                </select>
 
                 <div className="rm-pct-chip" title="Chance this trait is picked when its layer appears">
                   <span className="rm-pct-icon">◈</span>{pct}%

@@ -50,14 +50,14 @@ function IfTraitDropdown({ assets, value, onChange }) {
 
   return (
     <div ref={ref} style={{ position: 'relative', flex: 1, minWidth: 160 }}>
-      <button type="button" onClick={() => setOpen(o => !o)} style={ddBtn}>
+      <button type="button" data-testid="rt-if-btn" onClick={() => setOpen(o => !o)} style={ddBtn}>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected ? selected.name : 'Select a trait'}</span>
         <span style={{ opacity: .5 }}>⌄</span>
       </button>
       {open && (
         <div style={ddPanel}>
           {assets.map(a => (
-            <div key={a.stem} onClick={() => { onChange(a.stem); setOpen(false); }} style={ddRow}>
+            <div key={a.stem} data-stem={a.stem} onClick={() => { onChange(a.stem); setOpen(false); }} style={ddRow}>
               <TraitThumb rel={a.rel} name={a.name} />
               <span>{a.name}</span>
             </div>
@@ -93,7 +93,7 @@ function ThenTraitDropdown({ layers, value, onChange }) {
 
   return (
     <div ref={ref} style={{ position: 'relative', flex: 1, minWidth: 160 }}>
-      <button type="button" onClick={() => setOpen(o => !o)} style={ddBtn}>
+      <button type="button" data-testid="rt-then-btn" onClick={() => setOpen(o => !o)} style={ddBtn}>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
         <span style={{ opacity: .5 }}>⌄</span>
       </button>
@@ -114,7 +114,7 @@ function ThenTraitDropdown({ layers, value, onChange }) {
                 const key = `${l.folder}::${a.stem}`;
                 const checked = value.includes(key);
                 return (
-                  <label key={a.stem} onClick={() => toggle(l.folder, a.stem)} style={{ ...ddRow, color: checked ? 'var(--accent2)' : 'var(--muted)', fontWeight: checked ? 700 : 400 }}>
+                  <label key={a.stem} onClick={e => { e.preventDefault(); toggle(l.folder, a.stem); }} style={{ ...ddRow, color: checked ? 'var(--accent2)' : 'var(--muted)', fontWeight: checked ? 700 : 400 }}>
                     <input type="checkbox" checked={checked} readOnly style={{ accentColor: 'var(--accent)', pointerEvents: 'none' }} />
                     <TraitThumb rel={a.rel} name={a.name} />
                     <span>{a.name}</span>
@@ -204,13 +204,13 @@ export default function RulesTabContent({ layer, layers, rules: initialRules, on
 
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 16 }}>
         <IfTraitDropdown assets={layer.assets} value={ifTrait} onChange={setIfTrait} />
-        <select value={ruleType} onChange={e => setRuleType(e.target.value as 'exclude' | 'force')} style={{ ...ddBtn, width: 'auto', cursor: 'pointer' }}>
+        <select data-testid="rt-type-select" value={ruleType} onChange={e => setRuleType(e.target.value as 'exclude' | 'force')} style={{ ...ddBtn, width: 'auto', cursor: 'pointer' }}>
           <option value="force">⚡ force</option>
           <option value="exclude">⃠ block</option>
         </select>
         <ThenTraitDropdown layers={layers} value={thenKeys} onChange={setThenKeys} />
-        <button className="btn btn-primary" disabled={!ifTrait || thenKeys.length === 0} onClick={addRule} style={{ whiteSpace: 'nowrap' }}>Add Rule</button>
-        <button className="btn btn-ghost" onClick={deleteAll} style={{ whiteSpace: 'nowrap' }}>Delete All</button>
+        <button data-testid="rt-add-rule" className="btn btn-primary" disabled={!ifTrait || thenKeys.length === 0} onClick={addRule} style={{ whiteSpace: 'nowrap' }}>Add Rule</button>
+        <button data-testid="rt-delete-all" className="btn btn-ghost" onClick={deleteAll} style={{ whiteSpace: 'nowrap' }}>Delete All</button>
       </div>
 
       {rules.length > 0 && (

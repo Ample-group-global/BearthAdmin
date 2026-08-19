@@ -150,6 +150,17 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collectionId]);
 
+  // ── Check for pre-built ZIP after server export completes ────────────────
+  useEffect(() => {
+    if (svrStatus !== 'done' || !dbJobIdRef.current) return;
+    const bucket = svrBucket === '__new__' ? svrNewBucket.trim() : svrBucket.trim();
+    const qs = bucket ? `?bucket=${encodeURIComponent(bucket)}` : '';
+    fetch(`/api/nft-gen/export/presigned-zip/${dbJobIdRef.current}${qs}`)
+      .then(r => r.ok ? r.json() : { ready: false })
+      .then(d => { if (d.ready) setZipReady(true); })
+      .catch(() => {});
+  }, [svrStatus]);
+
   // ── Server export helpers ─────────────────────────────────────────────────
 
   async function startServerExport() {
@@ -219,9 +230,26 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     setSvrStatus('idle');
   }
 
-  const DOWNLOAD_ITEM_CAP = 4000; // matches BearthApi's download-zip cap (safe ZIP32 bounds)
-  function downloadOfflineZip() {
+  async function downloadOfflineZip() {
     if (!dbJobIdRef.current) return;
+
+    // Fast path: check if a pre-built ZIP exists in Filebase from the last
+    // server-side export. If so, use the pre-signed URL (direct S3 speed,
+    // no re-rendering, no server-streaming bottleneck).
+    try {
+      const bucket = svrBucket === '__new__' ? svrNewBucket.trim() : svrBucket.trim();
+      const qs = bucket ? `?bucket=${encodeURIComponent(bucket)}` : '';
+      const r = await fetch(`/api/nft-gen/export/presigned-zip/${dbJobIdRef.current}${qs}`);
+      if (r.ok) {
+        const d = await r.json();
+        if (d.ready && d.url) {
+          window.location.href = d.url;
+          return;
+        }
+      }
+    } catch { /* fall through to streaming */ }
+
+    // Streaming fallback: re-renders on the fly (slower, no Filebase needed).
     const params = new URLSearchParams({
       format: imgExt,
       width: String(targetW),
@@ -234,6 +262,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     window.location.href = `/api/nft-gen/export/download-zip/${dbJobIdRef.current}?${params.toString()}`;
   }
 
+  const [zipReady, setZipReady] = useState(false);
   const [syncingLayers, setSyncingLayers] = useState(false);
   async function syncLayersNow() {
     if (!collectionId || syncingLayers) return;
@@ -625,7 +654,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
               href="/dashboard/generator/sync-status"
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', textDecoration: 'none', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}
             >
-              \ud83d\udccb Collection Sync Status
+              {'\ud83d\udccb'} Collection Sync Status
             </Link>
           </div>
 
@@ -842,19 +871,19 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           <div className="exp-fb-header">
             <div className="exp-fb-title">Download All (Offline)</div>
             <div className="exp-fb-sub">
-              {supply > DOWNLOAD_ITEM_CAP
-                ? `Direct ZIP download supports up to ${DOWNLOAD_ITEM_CAP.toLocaleString()} NFTs — use Server-Side Export below for this collection`
-                : `Get a ZIP with all ${supply.toLocaleString()} composited images + metadata JSON for offline use — no Filebase/IPFS upload required`}
+              {zipReady
+                ? 'Pre-built ZIP ready in Filebase — instant download via direct link (no server re-render)'
+                : `ZIP of all ${supply.toLocaleString()} composited images + metadata — local only, no Filebase upload, no NFT Records sync`}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 10 }}>
             <button
               className="btn btn-primary"
               onClick={downloadOfflineZip}
-              disabled={supply > DOWNLOAD_ITEM_CAP}
               data-testid="download-offline-zip-btn"
             >
-              ⬇ Download All {supply.toLocaleString()} NFTs + Metadata (.zip)
+              {zipReady ? '⚡ Instant Download — ' : '⬇ Download All '}
+              {supply.toLocaleString()} NFTs + Metadata (.zip)
             </button>
           </div>
         </div>
@@ -874,7 +903,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
               href="/dashboard/generator/sync-status"
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-muted)', textDecoration: 'none', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0, marginTop: 2 }}
             >
-              📋 All Collections
+              {'📋'} All Collections
             </Link>
           </div>
 
