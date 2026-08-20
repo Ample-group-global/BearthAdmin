@@ -9,9 +9,9 @@ import { fetchWithTimeout } from '../../../../lib/fetchWithTimeout';
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function ExportPanel({ weights, layers: layersProp = [], collection, conflicts, collectionId = null }) {
   const supply      = Number(collection?.supply ?? 0);
-  const targetW     = collection?.width       ?? 512;
-  const targetH     = collection?.height      ?? 512;
-  const wantWebp    = collection?.format      === 'webp';
+  const targetW     = collection?.width       ?? null;
+  const targetH     = collection?.height      ?? null;
+  const wantWebp    = collection?.formatType   === 'webp';
   const imgExt      = wantWebp ? 'webp' : 'png';
   const imgMime     = wantWebp ? 'image/webp' : 'image/png';
   const nameFormat  = collection?.nameFormat  ?? '';
@@ -38,6 +38,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const [svrBucket,      setSvrBucket]      = useState('');
   const [svrNewBucket,   setSvrNewBucket]   = useState('');
   const [svrSyncRecords, setSvrSyncRecords] = useState(false);
+  const [svrResumeFrom,  setSvrResumeFrom]  = useState(0);
   const [bucketList,     setBucketList]     = useState<string[]>([]);
   const [bucketsLoading, setBucketsLoading] = useState(false);
   const [svrStatus,   setSvrStatus]   = useState<'idle'|'running'|'done'|'error'>('idle');
@@ -47,6 +48,16 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const [svrError,    setSvrError]    = useState('');
   const svrExportIdRef = useRef<string | null>(null);
   const svrPollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Refresh CIDs state ────────────────────────────────────────────────────
+  const [cidStatus,   setCidStatus]   = useState<'idle'|'running'|'done'|'error'>('idle');
+  const [cidProgress, setCidProgress] = useState(0);
+  const [cidTotal,    setCidTotal]    = useState(0);
+  const [cidResolved, setCidResolved] = useState(0);
+  const [cidSkipped,  setCidSkipped]  = useState(0);
+  const [cidPhase,    setCidPhase]    = useState('');
+  const [cidError,    setCidError]    = useState('');
+  const cidPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Server-side generation state ──────────────────────────────────────────
   const [svrGenStatus,   setSvrGenStatus]   = useState<'idle'|'running'|'done'|'error'>('idle');
@@ -167,8 +178,8 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
     const bucket = svrBucket === '__new__' ? svrNewBucket.trim() : svrBucket.trim();
     if (!bucket || !dbJobIdRef.current) return;
     setSvrStatus('running');
-    setSvrProgress(0);
-    setSvrPhase('Starting…');
+    setSvrProgress(svrResumeFrom || 0);
+    setSvrPhase(svrResumeFrom > 0 ? `Resuming from ${svrResumeFrom.toLocaleString()}…` : 'Starting…');
     setSvrError('');
 
     try {
@@ -186,6 +197,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
           nameFormat,
           externalUrl:    externalUrlBase,
           syncToRecords:  svrSyncRecords,
+          resumeFrom:     svrResumeFrom || 0,
         }),
       });
       const d = await r.json();
@@ -228,6 +240,68 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   function cancelServerExport() {
     if (svrPollRef.current) { clearInterval(svrPollRef.current); svrPollRef.current = null; }
     setSvrStatus('idle');
+  }
+
+  async function startRefreshCids() {
+    const bucket = svrBucket === '__new__' ? svrNewBucket.trim() : svrBucket.trim();
+    if (!bucket) return;
+    setCidStatus('running');
+    setCidProgress(0);
+    setCidTotal(0);
+    setCidResolved(0);
+    setCidSkipped(0);
+    setCidPhase('Starting…');
+    setCidError('');
+
+    try {
+      const r = await fetch('/api/nft-gen/export/refresh-cids', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bucket, format: imgExt }),
+      });
+      let d: any = null;
+      try { d = await r.json(); } catch { /* empty or non-JSON body */ }
+      if (!r.ok) { setCidStatus('error'); setCidError(d?.error ?? `Server error (${r.status})`); return; }
+      const refreshId = d?.refreshId;
+      if (!refreshId) { setCidStatus('error'); setCidError('No refreshId returned from server'); return; }
+
+      let cidPollFailures = 0;
+      cidPollRef.current = setInterval(async () => {
+        let resp: Response;
+        let pr: any = null;
+        try {
+          resp = await fetchWithTimeout(`/api/nft-gen/export/refresh-cids/${refreshId}`);
+          pr = await resp.json();
+        } catch {
+          cidPollFailures++;
+          if (cidPollFailures >= 3) {
+            clearInterval(cidPollRef.current!); cidPollRef.current = null;
+            setCidStatus('error'); setCidError('Lost connection to server.');
+          }
+          return;
+        }
+        if (!resp.ok) {
+          clearInterval(cidPollRef.current!); cidPollRef.current = null;
+          setCidStatus('error'); setCidError(pr?.error ?? 'Refresh failed');
+          return;
+        }
+        setCidProgress(pr.progress ?? 0);
+        setCidTotal(pr.total ?? 0);
+        setCidResolved(pr.resolved ?? 0);
+        setCidSkipped(pr.skipped ?? 0);
+        setCidPhase(pr.phase ?? '');
+        if (pr.status === 'done') {
+          setCidStatus('done');
+          clearInterval(cidPollRef.current!); cidPollRef.current = null;
+        } else if (pr.status === 'error') {
+          setCidStatus('error'); setCidError(pr.error ?? 'Refresh failed');
+          clearInterval(cidPollRef.current!); cidPollRef.current = null;
+        }
+      }, 2000);
+    } catch (e: any) {
+      setCidStatus('error');
+      setCidError(e.message ?? 'Failed to start CID refresh');
+    }
   }
 
   async function downloadOfflineZip() {
@@ -666,7 +740,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
                 { label: 'Name',       value: collName        || '—' },
                 { label: 'Supply',     value: collection?.supply ? Number(collection.supply).toLocaleString() : '—' },
                 { label: 'Blockchain', value: collection?.network || collection?.blockchain || '—' },
-                { label: 'Format',     value: collection?.format ? collection.format.toUpperCase() : '—' },
+                { label: 'Format',     value: collection?.formatType ? collection.formatType.toUpperCase() : '—' },
                 { label: 'Resolution', value: (collection?.width && collection?.height) ? collection.width + '×' + collection.height : '—' },
               ].map(item => (
                 <div key={item.label} className="exp-summary-stat">
@@ -687,7 +761,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
                 value={externalUrlBase}
                 onChange={e => setExternalUrlBase(e.target.value)}
               />
-              <div className="exp-option-sub">Each NFT gets: <code>{externalUrlBase.trim() ? `${externalUrlBase.trim().replace(/\/$/, '')}/1` : 'https://bearth.io/nft/1'}</code></div>
+              <div className="exp-option-sub">All NFTs share the same URL: <code>{externalUrlBase.trim() ? externalUrlBase.trim().replace(/\/$/, '') : 'https://www.imbearth.com'}</code></div>
             </div>
           </div>
 
@@ -956,6 +1030,23 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
                   Sync to NFT Records (production only — leave unchecked for test runs)
                 </label>
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <input
+                  type="number"
+                  id="resumeFromInput"
+                  data-testid="resume-from-input"
+                  min={0}
+                  max={supply}
+                  value={svrResumeFrom || ''}
+                  placeholder="0"
+                  onChange={e => setSvrResumeFrom(Math.max(0, Number(e.target.value) || 0))}
+                  className="exp-fb-input"
+                  style={{ width: 90 }}
+                />
+                <label htmlFor="resumeFromInput" style={{ fontSize: 13, userSelect: 'none', color: 'var(--text-muted)' }}>
+                  Resume from edition (0 = start fresh)
+                </label>
+              </div>
               {svrError && <div className="exp-error-banner" style={{ marginTop: 10 }}>{svrError}</div>}
             </>
           )}
@@ -990,6 +1081,72 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
             <div className="exp-banner exp-banner-error" style={{ marginTop: 14 }}>
               <span>Server export failed: {svrError}</span>
               <button className="exp-retry-btn" onClick={() => { setSvrStatus('idle'); setSvrError(''); }}>↺ Retry</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Refresh IPFS CIDs ── */}
+      {dbSaved && dbJobIdRef.current && (
+        <div className="exp-fb-card exp-svr-card" data-testid="refresh-cids-section">
+          <div className="exp-fb-header">
+            <div>
+              <div className="exp-fb-title">Refresh IPFS CIDs</div>
+              <div className="exp-fb-sub">
+                After export completes, Filebase assigns real IPFS CIDs to each image (10–30 s delay).
+                Run this to replace <code>ipfs://pending/…</code> placeholders with real CIDs in all metadata files.
+              </div>
+            </div>
+          </div>
+
+          {cidStatus === 'idle' && (
+            <div style={{ marginTop: 10 }}>
+              <button
+                className="btn btn-primary"
+                onClick={startRefreshCids}
+                disabled={!svrBucket.trim() && !svrNewBucket.trim()}
+                data-testid="refresh-cids-btn"
+              >
+                🔄 Refresh IPFS CIDs
+              </button>
+              {cidError && <div className="exp-error-banner" style={{ marginTop: 8 }}>{cidError}</div>}
+            </div>
+          )}
+
+          {cidStatus === 'running' && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <Spinner size={16} color="var(--accent)" />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{cidPhase || 'Working…'}</span>
+              </div>
+              {cidTotal > 0 && (
+                <>
+                  <ProgressBar value={cidProgress} max={cidTotal} />
+                  <div className="exp-step-count">{cidProgress.toLocaleString()} / {cidTotal.toLocaleString()}</div>
+                </>
+              )}
+            </div>
+          )}
+
+          {cidStatus === 'done' && (
+            <div className="exp-banner exp-banner-saved" style={{ marginTop: 14 }}>
+              <CheckIcon size={15} />
+              <span>
+                {cidResolved.toLocaleString()} CIDs resolved
+                {cidSkipped > 0 ? ` · ${cidSkipped.toLocaleString()} skipped (run again in 30 s to pick up remaining)` : ''}
+              </span>
+              <button className="btn btn-ghost" style={{ marginLeft: 'auto' }}
+                onClick={() => { setCidStatus('idle'); setCidProgress(0); setCidTotal(0); }}
+              >
+                Run again
+              </button>
+            </div>
+          )}
+
+          {cidStatus === 'error' && (
+            <div className="exp-banner exp-banner-error" style={{ marginTop: 14 }}>
+              <span>CID refresh failed: {cidError}</span>
+              <button className="exp-retry-btn" onClick={() => { setCidStatus('idle'); setCidError(''); }}>↺ Retry</button>
             </div>
           )}
         </div>
