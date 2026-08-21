@@ -683,7 +683,7 @@
 }
 .studio-wrap .rm-modal {
   background: var(--bg1); border: 1px solid var(--border2); border-radius: 14px;
-  width: 660px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;
+  width: 780px; max-width: 96vw; min-height: 540px; max-height: 95vh; display: flex; flex-direction: column; overflow: hidden;
   box-shadow: 0 20px 60px rgba(99,102,241,.2);
 }
 .studio-wrap .rm-header {

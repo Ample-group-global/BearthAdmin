@@ -67,11 +67,9 @@ export default function Page() {
       setWeights(prev => {
         const updated = { ...prev };
         data.forEach(l => {
-          if (!updated[l.folder]) {
-            updated[l.folder] = Object.fromEntries(
-              l.assets.map((a: LayerAsset) => [a.stem, a.defaultWeight ?? 1])
-            );
-          }
+          updated[l.folder] = Object.fromEntries(
+            l.assets.map((a: LayerAsset) => [a.stem, a.defaultWeight ?? 1])
+          );
         });
         return updated;
       });
@@ -161,6 +159,7 @@ export default function Page() {
               nameFormat:  c.nameFormat   ?? prev.nameFormat,
               format:      c.formatType   ?? prev.format,
             }));
+            if (Array.isArray(c.conflictRules)) setConflicts(c.conflictRules);
           })
           .catch(() => {});
       }

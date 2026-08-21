@@ -10,19 +10,24 @@ export default function AssetGrid({ layer, layerWeights, supply, onWeightChange,
   const ws: Record<string,number> = layerWeights ?? {};
   const totalW  = useMemo(() => Object.values(ws).reduce((a, b) => a + b, 0), [ws]);
 
+  const sortedAssets = useMemo(() =>
+    [...layer.assets].sort((a, b) =>
+      a.stem.localeCompare(b.stem, undefined, { numeric: true, sensitivity: 'base' })
+    ), [layer.assets]);
+
   const tierCounts = useMemo(() => {
     const counts = {};
     TIERS.forEach(t => { counts[t.label] = 0; });
-    layer.assets.forEach(a => {
+    sortedAssets.forEach(a => {
       const prob = totalW > 0 ? (ws[a.stem] ?? 0) / totalW : 0;
       counts[getTier(prob).label]++;
     });
     return counts;
-  }, [layer, ws, totalW]);
+  }, [sortedAssets, ws, totalW]);
 
   const visible = filterTier === 'all'
-    ? layer.assets
-    : layer.assets.filter(a => {
+    ? sortedAssets
+    : sortedAssets.filter(a => {
         const prob = totalW > 0 ? (ws[a.stem] ?? 0) / totalW : 0;
         return getTier(prob).label.toLowerCase() === filterTier;
       });

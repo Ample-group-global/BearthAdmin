@@ -49,7 +49,7 @@ async function syncOneLayer(token: string, collectionId: string, ml: ManifestLay
   // 213-trait upload crashed BearthApi that way).
   const bulkResp = await apiPost(token, `/api/nft-gen/layers/${layerId}/traits/bulk`, {
     traits: realAssets.map((asset) => ({
-      name:            asset.name ?? asset.stem,
+      name:            asset.stem,
       filePath:        asset.rel,
       rarityTier:      inferTier(asset.stem),
       storageProvider: "filebase",

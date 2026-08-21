@@ -11,7 +11,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
   const supply      = Number(collection?.supply ?? 0);
   const targetW     = collection?.width       ?? null;
   const targetH     = collection?.height      ?? null;
-  const wantWebp    = collection?.formatType   === 'webp';
+  const wantWebp    = collection?.format        === 'webp';
   const imgExt      = wantWebp ? 'webp' : 'png';
   const imgMime     = wantWebp ? 'image/webp' : 'image/png';
   const nameFormat  = collection?.nameFormat  ?? '';
@@ -740,7 +740,7 @@ export default function ExportPanel({ weights, layers: layersProp = [], collecti
                 { label: 'Name',       value: collName        || '—' },
                 { label: 'Supply',     value: collection?.supply ? Number(collection.supply).toLocaleString() : '—' },
                 { label: 'Blockchain', value: collection?.network || collection?.blockchain || '—' },
-                { label: 'Format',     value: collection?.formatType ? collection.formatType.toUpperCase() : '—' },
+                { label: 'Format',     value: collection?.format ? collection.format.toUpperCase() : '—' },
                 { label: 'Resolution', value: (collection?.width && collection?.height) ? collection.width + '×' + collection.height : '—' },
               ].map(item => (
                 <div key={item.label} className="exp-summary-stat">

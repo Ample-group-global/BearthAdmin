@@ -132,7 +132,7 @@ export function HLayerFilter({ layer, activeFilter, onTraitClick }) {
       {open && (
         <div className="exp-hfl-dropdown">
           {[...layer.assets]
-            .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+            .sort((a, b) => a.stem.localeCompare(b.stem, undefined, { numeric: true, sensitivity: 'base' }))
             .map(a => (
               <button
                 key={a.stem}

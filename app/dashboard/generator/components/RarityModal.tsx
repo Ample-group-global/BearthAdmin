@@ -2,7 +2,7 @@
 'use client';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { TIER_PRESET_WEIGHTS, TIERS, getTier } from '../../../../lib/studio/tiers';
-import { calcRarity, positionForProb } from '../../../../lib/studio/probability';
+import { calcRarity } from '../../../../lib/studio/probability';
 import { useLayerFiles } from '../LayerFilesContext';
 import RulesTabContent from './RulesTabContent';
 
@@ -54,13 +54,17 @@ export default function RarityModal({
   }, [focusStem]);
 
   const [tab, setTab] = useState<'assets' | 'rules'>('assets');
+  const [compact, setCompact] = useState(false);
   const [name, setName] = useState(layer.label ?? layer.folder);
   const [rarityPct, setRarityPct] = useState(layer.rarityPct ?? 100);
   const [traitNames, setTraitNames] = useState<Record<string, string>>(() =>
     Object.fromEntries(layer.assets.map(a => [a.stem, a.name])));
   const [weightInputOpen, setWeightInputOpen] = useState<Record<string, boolean>>({});
 
-  const totalW = useMemo(() => Object.values(localWs).reduce((a, b) => a + b, 0), [localWs]);
+  const totalW  = useMemo(() => Object.values(localWs).reduce((a, b) => a + b, 0), [localWs]);
+  // sliderMax scales with the heaviest trait so the thumb and tier-zone bar
+  // stay meaningful even when weights are large (e.g. Excel-imported 82-820).
+  const sliderMax = useMemo(() => Math.max(100, ...Object.values(localWs)), [localWs]);
 
   const setW = useCallback((stem, val) => {
     setLocalWs(prev => ({ ...prev, [stem]: Math.max(0, val) }));
@@ -118,8 +122,10 @@ export default function RarityModal({
     : (conflicts ?? []).length;
 
   return (
-    <div className="rm-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="rm-modal">
+    <div className="rm-overlay"
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div className="rm-modal" style={compact ? { maxHeight: '90vh', overflowY: 'auto' } : undefined}>
         {/* Header */}
         <div className="rm-header">
           <div>
@@ -129,8 +135,8 @@ export default function RarityModal({
           <button className="rm-close" onClick={onClose}>✕</button>
         </div>
 
-        {/* Layer Metadata */}
-        {onSaveLayerMeta && (
+        {/* Layer Metadata — hidden on Rules tab (keeps room for dropdown to open downward) */}
+        {onSaveLayerMeta && tab !== 'rules' && (
           <div style={{ padding: '14px 20px 4px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>Layer Metadata</div>
             <div style={{ fontSize: 11.5, color: 'var(--dim)', marginBottom: 10 }}>Layer details appearing in the token metadata.</div>
@@ -166,7 +172,11 @@ export default function RarityModal({
         )}
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 20, padding: '14px 20px 0', borderBottom: '1px solid var(--border)' }}>
+        <div style={{
+          display: 'flex', alignItems: 'flex-end', gap: 20, padding: '14px 20px 0',
+          borderBottom: '1px solid var(--border)',
+          ...(compact ? { position: 'sticky', top: 0, background: 'var(--bg1)', zIndex: 10 } : {}),
+        }}>
           <button
             onClick={() => setTab('assets')}
             style={{
@@ -185,27 +195,145 @@ export default function RarityModal({
               }}
             >Rules <span style={{ opacity: .6, fontWeight: 500 }}>{layerRuleCount}</span></button>
           )}
+          {(tab === 'assets' || tab === 'rules') && (
+            <button
+              onClick={() => setCompact(c => !c)}
+              title={compact ? 'Switch to detailed view' : 'Switch to compact view'}
+              style={{
+                marginLeft: 'auto', marginBottom: 10,
+                background: compact ? 'var(--bg2)' : 'none',
+                border: '1px solid var(--border2)', borderRadius: 6,
+                padding: '3px 10px', fontSize: 11, fontWeight: 600,
+                color: compact ? 'var(--text)' : 'var(--dim)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}
+            >
+              <span style={{ fontSize: 13, lineHeight: 1 }}>{compact ? '▤' : '☰'}</span>
+              {compact ? 'Detailed' : 'Compact'}
+            </button>
+          )}
         </div>
 
         {tab === 'rules' && onSaveConflicts ? (
-          <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1 }}>
-            <RulesTabContent layer={layer} layers={allLayers ?? [layer]} rules={conflicts} onChange={onSaveConflicts} />
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <RulesTabContent layer={layer} layers={allLayers ?? [layer]} rules={conflicts} onChange={onSaveConflicts} compact={compact} />
           </div>
         ) : (
         <>
         {/* Asset List */}
-        <div className="rm-list rm-list-v2" ref={listRef}>
-          {layer.assets.map(asset => {
+        <div
+          className="rm-list rm-list-v2"
+          ref={listRef}
+          style={compact ? { maxHeight: 'none', overflow: 'visible' } : undefined}
+        >
+          {[...layer.assets]
+            .sort((a, b) => a.stem.localeCompare(b.stem, undefined, { numeric: true, sensitivity: 'base' }))
+            .map((asset, idx) => {
             const w = localWs[asset.stem] ?? 1;
             const { pct, tier } = calcRarity(w, totalW, supply);
             const enabled = w > 0;
 
-            // Same tier-zone gradient math as the per-card modal (AssetCard.tsx) —
-            // reused here so the slider reads identically in both places.
-            const otherW = Math.max(0, totalW - w);
-            const lPos = positionForProb(otherW, 0.01);
-            const ePos = positionForProb(otherW, 0.05);
-            const rPos = positionForProb(otherW, 0.15);
+            if (compact) {
+              // ── Compact row (no slider, no tier-zone bar) ──────────────────
+              return (
+                <div
+                  key={asset.stem}
+                  data-stem={asset.stem}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '0 14px', height: 38,
+                    borderBottom: '1px solid var(--border)',
+                    background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.03)',
+                    opacity: enabled ? 1 : 0.4,
+                  }}
+                >
+                  {/* Tier-coloured enable dot */}
+                  <button
+                    onClick={() => setW(asset.stem, enabled ? 0 : (asset.defaultWeight ?? 1))}
+                    title={enabled ? 'Disable trait' : 'Enable trait'}
+                    style={{
+                      width: 9, height: 9, borderRadius: '50%', border: 'none', padding: 0,
+                      background: enabled ? tier.color : 'var(--border2)',
+                      cursor: 'pointer', flexShrink: 0,
+                      boxShadow: enabled ? `0 0 5px ${tier.color}80` : 'none',
+                    }}
+                  />
+
+                  {/* Tiny thumbnail */}
+                  <div style={{
+                    width: 26, height: 26, flexShrink: 0, borderRadius: 4,
+                    overflow: 'hidden', background: 'var(--bg2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {asset.rel
+                      ? <img src={getBlobUrl(asset.rel) ?? `/api/thumb/${asset.rel}`} alt={asset.name}
+                          loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                      : <span style={{ fontSize: 8, color: 'var(--xdim)', fontWeight: 600 }}>NONE</span>
+                    }
+                  </div>
+
+                  {/* Stem (monospace accent) */}
+                  <span style={{
+                    fontFamily: 'monospace', fontSize: 12, fontWeight: 700,
+                    color: 'var(--accent)', flexShrink: 0, minWidth: 38,
+                  }}>{asset.stem}</span>
+
+                  {/* Display name (if different from stem) */}
+                  <span style={{
+                    fontSize: 12, color: 'var(--muted)', flex: 1,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {(traitNames[asset.stem] ?? asset.name) !== asset.stem
+                      ? (traitNames[asset.stem] ?? asset.name) : ''}
+                  </span>
+
+                  {/* Tier dropdown — compact */}
+                  <select
+                    value={localTiers[asset.stem] ?? capitalise(asset.rarityTier ?? 'common')}
+                    onChange={e => applyTier(asset, e.target.value)}
+                    style={{
+                      fontSize: 11, fontWeight: 700, color: tier.color,
+                      background: 'var(--bg0)', border: '1px solid var(--border2)',
+                      borderRadius: 5, padding: '2px 5px', cursor: 'pointer', flexShrink: 0,
+                    }}
+                  >
+                    <option value="Legendary">Legendary</option>
+                    <option value="Epic">Epic</option>
+                    <option value="Rare">Rare</option>
+                    <option value="Common">Common</option>
+                  </select>
+
+                  {/* % chip */}
+                  <span style={{
+                    fontSize: 12, fontWeight: 700, color: 'var(--muted)',
+                    minWidth: 42, textAlign: 'right', flexShrink: 0,
+                  }}>
+                    <span style={{ color: tier.color, opacity: 0.8, marginRight: 1 }}>◈</span>{pct}%
+                  </span>
+
+                  {/* Delete */}
+                  {asset.rel && (
+                    <button
+                      title="Delete trait"
+                      onClick={() => { if (!confirm(`Delete "${asset.name}"? This cannot be undone.`)) return; onDelete?.(asset); }}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        fontSize: 13, color: 'var(--xdim)', padding: '0 2px',
+                        lineHeight: 1, flexShrink: 0,
+                      }}
+                    >🗑</button>
+                  )}
+                </div>
+              );
+            }
+
+            // ── Detailed row (original) ─────────────────────────────────────
+            // Bar color follows the dropdown tier the user assigned (not the
+            // computed probability tier) so the visual matches their intent.
+            const dropdownTierColor = TIER_LABELS.find(
+              t => t.label === (localTiers[asset.stem] ?? '')
+            )?.color ?? tier.color;
+            const fillPct = sliderMax > 0 ? Math.min(100, (w / sliderMax) * 100) : 0;
 
             return (
               <div key={asset.stem} data-stem={asset.stem} className={`rm-row-v2${enabled ? '' : ' rm-row-disabled'}`}>
@@ -238,7 +366,6 @@ export default function RarityModal({
                   onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                 />
 
-                {/* Rarity tier quick-picker — immediately saves tier + preset weight */}
                 <select
                   className="rm-tier-select"
                   data-stem={asset.stem}
@@ -261,25 +388,29 @@ export default function RarityModal({
                 </div>
 
                 <div className="rm-tierzone-col">
-                  <div className="rm-tier-bar">
-                    <div className="rm-tier-zone" style={{ width: `${lPos}%`, background: '#F59E0B' }} title="Legendary" />
-                    <div className="rm-tier-zone" style={{ width: `${Math.max(0, ePos - lPos)}%`, background: '#A855F7' }} title="Epic" />
-                    <div className="rm-tier-zone" style={{ width: `${Math.max(0, rPos - ePos)}%`, background: '#3B82F6' }} title="Rare" />
-                    <div className="rm-tier-zone" style={{ width: `${Math.max(0, 100 - rPos)}%`, background: '#6B7280' }} title="Common" />
+                  {/* Fill bar: color = dropdown tier, width = weight proportion */}
+                  <div className="rm-tier-bar" style={{ position: 'relative', overflow: 'hidden' }}>
+                    <div style={{
+                      position: 'absolute', inset: 0,
+                      background: `${dropdownTierColor}22`,
+                    }} />
+                    <div style={{
+                      position: 'absolute', top: 0, left: 0, bottom: 0,
+                      width: `${fillPct}%`,
+                      background: dropdownTierColor,
+                      opacity: 0.55,
+                      transition: 'width .1s',
+                    }} />
                   </div>
                   <input
                     className="rm-slider rm-slider-v2"
                     type="range"
-                    min="0" max="100" step="0.5"
-                    value={Math.min(w, 100)}
+                    min="0"
+                    max={sliderMax}
+                    step={Math.max(1, Math.ceil(sliderMax / 200))}
+                    value={w}
                     onChange={e => setW(asset.stem, parseFloat(e.target.value))}
                   />
-                  <div className="rm-tier-labels-row">
-                    <span style={{ color: '#F59E0B' }}>Legendary</span>
-                    <span style={{ color: '#A855F7' }}>Epic</span>
-                    <span style={{ color: '#3B82F6' }}>Rare</span>
-                    <span style={{ color: '#6B7280' }}>Common</span>
-                  </div>
                 </div>
 
                 <button
@@ -316,7 +447,10 @@ export default function RarityModal({
         )}
 
         {/* Footer */}
-        <div className="rm-footer">
+        <div
+          className="rm-footer"
+          style={compact ? { position: 'sticky', bottom: 0, background: 'var(--bg1)', zIndex: 10 } : undefined}
+        >
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={handleSave}>Save Rarity</button>
         </div>

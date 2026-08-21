@@ -193,7 +193,9 @@ export default function LayerContent({ layer, layerWeights, allWeights, supply, 
           {/* Existing files list */}
           {layer.assets.length > 0 && (
             <div className="lc-file-grid">
-              {layer.assets.map(asset => (
+              {[...layer.assets]
+                .sort((a, b) => a.stem.localeCompare(b.stem, undefined, { numeric: true, sensitivity: 'base' }))
+                .map(asset => (
                 <div key={asset.stem} className="lc-file-card">
                   <div className="lc-file-thumb">
                     {asset.rel ? (

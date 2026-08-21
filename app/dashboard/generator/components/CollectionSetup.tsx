@@ -22,12 +22,11 @@ function clientGetName(folder, stem, rel) {
         return d1.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim();
     }
   }
-  // Flat numeric stem (e.g. "0-1", "2-5") → "LayerLabel N"
-  const folderNum = (folder.match(/^(\d+)/) || [])[1] || '';
-  const inner = folderNum ? stem.replace(new RegExp('^' + folderNum + '[-_]'), '') : stem;
-  const firstSeg = inner.split(/[-_]/)[0];
-  if (firstSeg && /^\d+$/.test(firstSeg))
-    return deriveLabelFromFolder(folder) + ' ' + firstSeg;
+  // Numeric stem (e.g. "1-7", "2-14") — use the stem as-is.
+  // DB holds proper names set by the artist; this is just a local placeholder.
+  if (/^\d+-\d+$/.test(stem)) return stem;
+  // Non-numeric: derive a readable label from the stem text
+  const inner = stem.replace(/^\d+[-_]/, '') || stem;
   return inner.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim() || stem;
 }
 

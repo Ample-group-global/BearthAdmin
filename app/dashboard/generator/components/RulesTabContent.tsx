@@ -41,6 +41,11 @@ function TraitThumb({ rel, name }) {
   ) : <div style={{ width: 22, height: 22, flexShrink: 0 }} />;
 }
 
+function traitLabel(a) {
+  const name = a.name && a.name !== a.stem ? a.name : '';
+  return name ? `${a.stem} · ${name}` : a.stem;
+}
+
 // IF side — single-select, scoped to the current layer's own assets only.
 function IfTraitDropdown({ assets, value, onChange }) {
   const [open, setOpen] = useState(false);
@@ -49,17 +54,20 @@ function IfTraitDropdown({ assets, value, onChange }) {
   const selected = assets.find(a => a.stem === value);
 
   return (
-    <div ref={ref} style={{ position: 'relative', flex: 1, minWidth: 160 }}>
+    <div ref={ref} style={{ position: 'relative', flex: 1, minWidth: 180 }}>
       <button type="button" data-testid="rt-if-btn" onClick={() => setOpen(o => !o)} style={ddBtn}>
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected ? selected.name : 'Select a trait'}</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected ? traitLabel(selected) : 'Select a trait'}</span>
         <span style={{ opacity: .5 }}>⌄</span>
       </button>
       {open && (
         <div style={ddPanel}>
-          {assets.map(a => (
+          {[...assets]
+            .sort((a, b) => a.stem.localeCompare(b.stem, undefined, { numeric: true, sensitivity: 'base' }))
+            .map(a => (
             <div key={a.stem} data-stem={a.stem} onClick={() => { onChange(a.stem); setOpen(false); }} style={ddRow}>
               <TraitThumb rel={a.rel} name={a.name} />
-              <span>{a.name}</span>
+              <span style={{ fontFamily: 'monospace', fontSize: 11.5, color: 'var(--accent)', flexShrink: 0 }}>{a.stem}</span>
+              {a.name && a.name !== a.stem && <span style={{ color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>}
             </div>
           ))}
         </div>
@@ -110,14 +118,17 @@ function ThenTraitDropdown({ layers, value, onChange }) {
           {filtered.map(l => (
             <div key={l.folder} style={{ marginBottom: 6 }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--muted)', padding: '4px 4px 2px' }}>{l.label}</div>
-              {l.assets.map(a => {
+              {[...l.assets]
+                .sort((a, b) => a.stem.localeCompare(b.stem, undefined, { numeric: true, sensitivity: 'base' }))
+                .map(a => {
                 const key = `${l.folder}::${a.stem}`;
                 const checked = value.includes(key);
                 return (
                   <label key={a.stem} onClick={e => { e.preventDefault(); toggle(l.folder, a.stem); }} style={{ ...ddRow, color: checked ? 'var(--accent2)' : 'var(--muted)', fontWeight: checked ? 700 : 400 }}>
                     <input type="checkbox" checked={checked} readOnly style={{ accentColor: 'var(--accent)', pointerEvents: 'none' }} />
                     <TraitThumb rel={a.rel} name={a.name} />
-                    <span>{a.name}</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: 11, color: checked ? 'var(--accent)' : 'var(--accent)', opacity: checked ? 1 : 0.7, flexShrink: 0 }}>{a.stem}</span>
+                    {a.name && a.name !== a.stem && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>}
                   </label>
                 );
               })}
@@ -145,14 +156,18 @@ const ddRow: React.CSSProperties = {
   cursor: 'pointer', fontSize: 12.5, color: 'var(--muted)',
 };
 
-export default function RulesTabContent({ layer, layers, rules: initialRules, onChange }) {
+export default function RulesTabContent({ layer, layers, rules: initialRules, onChange, compact = false }) {
   const [rules, setRules]         = useState(() => normalizeRules(initialRules));
   const [ruleType, setRuleType]   = useState<'exclude' | 'force'>('force');
   const [ifTrait, setIfTrait]     = useState('');
   const [thenKeys, setThenKeys]   = useState<string[]>([]);
 
   const getLabel     = (folder) => layers.find(l => l.folder === folder)?.label ?? folder;
-  const getTraitName = (folder, stem) => layers.find(l => l.folder === folder)?.assets.find(a => a.stem === stem)?.name ?? stem;
+  const getTraitName = (folder, stem) => {
+    const a = layers.find(l => l.folder === folder)?.assets.find(a => a.stem === stem);
+    if (!a) return stem;
+    return a.name && a.name !== stem ? `${stem} · ${a.name}` : stem;
+  };
 
   function commit(next: typeof rules) {
     setRules(next);
@@ -196,37 +211,81 @@ export default function RulesTabContent({ layer, layers, rules: initialRules, on
     commit([]);
   }
 
+  const typeBadge = (type: string) => ({
+    display: 'inline-block' as const, fontSize: 9, fontWeight: 800, letterSpacing: .6,
+    padding: '2px 7px', borderRadius: 9, marginRight: 6, textTransform: 'uppercase' as const,
+    background: type === 'exclude' ? 'rgba(239,68,68,.12)' : 'rgba(99,102,241,.12)',
+    color:      type === 'exclude' ? '#ef4444'              : 'var(--accent)',
+    border:     `1px solid ${type === 'exclude' ? 'rgba(239,68,68,.3)' : 'rgba(99,102,241,.3)'}`,
+  });
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 14, lineHeight: 1.5 }}>
-        A rule allows you to <b>force</b> or <b>block</b> certain traits to match together. If you have too many rules, consider deleting unused ones.
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%' }}>
+      {/* Fixed header: description + add-rule row */}
+      <div style={{ flexShrink: 0, padding: '12px 20px 0' }}>
+        <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 12, lineHeight: 1.5 }}>
+          A rule allows you to <b>force</b> or <b>block</b> certain traits to match together. If you have too many rules, consider deleting unused ones.
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
+          <IfTraitDropdown assets={layer.assets} value={ifTrait} onChange={setIfTrait} />
+          <select data-testid="rt-type-select" value={ruleType} onChange={e => setRuleType(e.target.value as 'exclude' | 'force')} style={{ ...ddBtn, width: 'auto', cursor: 'pointer' }}>
+            <option value="force">⚡ force</option>
+            <option value="exclude">⃠ block</option>
+          </select>
+          <ThenTraitDropdown layers={layers} value={thenKeys} onChange={setThenKeys} />
+          <button data-testid="rt-add-rule" className="btn btn-primary" disabled={!ifTrait || thenKeys.length === 0} onClick={addRule} style={{ whiteSpace: 'nowrap' }}>Add Rule</button>
+          <button data-testid="rt-delete-all" className="btn btn-ghost" onClick={deleteAll} style={{ whiteSpace: 'nowrap' }}>Delete All</button>
+        </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 16 }}>
-        <IfTraitDropdown assets={layer.assets} value={ifTrait} onChange={setIfTrait} />
-        <select data-testid="rt-type-select" value={ruleType} onChange={e => setRuleType(e.target.value as 'exclude' | 'force')} style={{ ...ddBtn, width: 'auto', cursor: 'pointer' }}>
-          <option value="force">⚡ force</option>
-          <option value="exclude">⃠ block</option>
-        </select>
-        <ThenTraitDropdown layers={layers} value={thenKeys} onChange={setThenKeys} />
-        <button data-testid="rt-add-rule" className="btn btn-primary" disabled={!ifTrait || thenKeys.length === 0} onClick={addRule} style={{ whiteSpace: 'nowrap' }}>Add Rule</button>
-        <button data-testid="rt-delete-all" className="btn btn-ghost" onClick={deleteAll} style={{ whiteSpace: 'nowrap' }}>Delete All</button>
-      </div>
-
-      {rules.length > 0 && (
-        <div style={{ overflowY: 'auto', maxHeight: 220 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {rules.map(rule => (
+      {/* Scrollable rules list — fills remaining space */}
+      {rules.length > 0 ? (
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 20px 12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? 1 : 6 }}>
+            {rules.map((rule, idx) => compact ? (
+              /* ── Compact single-row rule ── */
+              <div key={rule.id} style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '0 10px', height: 40,
+                borderBottom: '1px solid var(--border)',
+                background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.03)',
+              }}>
+                <span style={typeBadge(rule.type)}>{rule.type === 'exclude' ? 'BLOCK' : 'FORCE'}</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--accent2)', fontWeight: 600, flexShrink: 0 }}>
+                  {rule.ifTrait}
+                </span>
+                <span style={{ color: 'var(--dim)', fontSize: 12 }}>→</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', flexShrink: 0 }}>
+                  {getLabel(rule.thenLayer)}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--dim)', flexShrink: 0 }}>:</span>
+                {/* First 4 trait stems as chips */}
+                {rule.thenTraits.slice(0, 4).map(stem => (
+                  <span key={stem} style={{
+                    fontFamily: 'monospace', fontSize: 11, fontWeight: 600,
+                    background: 'var(--bg2)', border: '1px solid var(--border)',
+                    borderRadius: 5, padding: '1px 6px',
+                    color: rule.type === 'exclude' ? '#ef4444' : 'var(--accent)',
+                    flexShrink: 0,
+                  }}>{stem}</span>
+                ))}
+                {rule.thenTraits.length > 4 && (
+                  <span style={{ fontSize: 11, color: 'var(--dim)', flexShrink: 0 }}>
+                    +{rule.thenTraits.length - 4} more
+                  </span>
+                )}
+                <button
+                  className="btn btn-ghost"
+                  style={{ padding: '2px 6px', fontSize: 11, marginLeft: 'auto', flexShrink: 0 }}
+                  onClick={() => removeRule(rule.id)}
+                >✕</button>
+              </div>
+            ) : (
+              /* ── Expanded card rule ── */
               <div key={rule.id} style={{ background: 'var(--bg0)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                   <div style={{ flex: 1, fontSize: 12, lineHeight: 1.6 }}>
-                    <span style={{
-                      display: 'inline-block', fontSize: 9, fontWeight: 800, letterSpacing: .6,
-                      padding: '2px 7px', borderRadius: 9, marginRight: 6, textTransform: 'uppercase',
-                      background: rule.type === 'exclude' ? 'rgba(239,68,68,.12)' : 'rgba(99,102,241,.12)',
-                      color:      rule.type === 'exclude' ? '#ef4444'              : 'var(--accent)',
-                      border:     `1px solid ${rule.type === 'exclude' ? 'rgba(239,68,68,.3)' : 'rgba(99,102,241,.3)'}`,
-                    }}>{rule.type === 'exclude' ? 'BLOCK' : 'FORCE'}</span>
+                    <span style={typeBadge(rule.type)}>{rule.type === 'exclude' ? 'BLOCK' : 'FORCE'}</span>
                     <span style={{ color: 'var(--dim)' }}>IF </span>
                     <span style={{ fontWeight: 600 }}>{getLabel(rule.ifLayer)}</span>
                     <span style={{ color: 'var(--dim)' }}> › </span>
@@ -253,6 +312,10 @@ export default function RulesTabContent({ layer, layers, rules: initialRules, on
               </div>
             ))}
           </div>
+        </div>
+      ) : (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: 12, color: 'var(--xdim)' }}>No rules yet. Add one above.</span>
         </div>
       )}
     </div>
