@@ -11,7 +11,7 @@
  *   Waves 3–7: revealed=true (internal), close_action=treasury, treasury_recipient=null
  *               delivery_status = treasury_wallet (all NFTs minted to treasury)
  *
- * Smart contract rule (BearthGenesisNFT.sol treasuryClose):
+ * Smart contract rule (BearthNFT.sol treasuryClose):
  *   Requires: waveEndTime set + block.timestamp > waveEndTime + waveRevealed=true
  *
  * What this phase tests:

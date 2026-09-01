@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import BearthNFTArtifact from "./BearthGenesisNFT.abi.json";
+import BearthNFTArtifact from "./BearthNFT.abi.json";
 import { getChainConfigOrDefault } from "./chains";
 
 export type MintPhase = 0 | 1 | 2;

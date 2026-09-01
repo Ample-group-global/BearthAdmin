@@ -115,7 +115,7 @@ export default function ContractOperationPage() {
           <div>
             <h1 className="text-lg font-bold" style={{ color: "#24315f" }}>Contract Operations</h1>
             <p className="text-xs mt-0.5" style={{ color: "#9bafc5" }}>
-              BearthGenesisNFT · Phase control · access control · reveal · emergency
+              BearthNFT · Phase control · access control · reveal · emergency
             </p>
           </div>
           <button onClick={load}

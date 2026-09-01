@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { ethers } from "ethers";
 import { useChain } from "@/lib/ChainContext";
-import BearthNFTArtifact from "@/lib/BearthGenesisNFT.abi.json";
+import BearthNFTArtifact from "@/lib/BearthNFT.abi.json";
 import { ipfsToGateway } from "@/lib/ipfs";
 import { ETH_ADDRESS_RE } from "@/lib/nft-constants";
 
